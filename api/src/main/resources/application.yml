@@ -1,0 +1,58 @@
+#-------------------------------------------------------
+# 服务全局配置文件
+#-------------------------------------------------------
+# 重要说明
+# 所有环境均使用此区域的配置。外部资源如数据库连接等可配置为开发
+# 环境使用的值，测试环境、预发布环境、线上环境请务必通过Apollo
+# 配置中心进行配置，切勿在此文件中定义
+#-------------------------------------------------------
+# ----- Schedule http://example.com/display/FWY/ke-infrastructure-schedule -----
+lianjia-schedule:
+  enabled: false
+  env: official_offline_3
+  project: ${spring.application.name}
+  token: xxxxxxxxxxxxxxxx
+lianjia:
+  # ----- Openiam验签鉴权组件(供服务提供方使用) http://example.com/project/1402/wiki/page/18528 -----
+  openiam:
+    client:
+      enabled: false
+      # 请在服务云上生成开发环境的ak/sk
+      access-key-id: <your-access-key-id>
+      access-key-secret: <your-access-key-secret>
+      target-uri: discovery://openiam
+    validation:
+      principal-detection-strategy: auto_detect_when_miss
+      default-fallback-strategy: accept
+      default-validation-strategy: authentication
+      # 请在服务云上IAM接入向导处获取开发环境的资源/动作前缀
+      resource-prefix: <your-resource-prefix>
+      action-prefix: <your-action-prefix>
+      http:
+        enabled: true
+        filter-uri: /api/**
+api:
+  # ----- api-signature请求加签组件(供服务调用方使用) http://example.com/project/1402/wiki/page/18501 -----
+  signature:
+    feign:
+      keychains:
+        example: { access-key-id: 123, access-key-secret: 456 }
+
+datasource:
+  use-dynamic: true
+  dynamic-default: master
+  pool:
+    master:
+      initial-size: 50
+      min-idle: 50
+      max-active: 100
+      url: ${DATASOURCE_POOL_MASTER_URL}
+      username: ${DATASOURCE_POOL_MASTER_USERNAME}
+      password: ${DATASOURCE_POOL_MASTER_PASSWORD}
+    slave:
+      initial-size: 100
+      min-idle: 100
+      max-active: 200
+      url: ${DATASOURCE_POOL_SLAVE_URL}
+      username: ${DATASOURCE_POOL_SLAVE_USERNAME}
+      password: ${DATASOURCE_POOL_SLAVE_PASSWORD}
