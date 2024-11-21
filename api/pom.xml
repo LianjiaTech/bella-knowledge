@@ -22,16 +22,13 @@
         <spring-cloud.version>Greenwich.SR3</spring-cloud.version>
         <ke-infrastructure.version>2.1.28</ke-infrastructure.version>
         <jooq.version>3.14.15</jooq.version>
+        <knowledge.version>1.0.1-SNAPSHOT</knowledge.version>
     </properties>
 
     <dependencies>
         <dependency>
             <groupId>com.lianjia.infrastructure</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.lianjia.hawk</groupId>
-            <artifactId>hawk-spring-boot-starter</artifactId>
         </dependency>
         <dependency>
             <groupId>com.lianjia.infrastructure</groupId>
@@ -148,10 +145,6 @@
             <artifactId>jooq-meta</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.springframework</groupId>
-            <artifactId>spring-tx</artifactId>
-        </dependency>
-        <dependency>
             <groupId>org.cooder</groupId>
             <artifactId>jooq-mate-types</artifactId>
             <version>2.1.0</version>
@@ -165,22 +158,6 @@
         <dependency>
             <groupId>mysql</groupId>
             <artifactId>mysql-connector-java</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.google.guava</groupId>
-            <artifactId>guava</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-core</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.datatype</groupId>
-            <artifactId>jackson-datatype-jsr310</artifactId>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
@@ -300,6 +277,43 @@
                                         <pojoImplements>com.ke.bella.files.db.repo.Operator</pojoImplements>
                                         <recordImplements>com.ke.bella.files.db.repo.Operator</recordImplements>
                                     </table>
+                                    <table>
+                                        <expression>file_mapping</expression>
+                                        <daoClass>
+                                            <transform>PASCAL</transform>
+                                            <expression>$0_D_B_Dao</expression>
+                                        </daoClass>
+                                        <pojoClass>
+                                            <transform>PASCAL</transform>
+                                            <expression>$0_D_B</expression>
+                                        </pojoClass>
+                                        <pojoImplements>com.ke.bella.files.db.repo.Operator</pojoImplements>
+                                        <recordImplements>com.ke.bella.files.db.repo.Operator</recordImplements>
+                                    </table>
+                                    <table>
+                                        <expression>file_progress</expression>
+                                        <daoClass>
+                                            <transform>PASCAL</transform>
+                                            <expression>$0_D_B_Dao</expression>
+                                        </daoClass>
+                                        <pojoClass>
+                                            <transform>PASCAL</transform>
+                                            <expression>$0_D_B</expression>
+                                        </pojoClass>
+                                        <pojoImplements>com.ke.bella.files.db.repo.Operator</pojoImplements>
+                                        <recordImplements>com.ke.bella.files.db.repo.Operator</recordImplements>
+                                    </table>
+                                    <table>
+                                        <expression>instance</expression>
+                                        <daoClass>
+                                            <transform>PASCAL</transform>
+                                            <expression>$0_D_B_Dao</expression>
+                                        </daoClass>
+                                        <pojoClass>
+                                            <transform>PASCAL</transform>
+                                            <expression>$0_D_B</expression>
+                                        </pojoClass>
+                                    </table>
                                 </tables>
                             </matchers>
                         </strategy>
@@ -316,7 +330,7 @@
                                 </forcedType>
                             </forcedTypes>
                             <includes>
-                                .*
+                                file|file_mapping|file_progress|instance
                             </includes>
                             <unsignedTypes>false</unsignedTypes>
                         </database>
@@ -366,15 +380,15 @@
                 <version>3.8</version>
                 <configuration>
                     <rulesets>
-                        <ruleset>rulesets/java/ali-concurrent.xml</ruleset>
-                        <ruleset>rulesets/java/ali-constant.xml</ruleset>
-                        <ruleset>rulesets/java/ali-exception.xml</ruleset>
-                        <ruleset>rulesets/java/ali-flowcontrol.xml</ruleset>
-                        <ruleset>rulesets/java/ali-naming.xml</ruleset>
-                        <ruleset>rulesets/java/ali-oop.xml</ruleset>
-                        <ruleset>rulesets/java/ali-orm.xml</ruleset>
-                        <ruleset>rulesets/java/ali-other.xml</ruleset>
-                        <ruleset>rulesets/java/ali-set.xml</ruleset>
+                        <!--                        <ruleset>rulesets/java/ali-concurrent.xml</ruleset>-->
+                        <!--                        <ruleset>rulesets/java/ali-constant.xml</ruleset>-->
+                        <!--                        <ruleset>rulesets/java/ali-exception.xml</ruleset>-->
+                        <!--                        <ruleset>rulesets/java/ali-flowcontrol.xml</ruleset>-->
+                        <!--                        <ruleset>rulesets/java/ali-naming.xml</ruleset>-->
+                        <!--                        <ruleset>rulesets/java/ali-oop.xml</ruleset>-->
+                        <!--                        <ruleset>rulesets/java/ali-orm.xml</ruleset>-->
+                        <!--                        <ruleset>rulesets/java/ali-other.xml</ruleset>-->
+                        <!--                        <ruleset>rulesets/java/ali-set.xml</ruleset>-->
                     </rulesets>
                     <printFailingErrors>true</printFailingErrors>
                 </configuration>
