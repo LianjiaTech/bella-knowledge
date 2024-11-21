@@ -2,23 +2,23 @@ package com.ke.bella.files.db.repo;
 
 public interface Operator extends Timed {
 
-	Long getId();
+    Long getId();
 
-	void setId(Long id);
+    void setId(Long id);
 
-	Long getCuid();
+    Long getCuid();
 
-	void setCuid(Long cuid);
+    void setCuid(Long cuid);
 
-	String getCuName();
+    String getCuName();
 
-	void setCuName(String cuName);
+    void setCuName(String cuName);
 
-	Long getMuid();
+    Long getMuid();
 
-	void setMuid(Long muid);
+    void setMuid(Long muid);
 
-	String getMuName();
+    String getMuName();
 
-	void setMuName(String muName);
+    void setMuName(String muName);
 }

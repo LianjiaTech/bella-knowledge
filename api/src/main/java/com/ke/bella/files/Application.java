@@ -4,7 +4,6 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 import com.ctrip.framework.apollo.spring.annotation.EnableApolloConfig;
-import com.ke.bella.openapi.login.config.EnableBellaLogin;
 
 /**
  * 服务启动类
