@@ -1,0 +1,31 @@
+#-------------------------------------------------------
+# 服务启动配置文件
+#-------------------------------------------------------
+# 重要说明
+# 此配置文件在服务启动时生效，可用于放置连接配置中心和服务注册发现
+# 前的配置。此处提供的配置值为开发环境使用。在测试、预览、线上环境
+# 中，setenv.sh文件中定义启动环境变量将覆盖这些值。
+#-------------------------------------------------------
+server:
+  port: ${PORT:8080}
+  dubbo-port: ${DUBBOPORT:11200}
+spring:
+  application:
+    name: example-file-api
+  config:
+    apollo:
+      server: http://example.com
+      environment: TEST
+      auto-update-injected: true
+  discovery:
+    client:
+      server-name: example.com
+      server-port: 10153
+  sentinel:
+    statistic:
+      max-rt-ms: 4900
+hawk:
+  app-name: ${spring.application.name}
+  server:
+    host: example.com
+    socket-port: 14604

@@ -59,3 +59,23 @@ logging:
     org:
       springframework: INFO
       jooq: DEBUG
+
+spring:
+  servlet:
+    multipart:
+      max-file-size: 512MB
+      max-request-size: 512MB
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+    default-property-inclusion: NON_NULL
+
+bella:
+  open_api_base: https://example.com
+
+file-api:
+  processer_name:
+    - indexing
+    - parser
+  file:
+    max_size_in_MB: 512
+    tmp_file_dir: /data0/www/privdata/example-file-api

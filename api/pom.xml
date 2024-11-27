@@ -165,10 +165,6 @@
             <optional>true</optional>
         </dependency>
         <dependency>
-            <groupId>org.springframework.kafka</groupId>
-            <artifactId>spring-kafka</artifactId>
-        </dependency>
-        <dependency>
             <groupId>com.googlecode.aviator</groupId>
             <artifactId>aviator</artifactId>
             <version>5.4.3</version>
@@ -187,6 +183,11 @@
         <dependency>
             <groupId>com.ke.bella.openapi</groupId>
             <artifactId>auth</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>com.ke.bella.openapi</groupId>
+            <artifactId>sdk</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
     </dependencies>
@@ -380,15 +381,15 @@
                 <version>3.8</version>
                 <configuration>
                     <rulesets>
-                        <!--                        <ruleset>rulesets/java/ali-concurrent.xml</ruleset>-->
-                        <!--                        <ruleset>rulesets/java/ali-constant.xml</ruleset>-->
-                        <!--                        <ruleset>rulesets/java/ali-exception.xml</ruleset>-->
-                        <!--                        <ruleset>rulesets/java/ali-flowcontrol.xml</ruleset>-->
-                        <!--                        <ruleset>rulesets/java/ali-naming.xml</ruleset>-->
-                        <!--                        <ruleset>rulesets/java/ali-oop.xml</ruleset>-->
-                        <!--                        <ruleset>rulesets/java/ali-orm.xml</ruleset>-->
-                        <!--                        <ruleset>rulesets/java/ali-other.xml</ruleset>-->
-                        <!--                        <ruleset>rulesets/java/ali-set.xml</ruleset>-->
+                        <ruleset>rulesets/java/ali-concurrent.xml</ruleset>
+                        <ruleset>rulesets/java/ali-constant.xml</ruleset>
+                        <ruleset>rulesets/java/ali-exception.xml</ruleset>
+                        <ruleset>rulesets/java/ali-flowcontrol.xml</ruleset>
+                        <ruleset>rulesets/java/ali-naming.xml</ruleset>
+                        <ruleset>rulesets/java/ali-oop.xml</ruleset>
+                        <ruleset>rulesets/java/ali-orm.xml</ruleset>
+                        <ruleset>rulesets/java/ali-other.xml</ruleset>
+                        <ruleset>rulesets/java/ali-set.xml</ruleset>
                     </rulesets>
                     <printFailingErrors>true</printFailingErrors>
                 </configuration>
