@@ -8,12 +8,12 @@ public class Configs {
     public static Long MAX_SIZE_IN_MB;
     public static String OPEN_API_BASE;
 
-    @Value("${file-api.file.max_size_in_MB}")
+    @Value("${file-api.file.max-size-in-MB}")
     public void setMaxSizeInMB(Long maxSizeInMB) {
         MAX_SIZE_IN_MB = maxSizeInMB;
     }
 
-    @Value("${bella.open_api_base}")
+    @Value("${bella.open-api-base}")
     public void setOpenApiBase(String openApiBase) {
         OPEN_API_BASE = openApiBase;
     }

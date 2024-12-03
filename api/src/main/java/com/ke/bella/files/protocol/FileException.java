@@ -23,9 +23,9 @@ public class FileException {
     }
 
     public static class FileTooLargeException extends IllegalStateException {
-        public FileTooLargeException(Long fileSize, String fileName) {
+        public FileTooLargeException(Long fileSize, String filename) {
             super(String.format("File size exceeds the maximum limit of %dMB. File size: %.1fMB. Filename: %s.", MAX_SIZE_IN_MB,
-                    fileSize / (1024.0 * 1024.0), fileName));
+                    fileSize / (1024.0 * 1024.0), filename));
         }
     }
 }
