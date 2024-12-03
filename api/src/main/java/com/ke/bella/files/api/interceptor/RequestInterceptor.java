@@ -1,6 +1,6 @@
 package com.ke.bella.files.api.interceptor;
 
-import static com.ke.bella.files.configuration.Configs.OPEN_API_BASE;
+import static com.ke.bella.files.utils.OpenapiUtils.openapiClient;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -13,12 +13,9 @@ import com.ke.bella.files.BellaContext;
 import com.ke.bella.files.api.Operator;
 import com.ke.bella.files.protocol.FileException.AuthorizationException;
 import com.ke.bella.openapi.apikey.ApikeyInfo;
-import com.ke.bella.openapi.client.OpenapiClient;
 
 @Component
-public class FileInterceptor extends HandlerInterceptorAdapter {
-
-    private static final OpenapiClient openapiClient = new OpenapiClient(OPEN_API_BASE);
+public class RequestInterceptor extends HandlerInterceptorAdapter {
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {

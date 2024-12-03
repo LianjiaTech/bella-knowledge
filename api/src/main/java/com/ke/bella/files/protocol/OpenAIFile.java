@@ -12,8 +12,8 @@ import lombok.experimental.SuperBuilder;
 public class OpenAIFile {
     private String id;
     private Long bytes;
-    private Long create_at;
-    private String fileName;
+    private Long createAt;
+    private String filename;
     private String object = "file";
     /**
      * assistants
@@ -28,5 +28,5 @@ public class OpenAIFile {
     @Deprecated
     private String status;
     @Deprecated
-    private String status_details;
+    private String statusDetails;
 }

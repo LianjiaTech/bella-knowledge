@@ -36,20 +36,26 @@ import com.ke.bella.files.protocol.UpdateProgressRequestData;
 import com.ke.bella.files.service.FileService;
 import com.ke.bella.files.utils.FileExtensionDetectUtil;
 
+import lombok.extern.slf4j.Slf4j;
+
 @FileAPI
 @RestController
 @RequestMapping("/v1/files")
+@Slf4j
 public class FileController {
 
     @Autowired
     FileService fileService;
 
-    @Value("${file-api.file.tmp_file_dir}")
+    @Value("${file-api.file.tmp-file-dir}")
     private String tmpFileDir;
 
     @PostMapping
-    public OpenAIFile upload(@RequestPart(value = "file") MultipartFile file, @RequestParam(value = "purpose", required = false) String purpose,
-            @RequestParam(value = "meta_data", required = false) String metaData) throws IOException {
+    public OpenAIFile upload(
+            @RequestPart(value = "file") MultipartFile file,
+            @RequestParam(value = "purpose", required = false) String purpose,
+            @RequestParam(value = "metadata", required = false) String metadata) throws IOException {
+
         long maxSizeInBytes = MAX_SIZE_IN_MB * 1024 * 1024; // 512MB in bytes
         long fileSize = file.getSize();
         if(fileSize > maxSizeInBytes) {
@@ -62,7 +68,7 @@ public class FileController {
             File tmpDir = new File(tmpFileDir);
             tmpFile = File.createTempFile("tmp", suffix, tmpDir);
             file.transferTo(tmpFile);
-            return fileService.upload(tmpFile, file.getOriginalFilename(), purpose, metaData, extension);
+            return fileService.upload(tmpFile, file.getOriginalFilename(), purpose, metadata, extension);
         } finally {
             if(tmpFile != null) {
                 boolean deleteSuccess = tmpFile.delete();
@@ -95,7 +101,7 @@ public class FileController {
     @GetMapping("/{file_id}/content")
     public void retrieveContent(HttpServletResponse response, @PathVariable("file_id") String fileId) {
         try (InputStream inputStream = fileService.retrieveContent(fileId)) {
-            String fileName = fileService.get(fileId).getFileName();
+            String fileName = fileService.get(fileId).getFilename();
             Optional<MediaType> mediaType = MediaTypeFactory.getMediaType(fileName);
             String contentType = mediaType.orElse(MediaType.APPLICATION_OCTET_STREAM).toString();
             response.setContentType(contentType);
