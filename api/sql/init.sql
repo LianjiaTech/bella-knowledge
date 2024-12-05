@@ -20,6 +20,7 @@ CREATE TABLE `file`
     `meta_data`  text,
     `status`     tinyint(1)      NOT NULL DEFAULT 0 COMMENT '文件是否被删除，0表示未删除，-1表示已删除',
     `ak_code`    varchar(128)    NOT NULL DEFAULT '' COMMENT '',
+    `broadcast_status` bigint    NOT NULL DEFAULT 0 COMMENT '文件是否被广播成功，0表示广播失败，1表示广播成功',
     PRIMARY KEY (`id`),
     UNIQUE KEY `idx_file_space` (`file_id`, `space_code`) USING BTREE,
 ) ENGINE = InnoDB

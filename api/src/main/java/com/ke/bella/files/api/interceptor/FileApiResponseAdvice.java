@@ -3,8 +3,6 @@ package com.ke.bella.files.api.interceptor;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 
-import javax.naming.AuthenticationException;
-
 import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -17,11 +15,17 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
 
 import com.ke.bella.files.annotations.FileAPI;
-import com.ke.bella.files.protocol.BellaResponse;
+import com.ke.bella.files.protocol.CustomOpenAiError;
+import com.ke.bella.files.protocol.FileException.AuthorizationException;
+import com.ke.bella.files.protocol.FileException.FileNotFoundException;
+import com.ke.bella.files.protocol.FileException.FileTooLargeException;
+import com.ke.bella.files.protocol.FileException.ProgressNotFoundException;
 import com.ke.bella.files.utils.JsonUtils;
+import com.theokanning.openai.OpenAiError.OpenAiErrorDetails;
 
 import lombok.extern.slf4j.Slf4j;
 
+@FileAPI
 @RestControllerAdvice(annotations = FileAPI.class)
 @Slf4j
 public class FileApiResponseAdvice implements ResponseBodyAdvice<Object> {
@@ -42,41 +46,44 @@ public class FileApiResponseAdvice implements ResponseBodyAdvice<Object> {
             ServerHttpResponse response) {
         response.getHeaders().add("Cache-Control", "no-cache");
         response.getHeaders().add("Content-Type", "application/json;charset=UTF-8");
-        if(body instanceof BellaResponse) {
-            response.setStatusCode(HttpStatus.valueOf(((BellaResponse) body).getCode()));
+
+        if(body instanceof CustomOpenAiError) {
+            response.setStatusCode(HttpStatus.valueOf(((CustomOpenAiError) body).getCode()));
             return body;
         }
-        BellaResponse<Object> resp = new BellaResponse<>();
-        resp.setCode(200);
-        resp.setTimestamp(System.currentTimeMillis());
-        resp.setData(body);
+
         if(body instanceof String) {
-            return JsonUtils.toJson(resp);
+            return JsonUtils.toJson(body);
         }
-        return resp;
+        return body;
     }
 
     @ExceptionHandler(Exception.class)
     @ResponseBody
-    public BellaResponse<?> handleException(Exception e) {
+    public CustomOpenAiError handleException(Exception e) {
         int code = 500;
-        String msg = e.getLocalizedMessage();
-        if(e instanceof AuthenticationException) {
+        String errorType;
+        String msg = e.getMessage();
+        if(e instanceof AuthorizationException) {
             code = 401;
+        } else if(e instanceof FileNotFoundException || e instanceof ProgressNotFoundException) {
+            code = 404;
+        } else if(e instanceof FileTooLargeException) {
+            code = 413;
+        } else if(e instanceof IllegalArgumentException) {
+            code = 400;
         }
         if(code == 500) {
+            errorType = "internal_server_error";
             LOGGER.warn(e.getLocalizedMessage(), e);
         } else {
+            errorType = "invalid_request_error";
             LOGGER.info(e.getMessage());
         }
-
-        BellaResponse<?> resp = new BellaResponse<>();
-        resp.setCode(code);
-        resp.setTimestamp(System.currentTimeMillis());
-
-        if(code == 500) {
-            resp.setStacktrace(stacktrace(e));
-        }
-        return resp;
+        OpenAiErrorDetails openAiErrorDetails = new OpenAiErrorDetails(msg, errorType, null, null);
+        CustomOpenAiError customOpenAiError = new CustomOpenAiError();
+        customOpenAiError.setCode(code);
+        customOpenAiError.setError(openAiErrorDetails);
+        return customOpenAiError;
     }
 }

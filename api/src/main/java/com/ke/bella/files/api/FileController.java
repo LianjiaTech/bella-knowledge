@@ -47,7 +47,7 @@ public class FileController {
     @Autowired
     FileService fileService;
 
-    @Value("${file-api.file.tmp-file-dir}")
+    @Value("${bella.file-api.file.tmp-file-dir}")
     private String tmpFileDir;
 
     @PostMapping
