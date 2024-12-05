@@ -4,17 +4,12 @@ import static com.ke.bella.files.configuration.Configs.MAX_SIZE_IN_MB;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.util.Optional;
 
 import javax.servlet.http.HttpServletResponse;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.MediaTypeFactory;
-import org.springframework.util.StreamUtils;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -99,22 +94,19 @@ public class FileController {
     }
 
     @GetMapping("/{file_id}/content")
-    public void retrieveContent(HttpServletResponse response, @PathVariable("file_id") String fileId) {
-        try (InputStream inputStream = fileService.retrieveContent(fileId)) {
-            String fileName = fileService.get(fileId).getFilename();
-            Optional<MediaType> mediaType = MediaTypeFactory.getMediaType(fileName);
-            String contentType = mediaType.orElse(MediaType.APPLICATION_OCTET_STREAM).toString();
-            response.setContentType(contentType);
-            response.setHeader(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + fileName);
-            StreamUtils.copy(inputStream, response.getOutputStream());
-            response.flushBuffer();
-        } catch (IOException e) {
-            throw new IllegalStateException(e.getCause());
-        }
+    public void retrieveContentRedirect(
+            HttpServletResponse response,
+            @PathVariable("file_id") String fileId) {
+        FileUrl fileUrl = fileService.getUrl(fileId);
+        String redirectUrl = fileUrl.getS3Url();
+        response.setHeader(HttpHeaders.LOCATION, redirectUrl);
+        response.setStatus(HttpServletResponse.SC_MOVED_TEMPORARILY);
     }
 
     @GetMapping("/{file_id}/url")
-    public FileUrl getUrl(@PathVariable("file_id") String fileId, @RequestParam(value = "expires", required = false) Long expires) {
+    public FileUrl getUrl(
+            @PathVariable("file_id") String fileId,
+            @RequestParam(value = "expires", required = false, defaultValue = "86400") Long expires) {
         return fileService.getUrl(fileId, expires);
     }
 

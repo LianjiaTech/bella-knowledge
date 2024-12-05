@@ -1,6 +1,10 @@
 package com.ke.bella.files.service;
 
 import java.io.File;
+import java.net.URL;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.Date;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -37,5 +41,14 @@ public class AmazonS3Service {
             File file) {
         amazonS3.putObject(bucketName, fileKey, file);
         return fileKey;
+    }
+
+    public String signUrl(
+            String bucketName,
+            String fileKey,
+            Long expirationSeconds) {
+        Date expirationDate = Date.from(LocalDateTime.now().plusSeconds(expirationSeconds).atZone(ZoneId.systemDefault()).toInstant());
+        URL singedUrl = amazonS3.generatePresignedUrl(bucketName, fileKey, expirationDate);
+        return singedUrl.toString();
     }
 }
