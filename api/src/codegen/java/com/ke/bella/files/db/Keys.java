@@ -30,7 +30,6 @@ public class Keys {
     // UNIQUE and PRIMARY KEY definitions
     // -------------------------------------------------------------------------
 
-    public static final UniqueKey<FileRecord> KEY_FILE_IDX_FILE_ID = Internal.createUniqueKey(File.FILE, DSL.name("KEY_file_idx_file_id"), new TableField[] { File.FILE.FILE_ID }, true);
     public static final UniqueKey<FileRecord> KEY_FILE_IDX_FILE_SPACE = Internal.createUniqueKey(File.FILE, DSL.name("KEY_file_idx_file_space"), new TableField[] { File.FILE.FILE_ID, File.FILE.SPACE_CODE }, true);
     public static final UniqueKey<FileRecord> KEY_FILE_PRIMARY = Internal.createUniqueKey(File.FILE, DSL.name("KEY_file_PRIMARY"), new TableField[] { File.FILE.ID }, true);
     public static final UniqueKey<FileMappingRecord> KEY_FILE_MAPPING_PRIMARY = Internal.createUniqueKey(FileMapping.FILE_MAPPING, DSL.name("KEY_file_mapping_PRIMARY"), new TableField[] { FileMapping.FILE_MAPPING.ID }, true);

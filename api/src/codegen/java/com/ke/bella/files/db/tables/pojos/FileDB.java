@@ -34,6 +34,8 @@ public class FileDB implements Operator, Serializable {
     private LocalDateTime mtime;
     private String        metaData;
     private Integer       status;
+    private String        akCode;
+    private Long          broadcastStatus;
 
     public FileDB() {}
 
@@ -54,6 +56,8 @@ public class FileDB implements Operator, Serializable {
         this.mtime = value.mtime;
         this.metaData = value.metaData;
         this.status = value.status;
+        this.akCode = value.akCode;
+        this.broadcastStatus = value.broadcastStatus;
     }
 
     public FileDB(
@@ -72,7 +76,9 @@ public class FileDB implements Operator, Serializable {
         String        muName,
         LocalDateTime mtime,
         String        metaData,
-        Integer       status
+        Integer       status,
+        String        akCode,
+        Long          broadcastStatus
     ) {
         this.id = id;
         this.fileId = fileId;
@@ -90,6 +96,8 @@ public class FileDB implements Operator, Serializable {
         this.mtime = mtime;
         this.metaData = metaData;
         this.status = status;
+        this.akCode = akCode;
+        this.broadcastStatus = broadcastStatus;
     }
 
     /**
@@ -316,6 +324,34 @@ public class FileDB implements Operator, Serializable {
         this.status = status;
     }
 
+    /**
+     * Getter for <code>file.ak_code</code>.
+     */
+    public String getAkCode() {
+        return this.akCode;
+    }
+
+    /**
+     * Setter for <code>file.ak_code</code>.
+     */
+    public void setAkCode(String akCode) {
+        this.akCode = akCode;
+    }
+
+    /**
+     * Getter for <code>file.broadcast_status</code>. 文件是否被广播成功，0表示广播失败，1表示广播成功
+     */
+    public Long getBroadcastStatus() {
+        return this.broadcastStatus;
+    }
+
+    /**
+     * Setter for <code>file.broadcast_status</code>. 文件是否被广播成功，0表示广播失败，1表示广播成功
+     */
+    public void setBroadcastStatus(Long broadcastStatus) {
+        this.broadcastStatus = broadcastStatus;
+    }
+
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder("FileDB (");
@@ -336,6 +372,8 @@ public class FileDB implements Operator, Serializable {
         sb.append(", ").append(mtime);
         sb.append(", ").append(metaData);
         sb.append(", ").append(status);
+        sb.append(", ").append(akCode);
+        sb.append(", ").append(broadcastStatus);
 
         sb.append(")");
         return sb.toString();

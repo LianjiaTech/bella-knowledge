@@ -17,7 +17,7 @@ import org.jooq.ForeignKey;
 import org.jooq.Identity;
 import org.jooq.Name;
 import org.jooq.Record;
-import org.jooq.Row16;
+import org.jooq.Row18;
 import org.jooq.Schema;
 import org.jooq.Table;
 import org.jooq.TableField;
@@ -129,6 +129,16 @@ public class File extends TableImpl<FileRecord> {
      */
     public final TableField<FileRecord, Integer> STATUS = createField(DSL.name("status"), SQLDataType.INTEGER.nullable(false).defaultValue(DSL.inline("0", SQLDataType.INTEGER)), this, "文件是否被删除，0表示未删除，-1表示已删除");
 
+    /**
+     * The column <code>file.ak_code</code>.
+     */
+    public final TableField<FileRecord, String> AK_CODE = createField(DSL.name("ak_code"), SQLDataType.VARCHAR(128).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "");
+
+    /**
+     * The column <code>file.broadcast_status</code>. 文件是否被广播成功，0表示广播失败，1表示广播成功
+     */
+    public final TableField<FileRecord, Long> BROADCAST_STATUS = createField(DSL.name("broadcast_status"), SQLDataType.BIGINT.nullable(false).defaultValue(DSL.inline("0", SQLDataType.BIGINT)), this, "文件是否被广播成功，0表示广播失败，1表示广播成功");
+
     private File(Name alias, Table<FileRecord> aliased) {
         this(alias, aliased, null);
     }
@@ -179,7 +189,7 @@ public class File extends TableImpl<FileRecord> {
 
     @Override
     public List<UniqueKey<FileRecord>> getKeys() {
-        return Arrays.<UniqueKey<FileRecord>>asList(Keys.KEY_FILE_PRIMARY, Keys.KEY_FILE_IDX_FILE_ID, Keys.KEY_FILE_IDX_FILE_SPACE);
+        return Arrays.<UniqueKey<FileRecord>>asList(Keys.KEY_FILE_PRIMARY, Keys.KEY_FILE_IDX_FILE_SPACE);
     }
 
     @Override
@@ -209,11 +219,11 @@ public class File extends TableImpl<FileRecord> {
     }
 
     // -------------------------------------------------------------------------
-    // Row16 type methods
+    // Row18 type methods
     // -------------------------------------------------------------------------
 
     @Override
-    public Row16<Long, String, String, String, String, Long, String, String, Long, String, LocalDateTime, Long, String, LocalDateTime, String, Integer> fieldsRow() {
-        return (Row16) super.fieldsRow();
+    public Row18<Long, String, String, String, String, Long, String, String, Long, String, LocalDateTime, Long, String, LocalDateTime, String, Integer, String, Long> fieldsRow() {
+        return (Row18) super.fieldsRow();
     }
 }
