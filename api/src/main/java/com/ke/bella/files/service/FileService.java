@@ -3,7 +3,6 @@ package com.ke.bella.files.service;
 import static com.ke.bella.files.db.IDGenerator.FILEID_GEN;
 
 import java.io.File;
-import java.io.InputStream;
 
 import javax.annotation.Resource;
 
@@ -19,6 +18,7 @@ import com.ke.bella.files.db.repo.FileRepo;
 import com.ke.bella.files.db.tables.pojos.FileDB;
 import com.ke.bella.files.protocol.EventType;
 import com.ke.bella.files.protocol.FileBroadcasting;
+import com.ke.bella.files.protocol.FileException.FileNotFoundException;
 import com.ke.bella.files.protocol.FileUrl;
 import com.ke.bella.files.protocol.OpenAIFile;
 import com.ke.bella.files.protocol.OpenapiListResponse;
@@ -92,12 +92,23 @@ public class FileService {
         return null;
     }
 
-    public InputStream retrieveContent(String fileId) {
-        return null;
+    public FileUrl getUrl(
+            String fileId,
+            Long expires) {
+        FileDB file = fileRepo.queryFile(fileId);
+        if(file == null) {
+            throw new FileNotFoundException(fileId);
+        }
+        String bucketName = file.getBucket();
+        String keyName = file.getPath();
+        String url = amazonS3Service.signUrl(bucketName, keyName, expires);
+        return FileUrl.builder()
+                .s3Url(url)
+                .build();
     }
 
-    public FileUrl getUrl(String fileId, Long expires) {
-        return null;
+    public FileUrl getUrl(String fileId) {
+        return getUrl(fileId, 86400L);
     }
 
     public Progress updateProgress(UpdateProgressRequestData data, String fileId, String progressName) {
