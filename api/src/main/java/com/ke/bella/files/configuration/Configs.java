@@ -8,7 +8,7 @@ public class Configs {
     public static Long MAX_SIZE_IN_MB;
     public static String OPEN_API_BASE;
 
-    @Value("${file-api.file.max-size-in-MB}")
+    @Value("${bella.file-api.file.max-size-in-MB}")
     public void setMaxSizeInMB(Long maxSizeInMB) {
         MAX_SIZE_IN_MB = maxSizeInMB;
     }
