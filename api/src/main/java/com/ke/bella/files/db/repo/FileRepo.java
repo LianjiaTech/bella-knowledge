@@ -7,12 +7,14 @@ import java.time.ZoneId;
 
 import javax.annotation.Resource;
 
+import com.ke.bella.files.protocol.FileOps;
 import org.jooq.DSLContext;
 import org.springframework.stereotype.Component;
 
 import com.ke.bella.files.db.tables.pojos.FileDB;
 import com.ke.bella.files.db.tables.records.FileRecord;
 import com.ke.bella.files.protocol.FileException.FileNotFoundException;
+import com.ke.bella.files.protocol.FileStatus;
 import com.ke.bella.files.protocol.OpenAIFile;
 import com.ke.bella.files.utils.StringUtils;
 
@@ -74,7 +76,7 @@ public class FileRepo implements BaseRepo {
         fileId = queryNewFileId(fileId);
         String shardingKey = getShardingKeyByFileId(fileId);
         return db(shardingKey).selectFrom(FILE)
-                .where(FILE.FILE_ID.eq(fileId).and(FILE.STATUS.eq(0)))
+                .where(FILE.FILE_ID.eq(fileId).and(FILE.STATUS.eq(FileStatus.NOT_DELETED.getValue())))
                 .fetchOneInto(FileDB.class);
     }
 
@@ -96,19 +98,24 @@ public class FileRepo implements BaseRepo {
         }
     }
 
-    public void updateFileStatus(String fileId, Long status) {
-        fileId = queryNewFileId(fileId);
+    public void updateFile(FileOps op) {
+        String fileId = queryNewFileId(op.getFileId());
         String shardingKey = getShardingKeyByFileId(fileId);
         FileRecord rec = FILE.newRecord();
         rec.setFileId(fileId);
-        rec.setBroadcastStatus(status);
+        if(op.getStatus() != null) {
+            rec.setStatus(op.getStatus().getValue());
+        }
+        if(op.getBroadcastStatus() != null) {
+            rec.setBroadcastStatus(op.getBroadcastStatus().getValue());
+        }
         fillUpdatorInfo(rec);
         Integer updatedNum = db(shardingKey).update(FILE)
                 .set(rec)
-                .where(FILE.FILE_ID.eq(fileId))
+                .where(FILE.FILE_ID.eq(fileId).and(FILE.STATUS.eq(FileStatus.NOT_DELETED.getValue())))
                 .execute();
         if(updatedNum != 1) {
-            throw new IllegalStateException("update file status failed, fileId: " + fileId);
+            throw new IllegalStateException("update file failed, fileId: " + fileId);
         }
     }
 }
