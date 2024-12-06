@@ -16,15 +16,20 @@ import com.ke.bella.files.BellaContext;
 import com.ke.bella.files.configuration.BucketConfig;
 import com.ke.bella.files.db.repo.FileRepo;
 import com.ke.bella.files.db.tables.pojos.FileDB;
+import com.ke.bella.files.protocol.BroadcastStatus;
 import com.ke.bella.files.protocol.EventType;
 import com.ke.bella.files.protocol.FileBroadcasting;
 import com.ke.bella.files.protocol.FileException.FileNotFoundException;
+import com.ke.bella.files.protocol.FileOps;
 import com.ke.bella.files.protocol.FileUrl;
 import com.ke.bella.files.protocol.OpenAIFile;
 import com.ke.bella.files.protocol.OpenapiListResponse;
 import com.ke.bella.files.protocol.Progress;
 import com.ke.bella.files.protocol.UpdateProgressRequestData;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Component
 public class FileService {
     @Autowired
@@ -73,9 +78,29 @@ public class FileService {
         message.setData(openAIFile);
         message.setMetadata(metadata);
         kafkaTemplate.send(topic, message).addCallback(success -> {
-            fileRepo.updateFileStatus(fileId, 1L);
+            FileOps op = new FileOps();
+            op.setFileId(fileId);
+            op.setBroadcastStatus(BroadcastStatus.SUCCESS);
+            try {
+                fileRepo.updateFile(op);
+            } catch (Exception e) {
+                String msg = "Failed to update file broadcast status, fileId: "
+                        + fileId + ", broadcastStatus: " + BroadcastStatus.SUCCESS.getValue();
+                LOGGER.error(msg, e);
+                throw new IllegalStateException(msg, e);
+            }
         }, failure -> {
-            fileRepo.updateFileStatus(fileId, 0L);
+            FileOps op = new FileOps();
+            op.setFileId(fileId);
+            op.setBroadcastStatus(BroadcastStatus.FAILED);
+            try {
+                fileRepo.updateFile(op);
+            } catch (Exception e) {
+                String msg = "Failed to update file broadcast status, fileId: "
+                        + fileId + ", broadcastStatus: " + BroadcastStatus.FAILED.getValue();
+                LOGGER.error(msg, e);
+                throw new IllegalStateException(msg, e);
+            }
         });
         return openAIFile;
     }
