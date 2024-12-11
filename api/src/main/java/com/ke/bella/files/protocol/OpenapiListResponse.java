@@ -15,5 +15,5 @@ public class OpenapiListResponse<T> extends OpenapiResponse {
     private String object = "list";
     private List<T> data;
     private String lastId;
-    private String hasMore;
+    private Boolean hasMore = false;
 }

@@ -5,7 +5,7 @@ import java.util.Date;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.ke.bella.files.BellaContext;
-import com.ke.bella.files.utils.StringUtils;
+import com.ke.bella.files.utils.CustomStringUtils;
 
 public class IDGenerator {
     public static final IDGenerator FILEID_GEN = new IDGenerator("file-");
@@ -40,7 +40,7 @@ public class IDGenerator {
     public String generate() {
         String now = new SimpleDateFormat(yyMMddHHmmss).format(new Date());
         String spaceCode = BellaContext.getOperator().getSpaceCode();
-        String spaceCodeHash = String.valueOf(Math.abs(StringUtils.hashCode(spaceCode)));
+        String spaceCodeHash = String.valueOf(Math.abs(CustomStringUtils.hashCode(spaceCode)));
         return String.format("%s%s%s%s-%s", this.prefix, now, instanceId, nextTick(), spaceCodeHash);
     }
 
