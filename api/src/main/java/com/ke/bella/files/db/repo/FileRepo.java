@@ -2,21 +2,26 @@ package com.ke.bella.files.db.repo;
 
 import static com.ke.bella.files.db.Tables.FILE;
 import static com.ke.bella.files.db.Tables.FILE_MAPPING;
+import static com.ke.bella.files.db.Tables.FILE_PROGRESS;
 
-import java.time.ZoneId;
+import java.util.List;
 
 import javax.annotation.Resource;
 
-import com.ke.bella.files.protocol.FileOps;
+import org.apache.commons.lang3.StringUtils;
+import org.jooq.Condition;
 import org.jooq.DSLContext;
+import org.jooq.impl.DSL;
 import org.springframework.stereotype.Component;
 
 import com.ke.bella.files.db.tables.pojos.FileDB;
+import com.ke.bella.files.db.tables.pojos.FileProgressDB;
+import com.ke.bella.files.db.tables.records.FileProgressRecord;
 import com.ke.bella.files.db.tables.records.FileRecord;
 import com.ke.bella.files.protocol.FileException.FileNotFoundException;
+import com.ke.bella.files.protocol.FileOps;
 import com.ke.bella.files.protocol.FileStatus;
-import com.ke.bella.files.protocol.OpenAIFile;
-import com.ke.bella.files.utils.StringUtils;
+import com.ke.bella.files.utils.CustomStringUtils;
 
 @Component
 public class FileRepo implements BaseRepo {
@@ -37,7 +42,7 @@ public class FileRepo implements BaseRepo {
     }
 
     private static String getShardingKeyBySpaceCode(String spaceCode) {
-        Integer hashCode = StringUtils.hashCode(spaceCode);
+        Integer hashCode = CustomStringUtils.hashCode(spaceCode);
         return getShardingKeyBySpaceCodeHash(hashCode);
     }
 
@@ -60,18 +65,6 @@ public class FileRepo implements BaseRepo {
                 .fetchOneInto(String.class);
     }
 
-    private OpenAIFile transferToOpenAIFile(FileDB fileDB) {
-        OpenAIFile file = new OpenAIFile();
-        file.setId(fileDB.getFileId());
-        file.setBytes(fileDB.getBytes());
-        file.setCreateAt(fileDB.getCtime()
-                .toInstant(ZoneId.systemDefault().getRules().getOffset(fileDB.getCtime()))
-                .toEpochMilli());
-        file.setFilename(fileDB.getFilename());
-        file.setPurpose(fileDB.getPurpose());
-        return file;
-    }
-
     public FileDB queryFile(String fileId) {
         fileId = queryNewFileId(fileId);
         String shardingKey = getShardingKeyByFileId(fileId);
@@ -80,17 +73,12 @@ public class FileRepo implements BaseRepo {
                 .fetchOneInto(FileDB.class);
     }
 
-    public OpenAIFile queryOpenAIFile(String fileId) {
-        FileDB fileDB = queryFile(fileId);
-        return fileDB == null ? null : transferToOpenAIFile(fileDB);
-    }
-
     public void addFile(FileDB fileDB) {
         String shardingKey = getShardingKeyBySpaceCode(fileDB.getSpaceCode());
         FileRecord rec = FILE.newRecord();
         rec.from(fileDB);
         fillCreatorInfo(rec);
-        Integer insertedNum = db(shardingKey).insertInto(FILE)
+        int insertedNum = db(shardingKey).insertInto(FILE)
                 .set(rec)
                 .execute();
         if(insertedNum != 1) {
@@ -110,12 +98,97 @@ public class FileRepo implements BaseRepo {
             rec.setBroadcastStatus(op.getBroadcastStatus().getValue());
         }
         fillUpdatorInfo(rec);
-        Integer updatedNum = db(shardingKey).update(FILE)
+        int updatedNum = db(shardingKey).update(FILE)
                 .set(rec)
                 .where(FILE.FILE_ID.eq(fileId).and(FILE.STATUS.eq(FileStatus.NOT_DELETED.getValue())))
                 .execute();
         if(updatedNum != 1) {
             throw new IllegalStateException("update file failed, fileId: " + fileId);
+        }
+    }
+
+    public List<FileDB> listFile(
+            String purpose,
+            Integer limit,
+            String order,
+            String after,
+            String spaceCode) {
+        String shardingKey = getShardingKeyBySpaceCode(spaceCode);
+        Condition condition = DSL.trueCondition()
+                .and(FILE.SPACE_CODE.eq(spaceCode))
+                .and(FILE.STATUS.eq(FileStatus.NOT_DELETED.getValue()));
+        // 如果purpose为空则查询所有文件
+        if(StringUtils.isNotEmpty(purpose)) {
+            condition = condition.and(FILE.PURPOSE.eq(purpose));
+        }
+        if(StringUtils.isNotEmpty(after)) {
+            after = queryNewFileId(after);
+            Long id = db(shardingKey).select(FILE.ID)
+                    .from(FILE)
+                    .where(FILE.FILE_ID.eq(after))
+                    .fetchOneInto(Long.class);
+            condition = condition.and("asc".equalsIgnoreCase(order) ? FILE.ID.gt(id) : FILE.ID.lt(id));
+        }
+        return db(shardingKey).selectFrom(FILE)
+                .where(condition)
+                .orderBy("asc".equalsIgnoreCase(order) ? FILE.ID.asc() : FILE.ID.desc())
+                .limit(limit)
+                .fetchInto(FileDB.class);
+    }
+
+    public FileProgressDB queryProgress(
+            String fileId,
+            String progressName) {
+        fileId = queryNewFileId(fileId);
+        String shardingKey = getShardingKeyByFileId(fileId);
+        return db(shardingKey).selectFrom(FILE_PROGRESS)
+                .where(FILE_PROGRESS.FILE_ID.eq(fileId).and(FILE_PROGRESS.NAME.eq(progressName)))
+                .fetchOneInto(FileProgressDB.class);
+    }
+
+    public void insertProgress(
+            String fileId,
+            String progressName,
+            String status,
+            String message,
+            Integer percent) {
+        fileId = queryNewFileId(fileId);
+        String shardingKey = getShardingKeyByFileId(fileId);
+        FileProgressRecord rec = FILE_PROGRESS.newRecord();
+        rec.setFileId(fileId);
+        rec.setName(progressName);
+        rec.setStatus(status);
+        rec.setMessage(message);
+        rec.setPercent(percent);
+        fillCreatorInfo(rec);
+        int insertedNum = db(shardingKey).insertInto(FILE_PROGRESS)
+                .set(rec)
+                .execute();
+        if(insertedNum != 1) {
+            throw new IllegalStateException("insert progress failed, fileId: " + fileId + ", progressName: " + progressName);
+        }
+
+    }
+
+    public void updateProgress(
+            String fileId,
+            String progressName,
+            String status,
+            String message,
+            Integer percent) {
+        fileId = queryNewFileId(fileId);
+        String shardingKey = getShardingKeyByFileId(fileId);
+        FileProgressRecord rec = FILE_PROGRESS.newRecord();
+        rec.setStatus(status);
+        rec.setMessage(message);
+        rec.setPercent(percent);
+        fillUpdatorInfo(rec);
+        int updatedNum = db(shardingKey).update(FILE_PROGRESS)
+                .set(rec)
+                .where(FILE_PROGRESS.FILE_ID.eq(fileId).and(FILE_PROGRESS.NAME.eq(progressName)))
+                .execute();
+        if(updatedNum != 1) {
+            throw new IllegalStateException("update progress failed, fileId: " + fileId + ", progressName: " + progressName);
         }
     }
 }

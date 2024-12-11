@@ -1,6 +1,6 @@
 package com.ke.bella.files.utils;
 
-public class StringUtils {
+public class CustomStringUtils {
     // 移植String类的hashCode方法，避免jdk升级可能带来的算法变化；
     public static int hashCode(String str) {
         if(str == null) {
