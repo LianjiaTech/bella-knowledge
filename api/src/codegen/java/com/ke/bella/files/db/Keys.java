@@ -32,8 +32,8 @@ public class Keys {
 
     public static final UniqueKey<FileRecord> KEY_FILE_IDX_FILE_SPACE = Internal.createUniqueKey(File.FILE, DSL.name("KEY_file_idx_file_space"), new TableField[] { File.FILE.FILE_ID, File.FILE.SPACE_CODE }, true);
     public static final UniqueKey<FileRecord> KEY_FILE_PRIMARY = Internal.createUniqueKey(File.FILE, DSL.name("KEY_file_PRIMARY"), new TableField[] { File.FILE.ID }, true);
+    public static final UniqueKey<FileMappingRecord> KEY_FILE_MAPPING_FILE_ID_OLD = Internal.createUniqueKey(FileMapping.FILE_MAPPING, DSL.name("KEY_file_mapping_file_id_old"), new TableField[] { FileMapping.FILE_MAPPING.FILE_ID_OLD, FileMapping.FILE_MAPPING.FILE_ID }, true);
     public static final UniqueKey<FileMappingRecord> KEY_FILE_MAPPING_PRIMARY = Internal.createUniqueKey(FileMapping.FILE_MAPPING, DSL.name("KEY_file_mapping_PRIMARY"), new TableField[] { FileMapping.FILE_MAPPING.ID }, true);
-    public static final UniqueKey<FileMappingRecord> KEY_FILE_MAPPING_UNIQUE_FILE_IDS = Internal.createUniqueKey(FileMapping.FILE_MAPPING, DSL.name("KEY_file_mapping_unique_file_ids"), new TableField[] { FileMapping.FILE_MAPPING.FILE_ID_OLD, FileMapping.FILE_MAPPING.FILE_ID }, true);
     public static final UniqueKey<FileProgressRecord> KEY_FILE_PROGRESS_FILE_ID = Internal.createUniqueKey(FileProgress.FILE_PROGRESS, DSL.name("KEY_file_progress_file_id"), new TableField[] { FileProgress.FILE_PROGRESS.FILE_ID, FileProgress.FILE_PROGRESS.NAME }, true);
     public static final UniqueKey<FileProgressRecord> KEY_FILE_PROGRESS_PRIMARY = Internal.createUniqueKey(FileProgress.FILE_PROGRESS, DSL.name("KEY_file_progress_PRIMARY"), new TableField[] { FileProgress.FILE_PROGRESS.ID }, true);
     public static final UniqueKey<InstanceRecord> KEY_INSTANCE_PRIMARY = Internal.createUniqueKey(Instance.INSTANCE, DSL.name("KEY_instance_PRIMARY"), new TableField[] { Instance.INSTANCE.ID }, true);

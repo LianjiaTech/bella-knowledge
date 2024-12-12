@@ -29,6 +29,7 @@ CREATE TABLE `file`
 -- ----------------------------
 -- Table structure for file_mapping
 -- ----------------------------
+DROP TABLE IF EXISTS `file_mapping`;
 CREATE TABLE `file_mapping`
 (
     `id`          bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -42,6 +43,7 @@ CREATE TABLE `file_mapping`
     `mtime`       datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     UNIQUE KEY (file_id_old, file_id) USING BTREE,
+    INDEX `idx_ctime` (`ctime`) USING BTREE
 ) ENGINE = InnoDB
   AUTO_INCREMENT = 1
 
