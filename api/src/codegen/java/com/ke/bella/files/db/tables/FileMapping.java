@@ -136,7 +136,7 @@ public class FileMapping extends TableImpl<FileMappingRecord> {
 
     @Override
     public List<Index> getIndexes() {
-        return Arrays.<Index>asList(Indexes.FILE_MAPPING_IDX_FILE_ID_OLD);
+        return Arrays.<Index>asList(Indexes.FILE_MAPPING_IDX_CTIME);
     }
 
     @Override
@@ -151,7 +151,7 @@ public class FileMapping extends TableImpl<FileMappingRecord> {
 
     @Override
     public List<UniqueKey<FileMappingRecord>> getKeys() {
-        return Arrays.<UniqueKey<FileMappingRecord>>asList(Keys.KEY_FILE_MAPPING_PRIMARY, Keys.KEY_FILE_MAPPING_UNIQUE_FILE_IDS);
+        return Arrays.<UniqueKey<FileMappingRecord>>asList(Keys.KEY_FILE_MAPPING_PRIMARY, Keys.KEY_FILE_MAPPING_FILE_ID_OLD);
     }
 
     @Override
