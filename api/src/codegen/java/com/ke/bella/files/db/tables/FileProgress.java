@@ -5,7 +5,6 @@ package com.ke.bella.files.db.tables;
 
 
 import com.ke.bella.files.db.DefaultSchema;
-import com.ke.bella.files.db.Indexes;
 import com.ke.bella.files.db.Keys;
 import com.ke.bella.files.db.tables.records.FileProgressRecord;
 
@@ -16,7 +15,6 @@ import java.util.List;
 import org.jooq.Field;
 import org.jooq.ForeignKey;
 import org.jooq.Identity;
-import org.jooq.Index;
 import org.jooq.Name;
 import org.jooq.Record;
 import org.jooq.Row12;
@@ -150,11 +148,6 @@ public class FileProgress extends TableImpl<FileProgressRecord> {
     }
 
     @Override
-    public List<Index> getIndexes() {
-        return Arrays.<Index>asList(Indexes.FILE_PROGRESS_IDX_FILE_ID_NAME);
-    }
-
-    @Override
     public Identity<FileProgressRecord, Long> getIdentity() {
         return (Identity<FileProgressRecord, Long>) super.getIdentity();
     }
@@ -166,7 +159,7 @@ public class FileProgress extends TableImpl<FileProgressRecord> {
 
     @Override
     public List<UniqueKey<FileProgressRecord>> getKeys() {
-        return Arrays.<UniqueKey<FileProgressRecord>>asList(Keys.KEY_FILE_PROGRESS_PRIMARY, Keys.KEY_FILE_PROGRESS_FILE_ID);
+        return Arrays.<UniqueKey<FileProgressRecord>>asList(Keys.KEY_FILE_PROGRESS_PRIMARY, Keys.KEY_FILE_PROGRESS_IDX_FILE_ID_NAME);
     }
 
     @Override

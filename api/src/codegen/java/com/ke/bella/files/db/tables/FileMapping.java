@@ -144,7 +144,7 @@ public class FileMapping extends TableImpl<FileMappingRecord> {
 
     @Override
     public List<UniqueKey<FileMappingRecord>> getKeys() {
-        return Arrays.<UniqueKey<FileMappingRecord>>asList(Keys.KEY_FILE_MAPPING_PRIMARY, Keys.KEY_FILE_MAPPING_FILE_ID_OLD);
+        return Arrays.<UniqueKey<FileMappingRecord>>asList(Keys.KEY_FILE_MAPPING_PRIMARY, Keys.KEY_FILE_MAPPING_IDX_FILE_ID_NEW_OLD);
     }
 
     @Override
