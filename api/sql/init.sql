@@ -1,6 +1,7 @@
 -- ----------------------------
 -- Table structure for file
 -- ----------------------------
+DROP TABLE IF EXISTS `file`;
 CREATE TABLE `file`
 (
     `id`         bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -23,6 +24,7 @@ CREATE TABLE `file`
     `broadcast_status` bigint    NOT NULL DEFAULT 0 COMMENT '文件是否被广播成功，0表示广播失败，1表示广播成功',
     PRIMARY KEY (`id`),
     UNIQUE KEY `idx_file_space` (`file_id`, `space_code`) USING BTREE,
+    INDEX `idx_ctime` (`ctime`) USING BTREE
 ) ENGINE = InnoDB
   AUTO_INCREMENT = 1;
 
@@ -42,14 +44,14 @@ CREATE TABLE `file_mapping`
     `mu_name`     varchar(32)  NOT NULL DEFAULT '',
     `mtime`       datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
-    UNIQUE KEY (file_id_old, file_id) USING BTREE,
-    INDEX `idx_ctime` (`ctime`) USING BTREE
+    UNIQUE KEY (file_id_old, file_id) USING BTREE
 ) ENGINE = InnoDB
   AUTO_INCREMENT = 1
 
 -- ----------------------------
 -- Table structure for file_progress
 -- ----------------------------
+DROP TABLE IF EXISTS `file_progress`;
 CREATE TABLE `file_progress`
 (
     `id`      bigint unsigned NOT NULL AUTO_INCREMENT,

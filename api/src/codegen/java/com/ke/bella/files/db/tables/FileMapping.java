@@ -5,7 +5,6 @@ package com.ke.bella.files.db.tables;
 
 
 import com.ke.bella.files.db.DefaultSchema;
-import com.ke.bella.files.db.Indexes;
 import com.ke.bella.files.db.Keys;
 import com.ke.bella.files.db.tables.records.FileMappingRecord;
 
@@ -16,7 +15,6 @@ import java.util.List;
 import org.jooq.Field;
 import org.jooq.ForeignKey;
 import org.jooq.Identity;
-import org.jooq.Index;
 import org.jooq.Name;
 import org.jooq.Record;
 import org.jooq.Row9;
@@ -132,11 +130,6 @@ public class FileMapping extends TableImpl<FileMappingRecord> {
     @Override
     public Schema getSchema() {
         return DefaultSchema.DEFAULT_SCHEMA;
-    }
-
-    @Override
-    public List<Index> getIndexes() {
-        return Arrays.<Index>asList(Indexes.FILE_MAPPING_IDX_CTIME);
     }
 
     @Override

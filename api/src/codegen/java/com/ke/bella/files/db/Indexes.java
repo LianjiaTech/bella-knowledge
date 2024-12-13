@@ -4,7 +4,7 @@
 package com.ke.bella.files.db;
 
 
-import com.ke.bella.files.db.tables.FileMapping;
+import com.ke.bella.files.db.tables.File;
 import com.ke.bella.files.db.tables.FileProgress;
 import com.ke.bella.files.db.tables.Instance;
 
@@ -24,7 +24,7 @@ public class Indexes {
     // INDEX definitions
     // -------------------------------------------------------------------------
 
-    public static final Index FILE_MAPPING_IDX_CTIME = Internal.createIndex(DSL.name("idx_ctime"), FileMapping.FILE_MAPPING, new OrderField[] { FileMapping.FILE_MAPPING.CTIME }, false);
+    public static final Index FILE_IDX_CTIME = Internal.createIndex(DSL.name("idx_ctime"), File.FILE, new OrderField[] { File.FILE.CTIME }, false);
     public static final Index FILE_PROGRESS_IDX_FILE_ID_NAME = Internal.createIndex(DSL.name("idx_file_id_name"), FileProgress.FILE_PROGRESS, new OrderField[] { FileProgress.FILE_PROGRESS.FILE_ID, FileProgress.FILE_PROGRESS.NAME }, false);
     public static final Index INSTANCE_IDX_IP_PORT = Internal.createIndex(DSL.name("idx_ip_port"), Instance.INSTANCE, new OrderField[] { Instance.INSTANCE.IP, Instance.INSTANCE.PORT }, false);
 }
