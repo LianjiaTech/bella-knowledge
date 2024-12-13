@@ -1,7 +1,6 @@
 -- ----------------------------
 -- Table structure for file
 -- ----------------------------
-DROP TABLE IF EXISTS `file`;
 CREATE TABLE `file`
 (
     `id`         bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -23,10 +22,11 @@ CREATE TABLE `file`
     `ak_code`    varchar(128)    NOT NULL DEFAULT '' COMMENT '',
     `broadcast_status` bigint    NOT NULL DEFAULT 0 COMMENT '文件是否被广播成功，0表示广播失败，1表示广播成功',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `idx_file_space` (`file_id`, `space_code`) USING BTREE,
+    UNIQUE KEY `idx_file_space` (`file_id`(80), `space_code`(80)) USING BTREE,
     INDEX `idx_ctime` (`ctime`) USING BTREE
 ) ENGINE = InnoDB
-  AUTO_INCREMENT = 1;
+  AUTO_INCREMENT = 1
+  DEFAULT CHARSET = utf8mb4;
 
 -- ----------------------------
 -- Table structure for file_mapping
@@ -44,14 +44,14 @@ CREATE TABLE `file_mapping`
     `mu_name`     varchar(32)  NOT NULL DEFAULT '',
     `mtime`       datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
-    UNIQUE KEY (file_id_old, file_id) USING BTREE
+    UNIQUE KEY `idx_file_id_new_old` (`file_id_old`(80), `file_id`(80)) USING BTREE
 ) ENGINE = InnoDB
   AUTO_INCREMENT = 1
+  DEFAULT CHARSET = utf8mb4;
 
 -- ----------------------------
 -- Table structure for file_progress
 -- ----------------------------
-DROP TABLE IF EXISTS `file_progress`;
 CREATE TABLE `file_progress`
 (
     `id`      bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -67,9 +67,10 @@ CREATE TABLE `file_progress`
     `mu_name` varchar(32)     NOT NULL DEFAULT '',
     `mtime`   datetime        NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
-    UNIQUE INDEX `idx_file_id_name` (`file_id`, `name`) USING BTREE
+    UNIQUE INDEX `idx_file_id_name` (`file_id`(80), `name`(80)) USING BTREE
 ) ENGINE = InnoDB
-  AUTO_INCREMENT = 1;
+  AUTO_INCREMENT = 1
+  DEFAULT CHARSET = utf8mb4;
 
 -- ----------------------------
 -- Table structure for instance
@@ -84,5 +85,7 @@ CREATE TABLE `instance`
     `ctime`  datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `mtime`  datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
-    KEY      `idx_ip_port` (`ip`,`port`)
-) ENGINE=InnoDB AUTO_INCREMENT=19;
+    KEY `idx_ip_port` (`ip`,`port`)
+) ENGINE=InnoDB
+	AUTO_INCREMENT=19
+	DEFAULT CHARSET = utf8mb4;
