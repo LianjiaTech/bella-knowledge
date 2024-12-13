@@ -65,7 +65,7 @@ public class FileService {
         return OpenAIFile.builder()
                 .id(fileDB.getFileId())
                 .bytes(fileDB.getBytes())
-                .createAt(fileDB.getCtime()
+                .createdAt(fileDB.getCtime()
                         .toInstant(ZoneId.systemDefault().getRules().getOffset(fileDB.getCtime()))
                         .toEpochMilli())
                 .filename(fileDB.getFilename())
@@ -122,7 +122,7 @@ public class FileService {
         fileDB.setAkCode(BellaContext.getApikey().getCode());
         fileRepo.addFile(fileDB);
         FileDB res = fileRepo.queryFile(fileId);
-        OpenAIFile openAIFile = res == null ? null : transferToOpenAIFile(fileDB);
+        OpenAIFile openAIFile = res == null ? null : transferToOpenAIFile(res);
 
         // Kafka发送消息
         FileBroadcasting<OpenAIFile> message = new FileBroadcasting<>();

@@ -4,6 +4,7 @@ import static com.ke.bella.files.db.Tables.FILE;
 import static com.ke.bella.files.db.Tables.FILE_MAPPING;
 import static com.ke.bella.files.db.Tables.FILE_PROGRESS;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import javax.annotation.Resource;
@@ -123,15 +124,15 @@ public class FileRepo implements BaseRepo {
         }
         if(StringUtils.isNotEmpty(after)) {
             after = queryNewFileId(after);
-            Long id = db(shardingKey).select(FILE.ID)
+            LocalDateTime afterCtime = db(shardingKey).select(FILE.CTIME)
                     .from(FILE)
                     .where(FILE.FILE_ID.eq(after))
-                    .fetchOneInto(Long.class);
-            condition = condition.and("asc".equalsIgnoreCase(order) ? FILE.ID.gt(id) : FILE.ID.lt(id));
+                    .fetchOneInto(LocalDateTime.class);
+            condition = condition.and("asc".equalsIgnoreCase(order) ? FILE.CTIME.gt(afterCtime) : FILE.CTIME.lt(afterCtime));
         }
         return db(shardingKey).selectFrom(FILE)
                 .where(condition)
-                .orderBy("asc".equalsIgnoreCase(order) ? FILE.ID.asc() : FILE.ID.desc())
+                .orderBy("asc".equalsIgnoreCase(order) ? FILE.CTIME.asc() : FILE.CTIME.desc())
                 .limit(limit)
                 .fetchInto(FileDB.class);
     }
