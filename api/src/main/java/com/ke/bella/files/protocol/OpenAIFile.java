@@ -12,7 +12,7 @@ import lombok.experimental.SuperBuilder;
 public class OpenAIFile {
     private String id;
     private Long bytes;
-    private Long createAt;
+    private Long createdAt;
     private String filename;
     private String object = "file";
     /**
