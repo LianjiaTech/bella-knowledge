@@ -103,7 +103,7 @@ public class FileService {
         String spaceCode = BellaContext.getOperator().getSpaceCode();
         String fileId = FILEID_GEN.generate();
         String bucketName = purpose == "version" ? bucketConfig.getVisionBucket() : bucketConfig.getGeneralBucket();
-        String keyName = String.format("%s/%s/%s", spaceCode, purpose, fileId);
+        String keyName = String.format("%s/%s", purpose, fileId);
         if(StringUtils.isNotEmpty(extension)) {
             keyName += "." + extension;
         }
