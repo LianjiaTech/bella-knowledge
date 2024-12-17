@@ -43,12 +43,17 @@ public class AmazonS3Service {
         return fileKey;
     }
 
-    public String signUrl(
+    public String getPresignedUrl(
             String bucketName,
             String fileKey,
             Long expirationSeconds) {
         Date expirationDate = Date.from(LocalDateTime.now().plusSeconds(expirationSeconds).atZone(ZoneId.systemDefault()).toInstant());
         URL singedUrl = amazonS3.generatePresignedUrl(bucketName, fileKey, expirationDate);
         return singedUrl.toString();
+    }
+
+    public String getPublicUrl(String bucketName, String fileKey) {
+        URL unsignUrl = amazonS3.getUrl(bucketName, fileKey);
+        return unsignUrl.toString();
     }
 }
