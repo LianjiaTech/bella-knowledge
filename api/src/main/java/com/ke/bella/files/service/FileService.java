@@ -36,6 +36,9 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Component
 public class FileService {
+    public static final Long ONE_DAY = 24 * 60 * 60L;
+    public static final String ONE_DAY_STRING = (24 * 60 * 60) + "";
+    private static final String VISION = "vision";
     @Autowired
     FileRepo fileRepo;
     @Autowired
@@ -102,7 +105,7 @@ public class FileService {
             String extension) {
         String spaceCode = BellaContext.getOperator().getSpaceCode();
         String fileId = FILEID_GEN.generate();
-        String bucketName = purpose == "version" ? bucketConfig.getVisionBucket() : bucketConfig.getGeneralBucket();
+        String bucketName = purpose.equals(VISION) ? bucketConfig.getVisionBucket() : bucketConfig.getGeneralBucket();
         String keyName = String.format("%s/%s", purpose, fileId);
         if(StringUtils.isNotEmpty(extension)) {
             keyName += "." + extension;
@@ -166,20 +169,26 @@ public class FileService {
         }
     }
 
+    public FileUrl getUrl(String fileId) {
+        return getUrl(fileId, ONE_DAY);
+    }
+
     public FileUrl getUrl(
             String fileId,
             Long expires) {
         FileDB file = fileRepo.queryFile(fileId);
         String bucketName = file.getBucket();
         String keyName = file.getPath();
-        String url = amazonS3Service.signUrl(bucketName, keyName, expires);
+        String purpose = file.getPurpose();
+        String url;
+        if(purpose.equals(VISION)) {
+            url = amazonS3Service.getPresignedUrl(bucketName, keyName, expires);
+        } else {
+            url = amazonS3Service.getPublicUrl(bucketName, keyName);
+        }
         return FileUrl.builder()
                 .s3Url(url)
                 .build();
-    }
-
-    public FileUrl getUrl(String fileId) {
-        return getUrl(fileId, 86400L);
     }
 
     public void updateProgress(

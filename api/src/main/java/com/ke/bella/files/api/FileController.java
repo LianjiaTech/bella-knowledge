@@ -1,6 +1,7 @@
 package com.ke.bella.files.api;
 
 import static com.ke.bella.files.configuration.Configs.MAX_SIZE_IN_MB;
+import static com.ke.bella.files.service.FileService.ONE_DAY_STRING;
 
 import java.io.File;
 import java.io.IOException;
@@ -45,7 +46,6 @@ public class FileController {
 
     @Autowired
     FileService fileService;
-
     @Value("${bella.file-api.file.tmp-file-dir}")
     private String tmpFileDir;
 
@@ -149,7 +149,7 @@ public class FileController {
     @GetMapping("/{file_id}/url")
     public FileUrl getUrl(
             @PathVariable("file_id") String fileId,
-            @RequestParam(value = "expires", required = false, defaultValue = "86400") Long expires) {
+            @RequestParam(value = "expires", required = false, defaultValue = ONE_DAY_STRING) Long expires) {
         OpenAIFile file = fileService.getFile(fileId);
         if(file == null) {
             throw new FileNotFoundException(fileId);
