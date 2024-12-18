@@ -54,4 +54,37 @@ logging:
     executableSql: INFO
     org:
       springframework: INFO
-      jooq: DEBUG
+      jooq: INFO
+
+spring:
+  servlet:
+    multipart:
+      max-file-size: 512MB
+      max-request-size: 512MB
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+    default-property-inclusion: NON_NULL
+  kafka:
+    producer:
+      bootstrap-servers: common-queue-04-01-online.zeus.ljnode.com:9092,common-queue-04-02-online.zeus.ljnode.com:9092,common-queue-04-03-online.zeus.ljnode.com:9092
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      topic:
+        broadcast: bella-file-broadcast
+
+bella:
+  open-api-base: https://api.example.com/
+  file-api:
+    processer-name:
+      - indexing
+      - parser
+    file:
+      max-size-in-MB: 512
+      tmp-file-dir: /data0/www/privdata/example-file-api
+    bucket-name:
+      vision: bella-file-private
+      general: bella-file-public
+s3:
+  ak: 57856TV6QN2MEEQL27AL
+  sk: 6e0SprFtGzl4jFSOFta9KxTgeXPn62pOeqg7TnAq
+  end_point: https://example.com
