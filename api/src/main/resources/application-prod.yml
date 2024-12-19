@@ -88,7 +88,7 @@ s3:
   ak: 57856TV6QN2MEEQL27AL
   sk: 6e0SprFtGzl4jFSOFta9KxTgeXPn62pOeqg7TnAq
   endpoint_write: https://example.com
-  endpoint_read: https://file.ljcdn.com
+  endpoint_read: https://example.com
 server:
   tomcat:
     max-swallow-size: -1
