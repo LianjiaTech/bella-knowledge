@@ -12,8 +12,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class OpenapiListResponse<T> extends OpenapiResponse {
-    private String object = "list";
     private List<T> data;
+    private String object = "list";
     private String lastId;
     private Boolean hasMore = false;
 }
