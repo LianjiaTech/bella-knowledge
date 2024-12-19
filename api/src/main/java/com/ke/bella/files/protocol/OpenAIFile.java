@@ -1,6 +1,7 @@
 package com.ke.bella.files.protocol;
 
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
@@ -11,10 +12,11 @@ import lombok.experimental.SuperBuilder;
 @Data
 public class OpenAIFile {
     private String id;
+    @Builder.Default
+    private String object = "file";
     private Long bytes;
     private Long createdAt;
     private String filename;
-    private String object = "file";
     /**
      * assistants
      * assistants_output
@@ -25,6 +27,7 @@ public class OpenAIFile {
      * vision
      */
     private String purpose;
+    private Boolean deleted;
     @Deprecated
     private String status;
     @Deprecated

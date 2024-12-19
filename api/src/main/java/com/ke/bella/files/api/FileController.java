@@ -129,7 +129,10 @@ public class FileController {
             throw new FileNotFoundException(fileId);
         }
         fileService.delete(fileId);
-        return file;
+        return OpenAIFile.builder()
+                .id(fileId)
+                .deleted(true)
+                .build();
     }
 
     @GetMapping("/{file_id}/content")
