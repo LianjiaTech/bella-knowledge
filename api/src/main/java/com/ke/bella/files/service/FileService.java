@@ -182,9 +182,9 @@ public class FileService {
         String purpose = file.getPurpose();
         String url;
         if(purpose.equals(VISION)) {
-            url = amazonS3Service.getPresignedUrl(bucketName, keyName, expires);
-        } else {
             url = amazonS3Service.getPublicUrl(bucketName, keyName);
+        } else {
+            url = amazonS3Service.getPresignedUrl(bucketName, keyName, expires);
         }
         return FileUrl.builder()
                 .s3Url(url)
