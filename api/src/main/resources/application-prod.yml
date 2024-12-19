@@ -82,9 +82,10 @@ bella:
       max-size-in-MB: 512
       tmp-file-dir: /data0/www/privdata/example-file-api
     bucket-name:
-      vision: bella-file-private
-      general: bella-file-public
+      vision: bella-file-public
+      general: bella-file-private
 s3:
   ak: 57856TV6QN2MEEQL27AL
   sk: 6e0SprFtGzl4jFSOFta9KxTgeXPn62pOeqg7TnAq
-  end_point: https://example.com
+  end_point_write: https://example.com
+  end_point_read: https://file.ljcdn.com

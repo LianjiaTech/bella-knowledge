@@ -18,19 +18,28 @@ import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 
 @Component
 public class AmazonS3Service {
-    private final String endPoint;
-    private final AmazonS3 amazonS3;
+    private final String endPointWrite;
+    private final String endPointRead;
+    private final AmazonS3 amazonS3Write;
+    private final AmazonS3 amazonS3Read;
 
     public AmazonS3Service(
             @Value("${s3.ak}") String ak,
             @Value("${s3.sk}") String sk,
-            @Value("${s3.end_point}") String endPoint) {
-        this.endPoint = endPoint;
+            @Value("${s3.end_point_write}") String endPointWrite,
+            @Value("${s3.end_point_read}") String endPointRead) {
+        this.endPointWrite = endPointWrite;
+        this.endPointRead = endPointRead;
         BasicAWSCredentials credentials = new BasicAWSCredentials(ak, sk);
         AWSStaticCredentialsProvider provider = new AWSStaticCredentialsProvider(credentials);
-        this.amazonS3 = AmazonS3ClientBuilder.standard()
+        this.amazonS3Write = AmazonS3ClientBuilder.standard()
                 .withCredentials(provider)
-                .withEndpointConfiguration(new EndpointConfiguration(this.endPoint, Regions.CN_NORTH_1.getName()))
+                .withEndpointConfiguration(new EndpointConfiguration(this.endPointWrite, Regions.CN_NORTH_1.getName()))
+                .withPathStyleAccessEnabled(true)
+                .build();
+        this.amazonS3Read = AmazonS3ClientBuilder.standard()
+                .withCredentials(provider)
+                .withEndpointConfiguration(new EndpointConfiguration(this.endPointRead, Regions.CN_NORTH_1.getName()))
                 .withPathStyleAccessEnabled(true)
                 .build();
     }
@@ -39,7 +48,7 @@ public class AmazonS3Service {
             String bucketName,
             String fileKey,
             File file) {
-        amazonS3.putObject(bucketName, fileKey, file);
+        amazonS3Write.putObject(bucketName, fileKey, file);
         return fileKey;
     }
 
@@ -48,12 +57,12 @@ public class AmazonS3Service {
             String fileKey,
             Long expirationSeconds) {
         Date expirationDate = Date.from(LocalDateTime.now().plusSeconds(expirationSeconds).atZone(ZoneId.systemDefault()).toInstant());
-        URL singedUrl = amazonS3.generatePresignedUrl(bucketName, fileKey, expirationDate);
+        URL singedUrl = amazonS3Read.generatePresignedUrl(bucketName, fileKey, expirationDate);
         return singedUrl.toString();
     }
 
     public String getPublicUrl(String bucketName, String fileKey) {
-        URL unsignUrl = amazonS3.getUrl(bucketName, fileKey);
+        URL unsignUrl = amazonS3Read.getUrl(bucketName, fileKey);
         return unsignUrl.toString();
     }
 }
