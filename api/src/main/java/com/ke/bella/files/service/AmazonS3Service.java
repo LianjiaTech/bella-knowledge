@@ -18,28 +18,28 @@ import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 
 @Component
 public class AmazonS3Service {
-    private final String endPointWrite;
-    private final String endPointRead;
+    private final String endpointWrite;
+    private final String endpointRead;
     private final AmazonS3 amazonS3Write;
     private final AmazonS3 amazonS3Read;
 
     public AmazonS3Service(
             @Value("${s3.ak}") String ak,
             @Value("${s3.sk}") String sk,
-            @Value("${s3.end_point_write}") String endPointWrite,
-            @Value("${s3.end_point_read}") String endPointRead) {
-        this.endPointWrite = endPointWrite;
-        this.endPointRead = endPointRead;
+            @Value("${s3.endpoint_write}") String endpointWrite,
+            @Value("${s3.endpoint_read}") String endpointRead) {
+        this.endpointWrite = endpointWrite;
+        this.endpointRead = endpointRead;
         BasicAWSCredentials credentials = new BasicAWSCredentials(ak, sk);
         AWSStaticCredentialsProvider provider = new AWSStaticCredentialsProvider(credentials);
         this.amazonS3Write = AmazonS3ClientBuilder.standard()
                 .withCredentials(provider)
-                .withEndpointConfiguration(new EndpointConfiguration(this.endPointWrite, Regions.CN_NORTH_1.getName()))
+                .withEndpointConfiguration(new EndpointConfiguration(this.endpointWrite, Regions.CN_NORTH_1.getName()))
                 .withPathStyleAccessEnabled(true)
                 .build();
         this.amazonS3Read = AmazonS3ClientBuilder.standard()
                 .withCredentials(provider)
-                .withEndpointConfiguration(new EndpointConfiguration(this.endPointRead, Regions.CN_NORTH_1.getName()))
+                .withEndpointConfiguration(new EndpointConfiguration(this.endpointRead, Regions.CN_NORTH_1.getName()))
                 .withPathStyleAccessEnabled(true)
                 .build();
     }

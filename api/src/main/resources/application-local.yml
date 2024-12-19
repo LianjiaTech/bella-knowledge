@@ -91,5 +91,5 @@ bella:
 s3:
   ak: access_key
   sk: secret_key
-  end_point_write: http://storage.example.com
-  end_point_read: http://storage.example.com
+  endpoint_write: http://storage.example.com
+  endpoint_read: http://storage.example.com
