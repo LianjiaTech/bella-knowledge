@@ -5,12 +5,12 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class Configs {
-    public static Long MAX_SIZE_IN_MB;
+    public static String MAX_FILE_SIZE;
     public static String OPEN_API_BASE;
 
-    @Value("${bella.file-api.file.max-size-in-MB}")
-    public void setMaxSizeInMB(Long maxSizeInMB) {
-        MAX_SIZE_IN_MB = maxSizeInMB;
+    @Value("${spring.servlet.multipart.max-file-size}")
+    public void setMaxSizeInMB(String maxFileSize) {
+        MAX_FILE_SIZE = maxFileSize;
     }
 
     @Value("${bella.open-api-base}")
