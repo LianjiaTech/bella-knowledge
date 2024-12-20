@@ -65,6 +65,7 @@ spring:
     multipart:
       max-file-size: 512MB
       max-request-size: 512MB
+      resolve-lazily: true
   jackson:
     property-naming-strategy: SNAKE_CASE
     default-property-inclusion: NON_NULL
@@ -83,7 +84,6 @@ bella:
       - indexing
       - parser
     file:
-      max-size-in-MB: 512
       tmp-file-dir: /data0/www/privdata/example-file-api
     bucket-name:
       vision: test
@@ -94,3 +94,6 @@ s3:
   sk: secret_key
   endpoint_write: http://storage.example.com
   endpoint_read: http://storage.example.com
+server:
+  tomcat:
+    max-swallow-size: -1

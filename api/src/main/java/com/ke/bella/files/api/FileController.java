@@ -1,6 +1,5 @@
 package com.ke.bella.files.api;
 
-import static com.ke.bella.files.configuration.Configs.MAX_SIZE_IN_MB;
 import static com.ke.bella.files.service.FileService.ONE_DAY_STRING;
 
 import java.io.File;
@@ -26,7 +25,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.ke.bella.files.annotations.FileAPI;
 import com.ke.bella.files.protocol.FileException.FileNotFoundException;
-import com.ke.bella.files.protocol.FileException.FileTooLargeException;
 import com.ke.bella.files.protocol.FileException.ProgressNotFoundException;
 import com.ke.bella.files.protocol.FileUrl;
 import com.ke.bella.files.protocol.OpenAIFile;
@@ -54,12 +52,6 @@ public class FileController {
             @RequestPart(value = "file") MultipartFile file,
             @RequestParam(value = "purpose", required = false) String purpose,
             @RequestParam(value = "metadata", required = false) String metadata) throws IOException {
-
-        long maxSizeInBytes = MAX_SIZE_IN_MB * 1024 * 1024; // 512MB in bytes
-        long fileSize = file.getSize();
-        if(fileSize > maxSizeInBytes) {
-            throw new FileTooLargeException(fileSize, file.getOriginalFilename());
-        }
         File tmpFile = null;
         try {
             String extension = FileExtensionDetectUtil.detectExtension(file.getOriginalFilename());

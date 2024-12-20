@@ -1,5 +1,7 @@
 package com.ke.bella.files.api.interceptor;
 
+import static com.ke.bella.files.configuration.Configs.MAX_FILE_SIZE;
+
 import java.io.PrintWriter;
 import java.io.StringWriter;
 
@@ -12,13 +14,13 @@ import org.springframework.http.server.ServerHttpResponse;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
 
 import com.ke.bella.files.annotations.FileAPI;
 import com.ke.bella.files.protocol.CustomOpenAiError;
 import com.ke.bella.files.protocol.FileException.AuthorizationException;
 import com.ke.bella.files.protocol.FileException.FileNotFoundException;
-import com.ke.bella.files.protocol.FileException.FileTooLargeException;
 import com.ke.bella.files.protocol.FileException.ProgressNotFoundException;
 import com.ke.bella.files.utils.JsonUtils;
 import com.theokanning.openai.OpenAiError.OpenAiErrorDetails;
@@ -68,8 +70,9 @@ public class FileApiResponseAdvice implements ResponseBodyAdvice<Object> {
             code = 401;
         } else if(e instanceof FileNotFoundException || e instanceof ProgressNotFoundException) {
             code = 404;
-        } else if(e instanceof FileTooLargeException) {
+        } else if(e instanceof MaxUploadSizeExceededException) {
             code = 413;
+            msg = String.format("File size exceeds the maximum limit of %s.", MAX_FILE_SIZE);
         } else if(e instanceof IllegalArgumentException) {
             code = 400;
         }
