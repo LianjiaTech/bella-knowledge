@@ -60,9 +60,4 @@ public class AmazonS3Service {
         URL singedUrl = amazonS3Read.generatePresignedUrl(bucketName, fileKey, expirationDate);
         return singedUrl.toString();
     }
-
-    public String getPublicUrl(String bucketName, String fileKey) {
-        URL unsignUrl = amazonS3Read.getUrl(bucketName, fileKey);
-        return unsignUrl.toString();
-    }
 }
