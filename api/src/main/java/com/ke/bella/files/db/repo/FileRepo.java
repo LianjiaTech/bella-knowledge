@@ -60,10 +60,14 @@ public class FileRepo implements BaseRepo {
         if(fileId.startsWith("file-")) {
             return fileId;
         }
-        return db.select(FILE_MAPPING.FILE_ID)
+        String newFileId = db.select(FILE_MAPPING.FILE_ID)
                 .from(FILE_MAPPING)
                 .where(FILE_MAPPING.FILE_ID_OLD.eq(fileId))
                 .fetchOneInto(String.class);
+        if(newFileId == null) {
+            throw new FileNotFoundException(fileId);
+        }
+        return newFileId;
     }
 
     public FileDB queryFile(String fileId) {
