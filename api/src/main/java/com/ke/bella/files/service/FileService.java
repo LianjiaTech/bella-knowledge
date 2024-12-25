@@ -179,7 +179,9 @@ public class FileService {
         FileDB file = fileRepo.queryFile(fileId);
         String bucketName = file.getBucket();
         String keyName = file.getPath();
-        String url = amazonS3Service.getPresignedUrl(bucketName, keyName, expires);
+        String purpose = file.getPurpose();
+        String url = purpose.equals(VISION) ? amazonS3Service.getPublicUrl(bucketName, keyName)
+                : amazonS3Service.getPresignedUrl(bucketName, keyName, expires);
         return FileUrl.builder()
                 .s3Url(url)
                 .build();
