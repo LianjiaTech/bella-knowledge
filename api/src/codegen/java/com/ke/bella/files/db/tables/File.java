@@ -69,12 +69,15 @@ public class File extends TableImpl<FileRecord> {
     /**
      * The column <code>file.mime_type</code>. mime type
      */
-    public final TableField<FileRecord, String> MIME_TYPE = createField(DSL.name("mime_type"), SQLDataType.VARCHAR(32).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "mime type");
+    public final TableField<FileRecord, String> MIME_TYPE = createField(DSL.name("mime_type"),
+            SQLDataType.VARCHAR(512).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "mime type");
 
     /**
      * The column <code>file.type</code>. subtype of mime type, also known as file type
      */
-    public final TableField<FileRecord, String> TYPE = createField(DSL.name("type"), SQLDataType.VARCHAR(16).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "subtype of mime type, also known as file type");
+    public final TableField<FileRecord, String> TYPE = createField(DSL.name("type"),
+            SQLDataType.VARCHAR(512).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this,
+            "subtype of mime type, also known as file type");
 
     /**
      * The column <code>file.bucket</code>. 存储的地方
