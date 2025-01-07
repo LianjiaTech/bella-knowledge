@@ -19,7 +19,7 @@ import org.jooq.Identity;
 import org.jooq.Index;
 import org.jooq.Name;
 import org.jooq.Record;
-import org.jooq.Row18;
+import org.jooq.Row20;
 import org.jooq.Schema;
 import org.jooq.Table;
 import org.jooq.TableField;
@@ -65,6 +65,16 @@ public class File extends TableImpl<FileRecord> {
      * The column <code>file.filename</code>. 文件名
      */
     public final TableField<FileRecord, String> FILENAME = createField(DSL.name("filename"), SQLDataType.VARCHAR(512).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "文件名");
+
+    /**
+     * The column <code>file.mime_type</code>. mime type
+     */
+    public final TableField<FileRecord, String> MIME_TYPE = createField(DSL.name("mime_type"), SQLDataType.VARCHAR(32).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "mime type");
+
+    /**
+     * The column <code>file.type</code>. subtype of mime type, also known as file type
+     */
+    public final TableField<FileRecord, String> TYPE = createField(DSL.name("type"), SQLDataType.VARCHAR(16).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "subtype of mime type, also known as file type");
 
     /**
      * The column <code>file.bucket</code>. 存储的地方
@@ -226,11 +236,11 @@ public class File extends TableImpl<FileRecord> {
     }
 
     // -------------------------------------------------------------------------
-    // Row18 type methods
+    // Row20 type methods
     // -------------------------------------------------------------------------
 
     @Override
-    public Row18<Long, String, String, String, String, Long, String, String, Long, String, LocalDateTime, Long, String, LocalDateTime, String, Integer, String, Long> fieldsRow() {
-        return (Row18) super.fieldsRow();
+    public Row20<Long, String, String, String, String, String, String, Long, String, String, Long, String, LocalDateTime, Long, String, LocalDateTime, String, Integer, String, Long> fieldsRow() {
+        return (Row20) super.fieldsRow();
     }
 }

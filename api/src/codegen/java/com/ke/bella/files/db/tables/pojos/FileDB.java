@@ -21,6 +21,8 @@ public class FileDB implements Operator, Serializable {
     private Long          id;
     private String        fileId;
     private String        filename;
+    private String        mimeType;
+    private String        type;
     private String        bucket;
     private String        path;
     private Long          bytes;
@@ -43,6 +45,8 @@ public class FileDB implements Operator, Serializable {
         this.id = value.id;
         this.fileId = value.fileId;
         this.filename = value.filename;
+        this.mimeType = value.mimeType;
+        this.type = value.type;
         this.bucket = value.bucket;
         this.path = value.path;
         this.bytes = value.bytes;
@@ -64,6 +68,8 @@ public class FileDB implements Operator, Serializable {
         Long          id,
         String        fileId,
         String        filename,
+        String        mimeType,
+        String        type,
         String        bucket,
         String        path,
         Long          bytes,
@@ -83,6 +89,8 @@ public class FileDB implements Operator, Serializable {
         this.id = id;
         this.fileId = fileId;
         this.filename = filename;
+        this.mimeType = mimeType;
+        this.type = type;
         this.bucket = bucket;
         this.path = path;
         this.bytes = bytes;
@@ -140,6 +148,34 @@ public class FileDB implements Operator, Serializable {
      */
     public void setFilename(String filename) {
         this.filename = filename;
+    }
+
+    /**
+     * Getter for <code>file.mime_type</code>. mime type
+     */
+    public String getMimeType() {
+        return this.mimeType;
+    }
+
+    /**
+     * Setter for <code>file.mime_type</code>. mime type
+     */
+    public void setMimeType(String mimeType) {
+        this.mimeType = mimeType;
+    }
+
+    /**
+     * Getter for <code>file.type</code>. subtype of mime type, also known as file type
+     */
+    public String getType() {
+        return this.type;
+    }
+
+    /**
+     * Setter for <code>file.type</code>. subtype of mime type, also known as file type
+     */
+    public void setType(String type) {
+        this.type = type;
     }
 
     /**
@@ -359,6 +395,8 @@ public class FileDB implements Operator, Serializable {
         sb.append(id);
         sb.append(", ").append(fileId);
         sb.append(", ").append(filename);
+        sb.append(", ").append(mimeType);
+        sb.append(", ").append(type);
         sb.append(", ").append(bucket);
         sb.append(", ").append(path);
         sb.append(", ").append(bytes);

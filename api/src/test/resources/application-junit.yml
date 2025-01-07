@@ -1,0 +1,4 @@
+bella:
+  file-api:
+    file:
+      tmp-file-dir: .

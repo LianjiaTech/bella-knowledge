@@ -10,5 +10,9 @@ import lombok.experimental.SuperBuilder;
 @NoArgsConstructor
 @Data
 public class FileUrl {
-    private String s3Url;
+    private String url;
+
+    public String getS3Url() {
+        return getUrl();
+    }
 }

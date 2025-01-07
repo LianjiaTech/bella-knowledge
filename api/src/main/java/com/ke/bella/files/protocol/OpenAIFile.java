@@ -1,5 +1,7 @@
 package com.ke.bella.files.protocol;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -32,4 +34,15 @@ public class OpenAIFile {
     private String status;
     @Deprecated
     private String statusDetails;
+    private String url;
+    /**
+     * subtype of mime_type. eg: image/jpeg
+     */
+    @JsonProperty("mime_type")
+    private String mimeType;
+    /**
+     * type of mime_type. eg: image
+     */
+    private String type;
+    private String extension;
 }
