@@ -84,7 +84,7 @@ bella:
       - indexing
       - parser
     file:
-      tmp-file-dir: /data0/www/privdata/example-file-api
+      tmp-file-dir: .
     bucket-name:
       vision: test
       general: test

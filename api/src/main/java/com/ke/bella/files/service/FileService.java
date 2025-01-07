@@ -26,7 +26,6 @@ import com.ke.bella.files.protocol.EventType;
 import com.ke.bella.files.protocol.FileBroadcasting;
 import com.ke.bella.files.protocol.FileOps;
 import com.ke.bella.files.protocol.FileStatus;
-import com.ke.bella.files.protocol.FileUrl;
 import com.ke.bella.files.protocol.OpenAIFile;
 import com.ke.bella.files.protocol.Progress;
 import com.ke.bella.files.protocol.UpdateProgressRequestData;
@@ -72,6 +71,8 @@ public class FileService {
                         .toInstant(ZoneId.systemDefault().getRules().getOffset(fileDB.getCtime()))
                         .toEpochMilli())
                 .filename(fileDB.getFilename())
+                .mimeType(fileDB.getMimeType())
+                .type(fileDB.getType())
                 .purpose(fileDB.getPurpose())
                 .build();
     }
@@ -102,6 +103,8 @@ public class FileService {
             String filename,
             String purpose,
             String metadata,
+            String mimeType,
+            String type,
             String extension) {
         String spaceCode = BellaContext.getOperator().getSpaceCode();
         String fileId = FILEID_GEN.generate();
@@ -116,6 +119,8 @@ public class FileService {
         FileDB fileDB = new FileDB();
         fileDB.setFileId(fileId);
         fileDB.setFilename(filename);
+        fileDB.setMimeType(mimeType);
+        fileDB.setType(type);
         fileDB.setBucket(bucketName);
         fileDB.setPath(keyName);
         fileDB.setBytes(file.length());
@@ -169,22 +174,19 @@ public class FileService {
         }
     }
 
-    public FileUrl getUrl(String fileId) {
+    public String getUrl(String fileId) {
         return getUrl(fileId, ONE_DAY);
     }
 
-    public FileUrl getUrl(
+    public String getUrl(
             String fileId,
-            Long expires) {
+            long expires) {
         FileDB file = fileRepo.queryFile(fileId);
         String bucketName = file.getBucket();
         String keyName = file.getPath();
         String purpose = file.getPurpose();
-        String url = purpose.equals(VISION) ? amazonS3Service.getPublicUrl(bucketName, keyName)
+        return purpose.equals(VISION) ? amazonS3Service.getPublicUrl(bucketName, keyName)
                 : amazonS3Service.getPresignedUrl(bucketName, keyName, expires);
-        return FileUrl.builder()
-                .s3Url(url)
-                .build();
     }
 
     public void updateProgress(

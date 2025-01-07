@@ -5,6 +5,7 @@ import static com.ke.bella.files.service.FileService.ONE_DAY_STRING;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 
 import javax.servlet.http.HttpServletResponse;
 
@@ -32,9 +33,10 @@ import com.ke.bella.files.protocol.OpenapiListResponse;
 import com.ke.bella.files.protocol.Progress;
 import com.ke.bella.files.protocol.UpdateProgressRequestData;
 import com.ke.bella.files.service.FileService;
-import com.ke.bella.files.utils.FileExtensionDetectUtil;
+import com.ke.bella.files.utils.FileUtils;
 
 import lombok.extern.slf4j.Slf4j;
+import okhttp3.MediaType;
 
 @FileAPI
 @RestController
@@ -51,15 +53,33 @@ public class FileController {
     public OpenAIFile upload(
             @RequestPart(value = "file") MultipartFile file,
             @RequestParam(value = "purpose", required = false) String purpose,
-            @RequestParam(value = "metadata", required = false) String metadata) throws IOException {
+            @RequestParam(value = "metadata", required = false) String metadata,
+            @RequestParam(value = "get_url", required = false, defaultValue = "false") boolean getUrl,
+            @RequestParam(value = "expires", required = false, defaultValue = ONE_DAY_STRING) long expires) throws IOException {
         File tmpFile = null;
         try {
-            String extension = FileExtensionDetectUtil.detectExtension(file.getOriginalFilename());
+            MediaType mimeTypeSource = Optional.ofNullable(file.getContentType()).map(MediaType::parse).orElse(null);
+            String type = "";
+            String mimeType = "";
+            if(mimeTypeSource != null) {
+                type = FileUtils.getFileType(mimeTypeSource);
+                mimeType = FileUtils.extraPureMediaType(mimeTypeSource);
+            }
+
+            String extension = FileUtils.detectExtension(file.getOriginalFilename());
             String suffix = StringUtils.isEmpty(extension) ? "" : "." + extension;
+
             File tmpDir = new File(tmpFileDir);
             tmpFile = File.createTempFile("tmp", suffix, tmpDir);
             file.transferTo(tmpFile);
-            return fileService.upload(tmpFile, file.getOriginalFilename(), purpose, metadata, extension);
+            OpenAIFile openaiFile = fileService.upload(tmpFile, file.getOriginalFilename(), purpose, metadata, mimeType, type, extension);
+
+            if(getUrl) {
+                String url = fileService.getUrl(openaiFile.getId(), expires);
+                openaiFile.setUrl(url);
+            }
+
+            return openaiFile;
         } finally {
             if(tmpFile != null) {
                 boolean deleteSuccess = tmpFile.delete();
@@ -75,7 +95,9 @@ public class FileController {
             @RequestParam(value = "purpose", required = false) String purpose,
             @RequestParam(value = "limit", required = false, defaultValue = "10000") Integer limit,
             @RequestParam(value = "order", required = false, defaultValue = "desc") String order,
-            @RequestParam(value = "after", required = false) String after) {
+            @RequestParam(value = "after", required = false) String after,
+            @RequestParam(value = "get_url", required = false, defaultValue = "false") boolean getUrl,
+            @RequestParam(value = "expires", required = false, defaultValue = ONE_DAY_STRING) long expires) {
         if(limit < 1) {
             throw new IllegalArgumentException(limit + " is less than the minimum of 1");
         }
@@ -101,15 +123,29 @@ public class FileController {
         } else if(!files.isEmpty()) {
             res.setLastId(files.get(files.size() - 1).getId());
         }
+
+        if(getUrl) {
+            for (OpenAIFile file : files) {
+                String url = fileService.getUrl(file.getId(), expires);
+                file.setUrl(url);
+            }
+        }
+
         res.setData(files);
         return res;
     }
 
     @GetMapping("/{file_id}")
-    public OpenAIFile get(@PathVariable("file_id") String fileId) {
+    public OpenAIFile get(@PathVariable("file_id") String fileId,
+            @RequestParam(value = "get_url", required = false, defaultValue = "false") boolean getUrl,
+            @RequestParam(value = "expires", required = false, defaultValue = ONE_DAY_STRING) long expires) {
         OpenAIFile file = fileService.getFile(fileId);
         if(file == null) {
             throw new FileNotFoundException(fileId);
+        }
+        if(getUrl) {
+            String url = fileService.getUrl(file.getId(), expires);
+            file.setUrl(url);
         }
         return file;
     }
@@ -135,8 +171,7 @@ public class FileController {
         if(file == null) {
             throw new FileNotFoundException(fileId);
         }
-        FileUrl fileUrl = fileService.getUrl(fileId);
-        String redirectUrl = fileUrl.getS3Url();
+        String redirectUrl = fileService.getUrl(fileId);
         response.setHeader(HttpHeaders.LOCATION, redirectUrl);
         response.setStatus(HttpServletResponse.SC_MOVED_TEMPORARILY);
     }
@@ -149,7 +184,10 @@ public class FileController {
         if(file == null) {
             throw new FileNotFoundException(fileId);
         }
-        return fileService.getUrl(fileId, expires);
+        String url = fileService.getUrl(fileId, expires);
+        return FileUrl.builder()
+                .url(url)
+                .build();
     }
 
     @PostMapping("{file_id}/progress/{progress_name}")

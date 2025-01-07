@@ -64,7 +64,7 @@ public class AmazonS3Service {
     public String getPresignedUrl(
             String bucketName,
             String fileKey,
-            Long expirationSeconds) {
+            long expirationSeconds) {
         Date expirationDate = Date.from(LocalDateTime.now().plusSeconds(expirationSeconds).atZone(ZoneId.systemDefault()).toInstant());
         URL singedUrl = amazonS3ReadPrivate.generatePresignedUrl(bucketName, fileKey, expirationDate);
         return singedUrl.toString();
