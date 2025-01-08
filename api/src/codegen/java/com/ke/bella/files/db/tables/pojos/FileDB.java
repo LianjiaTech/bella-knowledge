@@ -21,6 +21,7 @@ public class FileDB implements Operator, Serializable {
     private Long          id;
     private String        fileId;
     private String        filename;
+    private String extension;
     private String        mimeType;
     private String        type;
     private String        bucket;
@@ -45,6 +46,7 @@ public class FileDB implements Operator, Serializable {
         this.id = value.id;
         this.fileId = value.fileId;
         this.filename = value.filename;
+        this.extension = value.extension;
         this.mimeType = value.mimeType;
         this.type = value.type;
         this.bucket = value.bucket;
@@ -68,6 +70,7 @@ public class FileDB implements Operator, Serializable {
         Long          id,
         String        fileId,
         String        filename,
+            String extension,
         String        mimeType,
         String        type,
         String        bucket,
@@ -89,6 +92,7 @@ public class FileDB implements Operator, Serializable {
         this.id = id;
         this.fileId = fileId;
         this.filename = filename;
+        this.extension = extension;
         this.mimeType = mimeType;
         this.type = type;
         this.bucket = bucket;
@@ -148,6 +152,20 @@ public class FileDB implements Operator, Serializable {
      */
     public void setFilename(String filename) {
         this.filename = filename;
+    }
+
+    /**
+     * Getter for <code>file.extension</code>. extension
+     */
+    public String getExtension() {
+        return this.extension;
+    }
+
+    /**
+     * Setter for <code>file.extension</code>. extension
+     */
+    public void setExtension(String extension) {
+        this.extension = extension;
     }
 
     /**
@@ -395,6 +413,7 @@ public class FileDB implements Operator, Serializable {
         sb.append(id);
         sb.append(", ").append(fileId);
         sb.append(", ").append(filename);
+        sb.append(", ").append(extension);
         sb.append(", ").append(mimeType);
         sb.append(", ").append(type);
         sb.append(", ").append(bucket);

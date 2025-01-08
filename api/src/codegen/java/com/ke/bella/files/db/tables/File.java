@@ -19,7 +19,7 @@ import org.jooq.Identity;
 import org.jooq.Index;
 import org.jooq.Name;
 import org.jooq.Record;
-import org.jooq.Row20;
+import org.jooq.Row21;
 import org.jooq.Schema;
 import org.jooq.Table;
 import org.jooq.TableField;
@@ -65,6 +65,12 @@ public class File extends TableImpl<FileRecord> {
      * The column <code>file.filename</code>. 文件名
      */
     public final TableField<FileRecord, String> FILENAME = createField(DSL.name("filename"), SQLDataType.VARCHAR(512).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "文件名");
+
+    /**
+     * The column <code>file.extension</code>. extension
+     */
+    public final TableField<FileRecord, String> EXTENSION = createField(DSL.name("extension"),
+            SQLDataType.VARCHAR(512).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "extension");
 
     /**
      * The column <code>file.mime_type</code>. mime type
@@ -239,11 +245,11 @@ public class File extends TableImpl<FileRecord> {
     }
 
     // -------------------------------------------------------------------------
-    // Row20 type methods
+    // Row21 type methods
     // -------------------------------------------------------------------------
 
     @Override
-    public Row20<Long, String, String, String, String, String, String, Long, String, String, Long, String, LocalDateTime, Long, String, LocalDateTime, String, Integer, String, Long> fieldsRow() {
-        return (Row20) super.fieldsRow();
+    public Row21<Long, String, String, String, String, String, String, String, Long, String, String, Long, String, LocalDateTime, Long, String, LocalDateTime, String, Integer, String, Long> fieldsRow() {
+        return (Row21) super.fieldsRow();
     }
 }

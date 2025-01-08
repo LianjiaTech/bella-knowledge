@@ -71,6 +71,7 @@ public class FileService {
                         .toInstant(ZoneId.systemDefault().getRules().getOffset(fileDB.getCtime()))
                         .toEpochMilli())
                 .filename(fileDB.getFilename())
+                .extension(fileDB.getExtension())
                 .mimeType(fileDB.getMimeType())
                 .type(fileDB.getType())
                 .purpose(fileDB.getPurpose())
@@ -119,6 +120,7 @@ public class FileService {
         FileDB fileDB = new FileDB();
         fileDB.setFileId(fileId);
         fileDB.setFilename(filename);
+        fileDB.setExtension(extension);
         fileDB.setMimeType(mimeType);
         fileDB.setType(type);
         fileDB.setBucket(bucketName);

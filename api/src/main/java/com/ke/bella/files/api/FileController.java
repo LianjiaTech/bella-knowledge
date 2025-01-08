@@ -9,6 +9,7 @@ import java.util.Optional;
 
 import javax.servlet.http.HttpServletResponse;
 
+import com.ke.bella.openapi.utils.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,7 +34,6 @@ import com.ke.bella.files.protocol.OpenapiListResponse;
 import com.ke.bella.files.protocol.Progress;
 import com.ke.bella.files.protocol.UpdateProgressRequestData;
 import com.ke.bella.files.service.FileService;
-import com.ke.bella.files.utils.FileUtils;
 
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.MediaType;
@@ -62,11 +62,11 @@ public class FileController {
             String type = "";
             String mimeType = "";
             if(mimeTypeSource != null) {
-                type = FileUtils.getFileType(mimeTypeSource);
+                type = FileUtils.getType(mimeTypeSource);
                 mimeType = FileUtils.extraPureMediaType(mimeTypeSource);
             }
 
-            String extension = FileUtils.detectExtension(file.getOriginalFilename());
+            String extension = FileUtils.getFileExtension(file.getOriginalFilename());
             String suffix = StringUtils.isEmpty(extension) ? "" : "." + extension;
 
             File tmpDir = new File(tmpFileDir);
