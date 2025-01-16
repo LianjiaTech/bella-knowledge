@@ -200,7 +200,7 @@ public class FileRepo implements BaseRepo {
     }
 
     public List<FileDB> getFiles(ListFileOps ops) {
-        String shardingKey = getShardingKeyBySpaceCode(BellaContext.getOperator().getSpaceCode());
+        String shardingKey = getShardingKeyByFileId(ops.getFileIds().get(0));
 
         return db(shardingKey).selectFrom(FILE)
                 .where(FILE.STATUS.eq(FileStatus.NOT_DELETED.getValue()))
