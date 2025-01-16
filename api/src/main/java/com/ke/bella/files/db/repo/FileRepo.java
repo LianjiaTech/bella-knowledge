@@ -15,6 +15,7 @@ import org.jooq.DSLContext;
 import org.jooq.impl.DSL;
 import org.springframework.stereotype.Component;
 
+import com.ke.bella.files.BellaContext;
 import com.ke.bella.files.db.tables.pojos.FileDB;
 import com.ke.bella.files.db.tables.pojos.FileProgressDB;
 import com.ke.bella.files.db.tables.records.FileProgressRecord;
@@ -22,6 +23,7 @@ import com.ke.bella.files.db.tables.records.FileRecord;
 import com.ke.bella.files.protocol.FileException.FileNotFoundException;
 import com.ke.bella.files.protocol.FileOps;
 import com.ke.bella.files.protocol.FileStatus;
+import com.ke.bella.files.protocol.ListFileOps;
 import com.ke.bella.files.utils.CustomStringUtils;
 
 @Component
@@ -195,5 +197,15 @@ public class FileRepo implements BaseRepo {
         if(updatedNum != 1) {
             throw new IllegalStateException("update progress failed, fileId: " + fileId + ", progressName: " + progressName);
         }
+    }
+
+    public List<FileDB> getFiles(ListFileOps ops) {
+        String shardingKey = getShardingKeyBySpaceCode(BellaContext.getOperator().getSpaceCode());
+
+        return db(shardingKey).selectFrom(FILE)
+                .where(FILE.STATUS.eq(FileStatus.NOT_DELETED.getValue()))
+                .and(FILE.FILE_ID.in(ops.getFileIds()))
+                .limit(ops.getFileIds().size())
+                .fetchInto(FileDB.class);
     }
 }

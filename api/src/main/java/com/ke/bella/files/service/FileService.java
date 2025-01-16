@@ -26,6 +26,7 @@ import com.ke.bella.files.protocol.EventType;
 import com.ke.bella.files.protocol.FileBroadcasting;
 import com.ke.bella.files.protocol.FileOps;
 import com.ke.bella.files.protocol.FileStatus;
+import com.ke.bella.files.protocol.ListFileOps;
 import com.ke.bella.files.protocol.OpenAIFile;
 import com.ke.bella.files.protocol.Progress;
 import com.ke.bella.files.protocol.UpdateProgressRequestData;
@@ -210,5 +211,18 @@ public class FileService {
             String progressName) {
         FileProgressDB fileProgressDB = fileRepo.queryProgress(fileId, progressName);
         return fileProgressDB == null ? null : transferToProgress(fileProgressDB);
+    }
+
+    /**
+     * 支持通过fileIds批量查询，默认所有file在同一个space下
+     *
+     * @param ops
+     *
+     * @return
+     */
+    public List<OpenAIFile> getFiles(ListFileOps ops) {
+        List<FileDB> files = fileRepo.getFiles(ops);
+        List<OpenAIFile> emptyList = new ArrayList<>();
+        return files == null ? emptyList : files.stream().map(this::transferToOpenAIFile).collect(Collectors.toList());
     }
 }
