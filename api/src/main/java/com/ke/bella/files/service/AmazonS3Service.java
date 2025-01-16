@@ -1,7 +1,9 @@
 package com.ke.bella.files.service;
 
 import java.io.File;
+import java.io.InputStream;
 import java.net.URL;
+import java.nio.file.Files;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Date;
@@ -15,8 +17,12 @@ import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
+import com.amazonaws.services.s3.model.ObjectMetadata;
+
+import lombok.extern.slf4j.Slf4j;
 
 @Component
+@Slf4j
 public class AmazonS3Service {
     private final String endpointWrite;
     private final String endpointReadPrivate;
@@ -56,8 +62,28 @@ public class AmazonS3Service {
     public String putObject(
             String bucketName,
             String fileKey,
-            File file) {
-        amazonS3Write.putObject(bucketName, fileKey, file);
+            String mimeType,
+            File file,
+            String filename) {
+        ObjectMetadata metadata = new ObjectMetadata();
+        metadata.setContentType(mimeType);
+        metadata.setContentDisposition("attachment; filename=" + filename);
+
+        InputStream inputStream = null;
+        try {
+            inputStream = Files.newInputStream(file.toPath());
+            amazonS3Write.putObject(bucketName, fileKey, inputStream, metadata);
+        } catch (Exception e) {
+            throw new IllegalStateException("failed to upload file to s3, e:", e);
+        } finally {
+            if(inputStream != null) {
+                try {
+                    inputStream.close();
+                } catch (Exception e) {
+                    LOGGER.error("failed to close inputStream", e);
+                }
+            }
+        }
         return fileKey;
     }
 

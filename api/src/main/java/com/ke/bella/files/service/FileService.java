@@ -114,7 +114,7 @@ public class FileService {
         if(StringUtils.isNotEmpty(extension)) {
             keyName += "." + extension;
         }
-        amazonS3Service.putObject(bucketName, keyName, file);
+        amazonS3Service.putObject(bucketName, keyName, mimeType, file, filename);
 
         // 保存文件信息到数据库
         FileDB fileDB = new FileDB();
