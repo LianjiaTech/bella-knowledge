@@ -32,7 +32,7 @@ public class FileTest extends AbstractTest {
     public void testGetOpenAIFile() throws Exception {
         File file = new File("src/test/resources/upload_test.jpg");
         FileInputStream inputStream = new FileInputStream(file);
-        MockMultipartFile mockFile = new MockMultipartFile("file", inputStream);
+        MockMultipartFile mockFile = new MockMultipartFile("file", "upload_test.jpg", "image/jpeg", inputStream);
 
         MvcResult mvcResult = mockMvc
                 .perform(multipart("/v1/files")

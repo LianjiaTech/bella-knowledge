@@ -18,6 +18,7 @@ import com.amazonaws.regions.Regions;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.ObjectMetadata;
+import com.amazonaws.services.s3.model.PutObjectRequest;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -30,6 +31,8 @@ public class AmazonS3Service {
     private final AmazonS3 amazonS3Write;
     private final AmazonS3 amazonS3ReadPrivate;
     private final AmazonS3 amazonS3ReadPublic;
+
+    private static final Integer S3_MAX_FILE_SIZE_BYTES = 512 * 1024 * 1024;
 
     public AmazonS3Service(
             @Value("${s3.ak}") String ak,
@@ -72,7 +75,10 @@ public class AmazonS3Service {
         InputStream inputStream = null;
         try {
             inputStream = Files.newInputStream(file.toPath());
-            amazonS3Write.putObject(bucketName, fileKey, inputStream, metadata);
+            PutObjectRequest putObjectRequest = new PutObjectRequest(bucketName, fileKey, inputStream, metadata);
+            putObjectRequest.getRequestClientOptions().setReadLimit(S3_MAX_FILE_SIZE_BYTES);
+
+            amazonS3Write.putObject(putObjectRequest);
         } catch (Exception e) {
             throw new IllegalStateException("failed to upload file to s3, e:", e);
         } finally {
