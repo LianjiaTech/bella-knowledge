@@ -9,11 +9,11 @@ import java.util.Optional;
 
 import javax.servlet.http.HttpServletResponse;
 
-import com.ke.bella.openapi.utils.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
+import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -29,11 +29,13 @@ import com.ke.bella.files.annotations.FileAPI;
 import com.ke.bella.files.protocol.FileException.FileNotFoundException;
 import com.ke.bella.files.protocol.FileException.ProgressNotFoundException;
 import com.ke.bella.files.protocol.FileUrl;
+import com.ke.bella.files.protocol.ListFileOps;
 import com.ke.bella.files.protocol.OpenAIFile;
 import com.ke.bella.files.protocol.OpenapiListResponse;
 import com.ke.bella.files.protocol.Progress;
 import com.ke.bella.files.protocol.UpdateProgressRequestData;
 import com.ke.bella.files.service.FileService;
+import com.ke.bella.openapi.utils.FileUtils;
 
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.MediaType;
@@ -214,5 +216,24 @@ public class FileController {
             throw new ProgressNotFoundException(fileId, progressName);
         }
         return res;
+    }
+
+    @PostMapping("/list")
+    public List<OpenAIFile> getFiles(@RequestBody ListFileOps ops) {
+        if(ops == null) {
+            throw new IllegalArgumentException("Invalid request body");
+        }
+        if(CollectionUtils.isEmpty(ops.getFileIds()) || ops.getFileIds().size() > 1000) {
+            throw new IllegalArgumentException("the size of file_ids must be between 1 and 1000");
+        }
+
+        List<OpenAIFile> files = fileService.getFiles(ops);
+        if(ops.isGetUrl()) {
+            for (OpenAIFile file : files) {
+                String url = fileService.getUrl(file.getId(), ops.getExpires());
+                file.setUrl(url);
+            }
+        }
+        return files;
     }
 }
