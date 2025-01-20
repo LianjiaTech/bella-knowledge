@@ -5,7 +5,10 @@ import static com.ke.bella.files.db.IDGenerator.FILEID_GEN;
 import java.io.File;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import javax.annotation.Resource;
@@ -15,9 +18,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.util.DigestUtils;
 
 import com.ke.bella.files.BellaContext;
-import com.ke.bella.files.configuration.BucketConfig;
+import com.ke.bella.files.configuration.S3Config;
+import com.ke.bella.files.configuration.S3Config.MediaServiceConfig;
 import com.ke.bella.files.db.repo.FileRepo;
 import com.ke.bella.files.db.tables.pojos.FileDB;
 import com.ke.bella.files.db.tables.pojos.FileProgressDB;
@@ -39,12 +44,15 @@ public class FileService {
     public static final Long ONE_DAY = 24 * 60 * 60L;
     public static final String ONE_DAY_STRING = (24 * 60 * 60) + "";
     private static final String VISION = "vision";
+    private static final String PREVIEW_INSTRUCTION = "!m_convert,o_pdf_view";
     @Autowired
     FileRepo fileRepo;
     @Autowired
     AmazonS3Service amazonS3Service;
     @Autowired
-    private BucketConfig bucketConfig;
+    private MediaServiceConfig previewServiceConfig;
+    @Autowired
+    private S3Config s3Config;
     @Value("${spring.kafka.producer.topic.broadcast}")
     private String topic;
     @Resource
@@ -110,7 +118,7 @@ public class FileService {
             String extension) {
         String spaceCode = BellaContext.getOperator().getSpaceCode();
         String fileId = FILEID_GEN.generate();
-        String bucketName = purpose.equals(VISION) ? bucketConfig.getVisionBucket() : bucketConfig.getGeneralBucket();
+        String bucketName = purpose.equals(VISION) ? s3Config.getVisionBucket() : s3Config.getGeneralBucket();
         String keyName = String.format("%s/%s", purpose, fileId);
         if(StringUtils.isNotEmpty(extension)) {
             keyName += "." + extension;
@@ -224,5 +232,42 @@ public class FileService {
         List<FileDB> files = fileRepo.getFiles(ops);
         List<OpenAIFile> emptyList = new ArrayList<>();
         return files == null ? emptyList : files.stream().map(this::transferToOpenAIFile).collect(Collectors.toList());
+    }
+
+    public String getPreviewUrl(String fileId, Long expires) {
+        FileDB file = fileRepo.queryFile(fileId);
+        String purpose = file.getPurpose();
+        String keyName = file.getPath();
+        return purpose.equals(VISION) ? getPreviewUrlPublic(keyName, file.getBucket())
+                : getPreviewUrlPrivate(keyName, file.getBucket(), expires);
+    }
+
+    public String getPreviewUrlPublic(String keyName, String bucketName) {
+        return String.format("%s/%s/%s%s", previewServiceConfig.getEndpoint(), bucketName, keyName, PREVIEW_INSTRUCTION);
+    }
+
+    public String getPreviewUrlPrivate(String keyName, String bucketName, Long expires) {
+        String path = String.format("/%s/%s%s", bucketName, keyName, PREVIEW_INSTRUCTION);
+        long timestamp = System.currentTimeMillis() / 1000;
+
+        Map<String, String> parameters = new HashMap<>();
+
+        parameters.put("ak", previewServiceConfig.getAk());
+        parameters.put("exp", String.valueOf(expires));
+        parameters.put("path", path);
+        parameters.put("ts", String.valueOf(timestamp));
+
+        List<String> paramsKey = new ArrayList<>(parameters.keySet());
+        Collections.sort(paramsKey);
+        StringBuilder verifyStr = new StringBuilder();
+        for (String s : paramsKey) {
+            verifyStr.append(s.trim()).append("=").append(parameters.get(s).trim()).append("&");
+        }
+        verifyStr.append("sk=").append(previewServiceConfig.getSk());
+
+        String sign = DigestUtils.md5DigestAsHex(verifyStr.toString().getBytes());
+        String params = "ak=" + parameters.get("ak") + "&exp=" + parameters.get("exp") + "&ts=" + parameters.get("ts") + "&sign=" + sign;
+
+        return String.format("%s%s?%s", previewServiceConfig.getEndpoint(), path, params);
     }
 }

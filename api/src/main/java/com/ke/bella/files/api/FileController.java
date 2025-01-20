@@ -236,4 +236,15 @@ public class FileController {
         }
         return files;
     }
+
+    @GetMapping("/{file_id}/preview_url")
+    public FileUrl getPreviewUrl(
+            @PathVariable("file_id") String fileId,
+            @RequestParam(value = "expires", required = false, defaultValue = ONE_DAY_STRING) Long expires) {
+        String url = fileService.getPreviewUrl(fileId, expires);
+        return FileUrl
+                .builder()
+                .url(url)
+                .build();
+    }
 }
