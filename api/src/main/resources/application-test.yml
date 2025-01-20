@@ -95,6 +95,9 @@ s3:
   endpoint_write: http://storage.example.com
   endpoint_read_private: http://storage.example.com
   endpoint_read_public: http://storage.example.com
+  endpoint_preview: http://preview.example.com
+  ak_preview: access_key
+  sk_preview: secret_key
 server:
   tomcat:
     max-swallow-size: -1

@@ -18,6 +18,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.ke.bella.files.protocol.FileUrl;
 import com.ke.bella.files.protocol.OpenAIFile;
 import com.ke.bella.files.utils.JsonUtils;
 
@@ -30,21 +31,7 @@ public class FileTest extends AbstractTest {
 
     @Test
     public void testGetOpenAIFile() throws Exception {
-        File file = new File("src/test/resources/upload_test.jpg");
-        FileInputStream inputStream = new FileInputStream(file);
-        MockMultipartFile mockFile = new MockMultipartFile("file", "upload_test.jpg", "image/jpeg", inputStream);
-
-        MvcResult mvcResult = mockMvc
-                .perform(multipart("/v1/files")
-                        .file(mockFile)
-                        .param("purpose", "vision")
-                        .header("Authorization", "Bearer " + API_KEY))
-                .andExpect(status().isOk())
-                .andReturn();
-
-        MockHttpServletResponse response = mvcResult.getResponse();
-        OpenAIFile fileUploaded = JsonUtils.fromJson(response.getContentAsString(), new TypeReference<OpenAIFile>() {
-        });
+        OpenAIFile fileUploaded = uploadFile("upload_test.jpg", "vision", "image/jpeg");
 
         Assertions.assertNotNull(fileUploaded);
         Assertions.assertNotNull(fileUploaded.getId());
@@ -77,5 +64,70 @@ public class FileTest extends AbstractTest {
         Assertions.assertNotNull(openaiFile2.getType());
         Assertions.assertNotNull(openaiFile2.getMimeType());
         Assertions.assertNull(openaiFile2.getUrl());
+    }
+
+    @Test
+    public void getPreviewUrl() throws Exception {
+        // 先从list接口获取两种purpose的文件
+        OpenAIFile fileUploaded = uploadFile("doc_test.docx", "vision", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+
+        Assertions.assertNotNull(fileUploaded);
+        Assertions.assertNotNull(fileUploaded.getId());
+
+        String fileId = fileUploaded.getId();
+
+        FileUrl fileUrl = getPreviewUrl(fileId);
+
+        Assertions.assertNotNull(fileUrl);
+        Assertions.assertNotNull(fileUrl.getUrl());
+    }
+
+    @Test
+    public void getPreviewUrlPrivate() throws Exception {
+        // 先从list接口获取两种purpose的文件
+        OpenAIFile fileUploaded = uploadFile("doc_test.docx", "assistants",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+
+        Assertions.assertNotNull(fileUploaded);
+        Assertions.assertNotNull(fileUploaded.getId());
+
+        String fileId = fileUploaded.getId();
+
+        FileUrl fileUrl = getPreviewUrl(fileId);
+
+        Assertions.assertNotNull(fileUrl);
+        Assertions.assertNotNull(fileUrl.getUrl());
+    }
+
+    private FileUrl getPreviewUrl(String fileId) throws Exception {
+        String url = String.format("/v1/files/%s/preview_url", fileId);
+        MvcResult fileRicherResult = mockMvc.perform(get(url)
+                .header("Authorization", "Bearer " + API_KEY)
+                .param("expires", "3600")
+                .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk()).andReturn();
+        return JsonUtils.fromJson(fileRicherResult.getResponse().getContentAsString(), new TypeReference<FileUrl>() {
+        });
+    }
+
+    public OpenAIFile uploadFile(String filename, String purpose, String contentType) throws Exception {
+        // 先从list接口获取两种purpose的文件
+        File file = new File("src/test/resources/" + filename);
+        FileInputStream inputStream = new FileInputStream(file);
+        MockMultipartFile mockFile = new MockMultipartFile("file", filename,
+                contentType, inputStream);
+
+        MvcResult mvcResult = mockMvc
+                .perform(multipart("/v1/files")
+                        .file(mockFile)
+                        .param("purpose", purpose)
+                        .header("Authorization", "Bearer " + API_KEY))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        MockHttpServletResponse response = mvcResult.getResponse();
+
+        return JsonUtils.fromJson(response.getContentAsString(), new TypeReference<OpenAIFile>() {
+        });
     }
 }
