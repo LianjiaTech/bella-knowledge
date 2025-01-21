@@ -3,6 +3,7 @@ package com.ke.bella.files.service;
 import java.io.File;
 import java.io.InputStream;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -10,6 +11,7 @@ import java.util.Date;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.web.util.UriUtils;
 
 import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
@@ -19,6 +21,7 @@ import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.PutObjectRequest;
+import com.google.common.base.Throwables;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -70,7 +73,8 @@ public class AmazonS3Service {
             String filename) {
         ObjectMetadata metadata = new ObjectMetadata();
         metadata.setContentType(mimeType);
-        metadata.setContentDisposition("attachment; filename=" + filename);
+        String filenameEncoded = UriUtils.encodeFragment(filename, StandardCharsets.UTF_8);
+        metadata.setContentDisposition("attachment; filename=" + filenameEncoded);
 
         InputStream inputStream = null;
         try {
@@ -80,7 +84,10 @@ public class AmazonS3Service {
 
             amazonS3Write.putObject(putObjectRequest);
         } catch (Exception e) {
-            throw new IllegalStateException("failed to upload file to s3, e:", e);
+            String errMsg = String.format("failed to upload file to s3, bucketName: %s, fileKey: %s, mimeType: %s, filename: %s, e: %s", bucketName,
+                    fileKey, mimeType, filename, Throwables.getStackTraceAsString(e));
+            LOGGER.error(errMsg);
+            throw new IllegalStateException(errMsg);
         } finally {
             if(inputStream != null) {
                 try {

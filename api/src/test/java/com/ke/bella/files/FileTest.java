@@ -99,6 +99,14 @@ public class FileTest extends AbstractTest {
         Assertions.assertNotNull(fileUrl.getUrl());
     }
 
+    @Test
+    public void testUploadFileWithNoASCII() throws Exception {
+        OpenAIFile fileUploaded = uploadFile("中文名用例.docx", "vision", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+
+        Assertions.assertNotNull(fileUploaded);
+        Assertions.assertNotNull(fileUploaded.getId());
+    }
+
     private FileUrl getPreviewUrl(String fileId) throws Exception {
         String url = String.format("/v1/files/%s/preview_url", fileId);
         MvcResult fileRicherResult = mockMvc.perform(get(url)
