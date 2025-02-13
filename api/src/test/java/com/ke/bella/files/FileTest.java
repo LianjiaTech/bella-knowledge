@@ -2,10 +2,12 @@ package com.ke.bella.files;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.util.List;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -105,6 +107,25 @@ public class FileTest extends AbstractTest {
 
         Assertions.assertNotNull(fileUploaded);
         Assertions.assertNotNull(fileUploaded.getId());
+    }
+
+    @Test
+    public void testListFilesFromDifferentSharding() throws Exception {
+        MvcResult mvcResult = mockMvc
+                .perform(post("/v1/files/list")
+                        .content(
+                                "{\"file_ids\":[\"file-2412161207120019000935-219272336\",\"file-2412161519030019005690-272783953\",\"file-2412161519030019005692-272783953\"]}")
+                        .header("Authorization", "Bearer " + API_KEY)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        MockHttpServletResponse response = mvcResult.getResponse();
+
+        List<OpenAIFile> files = JsonUtils.fromJson(response.getContentAsString(), new TypeReference<List<OpenAIFile>>() {
+        });
+        Assertions.assertNotNull(files);
+        Assertions.assertEquals(3, files.size());
     }
 
     private FileUrl getPreviewUrl(String fileId) throws Exception {
