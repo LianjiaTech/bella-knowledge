@@ -3,9 +3,10 @@ package com.ke.bella.files.db.repo;
 import static com.ke.bella.files.db.Tables.FILE;
 import static com.ke.bella.files.db.Tables.FILE_MAPPING;
 import static com.ke.bella.files.db.Tables.FILE_PROGRESS;
+import static com.ke.bella.files.db.repo.DSLContextHolder.targetTableName;
+import static org.jooq.impl.DSL.field;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -16,7 +17,9 @@ import javax.annotation.Resource;
 import org.apache.commons.lang3.StringUtils;
 import org.jooq.Condition;
 import org.jooq.DSLContext;
+import org.jooq.Record;
 import org.jooq.SelectConditionStep;
+import org.jooq.SelectOrderByStep;
 import org.jooq.impl.DSL;
 import org.springframework.stereotype.Component;
 
@@ -207,28 +210,23 @@ public class FileRepo implements BaseRepo {
         Map<String, List<String>> shardToFileIds = ops.getFileIds().stream()
                 .collect(Collectors.groupingBy(FileRepo::getShardingKeyByFileId));
 
-        List<SelectConditionStep<FileRecord>> selects = shardToFileIds.entrySet().stream()
-                .map(entry -> db(entry.getKey())
-                        .selectFrom(FILE)
-                        .where(FILE.STATUS.eq(FileStatus.NOT_DELETED.getValue()))
-                        .and(FILE.FILE_ID.in(entry.getValue())))
+        List<SelectConditionStep<Record>> selects = shardToFileIds.entrySet().stream()
+                .map(entry -> db
+                        .select()
+                        .from(targetTableName(FILE.getName(), entry.getKey()))
+                        .where(field(FILE.STATUS.getName()).eq(FileStatus.NOT_DELETED.getValue()))
+                        .and(field(FILE.FILE_ID.getName()).in(entry.getValue())))
                 .collect(Collectors.toList());
 
         if(selects.isEmpty()) {
             return Collections.emptyList();
         }
 
-        List<String> sqlFragments = new ArrayList<>();
-        List<Object> bindValues = new ArrayList<>();
-
-        for (SelectConditionStep<FileRecord> select : selects) {
-            sqlFragments.add(select.getSQL());
-            bindValues.addAll(select.getBindValues());
+        SelectOrderByStep<Record> records = selects.get(0);
+        for (int i = 1; i < selects.size(); i++) {
+            records = records.unionAll(selects.get(i));
         }
 
-        String unionSql = String.join(" UNION ALL ", sqlFragments);
-
-        return db.fetch(unionSql, bindValues.toArray())
-                .map(record -> record.into(FileDB.class));
+        return records.fetchInto(FileDB.class);
     }
 }
