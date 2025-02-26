@@ -172,9 +172,11 @@ public class FileRepo implements BaseRepo {
         rec.setFileId(fileId);
         rec.setName(progressName);
         rec.setStatus(status);
-        rec.setMessage(message);
         rec.setPercent(percent);
         fillCreatorInfo(rec);
+        if(message != null) {
+            rec.setMessage(message);
+        }
         int insertedNum = db(shardingKey).insertInto(FILE_PROGRESS)
                 .set(rec)
                 .execute();
@@ -194,8 +196,10 @@ public class FileRepo implements BaseRepo {
         String shardingKey = getShardingKeyByFileId(fileId);
         FileProgressRecord rec = FILE_PROGRESS.newRecord();
         rec.setStatus(status);
-        rec.setMessage(message);
         rec.setPercent(percent);
+        if(message != null) {
+            rec.setMessage(message);
+        }
         fillUpdatorInfo(rec);
         int updatedNum = db(shardingKey).update(FILE_PROGRESS)
                 .set(rec)
