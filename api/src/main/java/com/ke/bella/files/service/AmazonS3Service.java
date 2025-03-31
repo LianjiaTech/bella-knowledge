@@ -71,13 +71,16 @@ public class AmazonS3Service {
             String mimeType,
             File file,
             String filename) {
-        ObjectMetadata metadata = new ObjectMetadata();
-        metadata.setContentType(mimeType);
-        String filenameEncoded = UriUtils.encodeFragment(filename, StandardCharsets.UTF_8);
-        metadata.setContentDisposition("attachment; filename=" + filenameEncoded);
-
         InputStream inputStream = null;
         try {
+
+            ObjectMetadata metadata = new ObjectMetadata();
+            metadata.setContentType(mimeType);
+            metadata.setContentLength(Files.size(file.toPath()));
+
+            String filenameEncoded = UriUtils.encodeFragment(filename, StandardCharsets.UTF_8);
+            metadata.setContentDisposition("attachment; filename=" + filenameEncoded);
+
             inputStream = Files.newInputStream(file.toPath());
             PutObjectRequest putObjectRequest = new PutObjectRequest(bucketName, fileKey, inputStream, metadata);
             putObjectRequest.getRequestClientOptions().setReadLimit(S3_MAX_FILE_SIZE_BYTES);
