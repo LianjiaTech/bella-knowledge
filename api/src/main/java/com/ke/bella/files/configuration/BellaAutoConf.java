@@ -1,14 +1,12 @@
 package com.ke.bella.files.configuration;
 
-import javax.annotation.PostConstruct;
-
+import com.ke.bella.files.db.IDGenerator;
+import com.ke.bella.files.db.repo.InstanceRepo;
+import com.ke.bella.openapi.server.BellaServerContextHolder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
 
-import com.ke.bella.files.db.IDGenerator;
-import com.ke.bella.files.db.repo.InstanceRepo;
-import com.ke.infra.cloud.extension.boostrap.AppContext;
-import com.ke.infra.cloud.extension.boostrap.Instance;
+import javax.annotation.PostConstruct;
 
 @Configuration
 public class BellaAutoConf {
@@ -17,9 +15,9 @@ public class BellaAutoConf {
 
     @PostConstruct
     public void registerInstance() {
-        Instance instance = AppContext.getInstance();
-        String ip = instance.getIpAddress();
-        Long id = instanceRepo.register(ip, instance.getPort());
+        String ip = BellaServerContextHolder.getIp();
+        int port = BellaServerContextHolder.getPort();
+        Long id = instanceRepo.register(ip, port);
         IDGenerator.setInstanceId(id);
     }
 }

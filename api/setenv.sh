@@ -1,71 +1,27 @@
 #!/bin/bash
 
-SH_APOLLO_SERVER="example.com"
-SH_EUREKA_SERVER_NAME="example.com"
+# 设置日志路径
+export LOG_PATH="/data0/www/applogs/"
+
+# 启用apollo配置中心
+export APOLLO_ENABLED='true'
 
 if [ "x$ENVTYPE" = "xpreview" ]; then
   export SPRING_PROFILES_ACTIVE='preview'
-  export APOLLO_SERVER="prev.${APOLLO_SERVER:-${SH_APOLLO_SERVER}}"
-  export APOLLO_ENV=${APOLLO_ENV:-"PREV"}
-  export APOLLO_CLUSTER=${APOLLO_CLUSTER:-"default"}
-  export EUREKA_SERVER_NAME="prev.${EUREKA_SERVER_NAME:-${SH_EUREKA_SERVER_NAME}}"
-  export EUREKA_SERVER_PORT="10135"
-  export EUREKA_ZONE="${IDC}"
 elif [ "x$ENVTYPE" = "xdocker" ]; then
   export SPRING_PROFILES_ACTIVE="${ENVTYPE}"
-  export EUREKA_SERVER_NAME="test.${EUREKA_SERVER_NAME:-${SH_EUREKA_SERVER_NAME}}"
-  export EUREKA_SERVER_PORT="10140"
-  export EUREKA_ZONE="${IDC}"
-  export APOLLO_SERVER="test.${APOLLO_SERVER:-${SH_APOLLO_SERVER}}"
-  export APOLLO_ENV=${APOLLO_ENV:-"TEST"}
-  export APOLLO_CLUSTER="${APOLLO_CLUSTER:-default}"
-  export EUREKA_ROLE="${ROLE:-${ENVNAME}}"
 elif [ "x$ENVTYPE" = "xtest" ]; then
   export SPRING_PROFILES_ACTIVE="${ENVTYPE}"
-  export APOLLO_SERVER="test.${APOLLO_SERVER:-${SH_APOLLO_SERVER}}"
-  export APOLLO_ENV=${APOLLO_ENV:-"TEST"}
-  export APOLLO_CLUSTER=${APOLLO_CLUSTER:-"default"}
-  export EUREKA_SERVER_NAME="test.${EUREKA_SERVER_NAME:-${SH_EUREKA_SERVER_NAME}}"
-  export EUREKA_SERVER_PORT="10140"
-  export EUREKA_ZONE="${IDC}"
-  export EUREKA_ROLE="${ENVTYPE}"
 elif [ "x$ENVTYPE" = "xprod" ]; then
   export SPRING_PROFILES_ACTIVE="${ENVTYPE}"
-  export APOLLO_SERVER="prod.${APOLLO_SERVER:-${SH_APOLLO_SERVER}}"
-  export APOLLO_ENV=${APOLLO_ENV:-"PROD"}
-  export APOLLO_CLUSTER=${APOLLO_CLUSTER:-"default"}
-  export EUREKA_SERVER_NAME="prod.${EUREKA_SERVER_NAME:-${SH_EUREKA_SERVER_NAME}}"
-  export EUREKA_SERVER_PORT="10122"
-  export EUREKA_ZONE="${IDC}"
   export HAWK_SERVER_HOST="example.com"
   export HAWK_SERVER_SOCKET_PORT="8101"
 elif [ "x$ENVTYPE" = "xdev" ]; then
   export SPRING_PROFILES_ACTIVE="${ENVTYPE}"
-  export APOLLO_SERVER="dev.${APOLLO_SERVER:-${SH_APOLLO_SERVER}}"
-  export APOLLO_ENV=${APOLLO_ENV:-"DEV"}
-  export APOLLO_CLUSTER=${APOLLO_CLUSTER:-"default"}
-  export EUREKA_SERVER_NAME="dev.${EUREKA_SERVER_NAME:-${SH_EUREKA_SERVER_NAME}}"
-  export EUREKA_SERVER_PORT="10153"
-  export EUREKA_ZONE="${IDC}"
 elif [ -n "${ENVTYPE}" ]; then
   export SPRING_PROFILES_ACTIVE="${ENVTYPE}"
-  export APOLLO_SERVER="test.${APOLLO_SERVER:-${SH_APOLLO_SERVER}}"
-  export APOLLO_ENV=${APOLLO_ENV:-"TEST"}
-  export APOLLO_CLUSTER=${APOLLO_CLUSTER:-"default"}
-  export EUREKA_SERVER_NAME="test.${EUREKA_SERVER_NAME:-${SH_EUREKA_SERVER_NAME}}"
-  export EUREKA_SERVER_PORT="10140"
-  export EUREKA_ZONE="${IDC}"
-  export EUREKA_ROLE="${ENVTYPE}"
 else
   export SPRING_PROFILES_ACTIVE='prod'
-  export APOLLO_SERVER="prod.${APOLLO_SERVER:-${SH_APOLLO_SERVER}}"
-  export APOLLO_ENV=${APOLLO_ENV:-"PROD"}
-  export APOLLO_CLUSTER=${APOLLO_CLUSTER:-"default"}
-  export EUREKA_SERVER_NAME="prod.${EUREKA_SERVER_NAME:-${SH_EUREKA_SERVER_NAME}}"
-  export EUREKA_SERVER_PORT="10122"
-  export EUREKA_ZONE="${IDC}"
-  export HAWK_SERVER_HOST="example.com"
-  export HAWK_SERVER_SOCKET_PORT="8101"
 fi
 
 USER_OPTS=""

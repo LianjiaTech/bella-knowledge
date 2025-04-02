@@ -34,3 +34,5 @@ build/
 .vscode/
 /.apt_generated_tests/
 /.idea/
+
+api/config-cache/example-file-api/config-cache/
