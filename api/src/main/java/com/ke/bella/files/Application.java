@@ -1,16 +1,11 @@
 package com.ke.bella.files;
 
+import com.ke.bella.files.configuration.ApolloConfig;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.Import;
 
-import com.ctrip.framework.apollo.spring.annotation.EnableApolloConfig;
-
-/**
- * 服务启动类
- *
- * @author keboot
- */
-@EnableApolloConfig
+@Import(ApolloConfig.class)
 @SpringBootApplication(scanBasePackages = { "com.ke.bella.files" })
 public class Application {
     public static void main(String[] args) {

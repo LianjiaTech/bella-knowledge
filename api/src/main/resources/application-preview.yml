@@ -1,51 +1,9 @@
 #-------------------------------------------------------
 # PREVIEW环境配置区域
 #-------------------------------------------------------
-# 重要说明
-# 此配置区域仅在PREVIEW环境中生效，只能定义测试环境中默认且长期
-# 不变的配置项，例如预览环境中的通用超时时间等，外部资源如数据库
-# 连接等请务必通过Apollo配置中心进行配置，切勿在此文件中定义
-#-------------------------------------------------------
-
-# ----- 作业调度 预览环境配置 -----
-lianjia-schedule:
-  enabled: false
-  env: official_offline_3
-  token: xxxxxxxxxxxxxxxx
-lianjia:
-  # ----- kms动态密钥管理组件 http://example.com/project/6658/wiki/page/21427 -----
-  kms:
-    client:
-      enabled: false
-      timeout: 2000
-      endpoint: http://example.com
-      spareEndpoint: http://example.com
-      service-id: ${spring.application.name}
-  # ----- Openiam验签鉴权组件(供服务提供方使用) http://example.com/project/1402/wiki/page/18528 -----
-  openiam:
-    client:
-      enabled: false
-      # 请在服务云上生成预发环境的ak/sk
-      access-key-id: <your-access-key-id>
-      access-key-secret: <your-access-key-secret>
-      target-uri: discovery://openiam
-    validation:
-      principal-detection-strategy: auto_detect_when_miss
-      default-fallback-strategy: accept
-      default-validation-strategy: authentication
-      # 请在服务云上IAM接入向导处获取预发环境的资源/动作前缀
-      resource-prefix: <your-resource-prefix>
-      action-prefix: <your-action-prefix>
-      http:
-        enabled: true
-        filter-uri: /api/**
-api:
-  # ----- api-signature请求加签组件(供服务调用方使用) http://example.com/project/1402/wiki/page/18501 -----
-  signature:
-    feign:
-      keychains:
-        example: { access-key-id: 123, access-key-secret: 456 }
-# ----- 日志级别配置 预览环境 -----
+apollo:
+  meta: http://example.com
+# ----- 日志级别配置 生产环境 -----
 logging:
   level:
     root: INFO
@@ -53,4 +11,57 @@ logging:
     executableSql: INFO
     org:
       springframework: INFO
-      jooq: DEBUG
+      jooq: INFO
+
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${DATASOURCE_POOL_MASTER_URL}
+    username: ${DATASOURCE_POOL_MASTER_USERNAME}
+    password: ${DATASOURCE_POOL_MASTER_PASSWORD}
+    hikari:
+      minimum-idle: 50
+      maximum-pool-size: 100
+      idle-timeout: 30000
+      pool-name: BellaHikariCP
+      max-lifetime: 1800000
+      connection-timeout: 30000
+  servlet:
+    multipart:
+      max-file-size: 512MB
+      max-request-size: 512MB
+      resolve-lazily: true
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+    default-property-inclusion: NON_NULL
+  kafka:
+    producer:
+      bootstrap-servers: common-queue-04-01-online.zeus.ljnode.com:9092,common-queue-04-02-online.zeus.ljnode.com:9092,common-queue-04-03-online.zeus.ljnode.com:9092
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      topic:
+        broadcast: bella-file-broadcast
+
+bella:
+  open-api-base: https://api.example.com/
+  file-api:
+    processer-name:
+      - indexing
+      - parser
+    file:
+      tmp-file-dir: /data0/www/privdata/example-file-api
+    bucket-name:
+      vision: bella-file-public
+      general: bella-file-private
+s3:
+  ak: 57856TV6QN2MEEQL27AL
+  sk: 6e0SprFtGzl4jFSOFta9KxTgeXPn62pOeqg7TnAq
+  endpoint_write: https://example.com
+  endpoint_read_private: https://example.com
+  endpoint_read_public: https://file.ljcdn.com
+  endpoint_preview: https://example.com
+  ak_preview: BBNQW9PF2N9IYI8MUEEC
+  sk_preview: dl4MXzlqCFEmf0KBHn/l2eK5nipqkIbehI7eo5hI
+server:
+  tomcat:
+    max-swallow-size: -1
