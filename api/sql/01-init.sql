@@ -31,7 +31,6 @@ CREATE TABLE `file`
 -- ----------------------------
 -- Table structure for file_mapping
 -- ----------------------------
-DROP TABLE IF EXISTS `file_mapping`;
 CREATE TABLE `file_mapping`
 (
     `id`          bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -75,7 +74,6 @@ CREATE TABLE `file_progress`
 -- ----------------------------
 -- Table structure for instance
 -- ----------------------------
-DROP TABLE IF EXISTS `instance`;
 CREATE TABLE `instance`
 (
     `id`     bigint unsigned NOT NULL AUTO_INCREMENT,
@@ -89,3 +87,21 @@ CREATE TABLE `instance`
 ) ENGINE=InnoDB
 	AUTO_INCREMENT=19
 	DEFAULT CHARSET = utf8mb4;
+
+
+create TABLE `file_0` like `file`;
+create TABLE `file_1` like `file`;
+create TABLE `file_2` like `file`;
+create TABLE `file_3` like `file`;
+create TABLE `file_4` like `file`;
+create TABLE `file_5` like `file`;
+create TABLE `file_6` like `file`;
+create TABLE `file_7` like `file`;
+create TABLE `file_8` like `file`;
+create TABLE `file_9` like `file`;
+create TABLE `file_10` like `file`;
+create TABLE `file_11` like `file`;
+create TABLE `file_12` like `file`;
+create TABLE `file_13` like `file`;
+create TABLE `file_14` like `file`;
+create TABLE `file_15` like `file`;

@@ -2,6 +2,8 @@
 # TEST环境配置区域
 #-------------------------------------------------------
 apollo:
+  bootstrap:
+    enabled: true
   meta: http://config.example.com
 # ----- 日志级别配置 测试环境 -----
 logging:
@@ -45,24 +47,24 @@ spring:
 bella:
   open-api-base: https://api.example.com/
   file-api:
-    processer-name:
-      - indexing
-      - parser
     file:
       tmp-file-dir: /data0/www/privdata/example-file-api
     bucket-name:
-      vision: test
-      general: test
-
-s3:
-  ak: access_key
-  sk: secret_key
-  endpoint_write: http://storage.example.com
-  endpoint_read_private: http://storage.example.com
-  endpoint_read_public: http://storage.example.com
-  endpoint_preview: http://preview.example.com
-  ak_preview: access_key
-  sk_preview: secret_key
+      public: test
+      private: test
+    storage:
+      type: ke
+      ke:
+        ak: access_key
+        sk: secret_key
+        endpoint: http://storage.example.com
+        endpoint_read_private: http://storage.example.com
+        endpoint_read_public: http://storage.example.com
+        endpoint_preview: http://preview.example.com
+        ak_preview: access_key
+        sk_preview: secret_key
+        region: cn-north-1
 server:
   tomcat:
     max-swallow-size: -1
+  port: 8080

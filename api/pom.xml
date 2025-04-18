@@ -22,6 +22,12 @@
         <spring-cloud.version>Hoxton.SR12</spring-cloud.version>
         <jooq.version>3.14.15</jooq.version>
         <apollo.version>2.1.0</apollo.version>
+        <!-- jooq数据库连接配置，jooq生成代码时替换为真实数据库配置 -->
+        <db.driver>com.mysql.cj.jdbc.Driver</db.driver>
+        <db.url>jdbc:mysql://localhost:3306/bella_file_api?useSSL=false&amp;allowPublicKeyRetrieval=true</db.url>
+        <db.username>root</db.username>
+        <db.password>123456</db.password>
+        <db.schema>bella_file_api</db.schema>
     </properties>
 
     <dependencies>
@@ -267,10 +273,10 @@
 
                 <configuration>
                     <jdbc>
-                        <driver>com.mysql.cj.jdbc.Driver</driver>
-                        <url>jdbc:mysql://s12020.mars.test.mysql.ljnode.com:12020/bella_openapi?useUnicode=true</url>
-                        <user>root</user>
-                        <password>E3WB349sfdXUTNCM</password>
+                        <driver>${db.driver}</driver>
+                        <url>${db.url}</url>
+                        <user>${db.username}</user>
+                        <password>${db.password}</password>
                     </jdbc>
                     <generator>
                         <database>
@@ -336,7 +342,7 @@
 
                         <database>
                             <name>org.jooq.meta.mysql.MySQLDatabase</name>
-                            <inputSchema>bella_file_api</inputSchema>
+                            <inputSchema>${db.schema}</inputSchema>
                             <outputSchemaToDefault>true</outputSchemaToDefault>
                             <forcedTypes>
                                 <forcedType>

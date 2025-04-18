@@ -1,14 +1,22 @@
+#-------------------------------------------------------
+# Docker环境配置区域
+#-------------------------------------------------------
 spring:
-  application:
-    name: example-file-api
   datasource:
-    url: jdbc:mysql://localhost:3306/bella_file_api?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
-    username: root
-    password: 123456
+    url: jdbc:mysql://${MYSQL_HOST:mysql}:${MYSQL_PORT:3306}/bella_file_api?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+    username: ${MYSQL_USER:bella_user}
+    password: ${MYSQL_PASSWORD:123456}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
-      maximum-pool-size: 20
+      connection-init-sql: SET NAMES utf8mb4
       minimum-idle: 5
+      maximum-pool-size: 15
+      auto-commit: true
+      idle-timeout: 30000
+      pool-name: HikariCP
+      max-lifetime: 1800000
+      connection-timeout: 30000
+      connection-test-query: SELECT 1
   servlet:
     multipart:
       max-file-size: 512MB
@@ -17,19 +25,20 @@ spring:
   jackson:
     property-naming-strategy: SNAKE_CASE
     default-property-inclusion: NON_NULL
+
 app:
   id: example-file-api
 
 bella:
-  open-api-base: https://localhost:8080/
+  open-api-base: ${BELLA_OPEN_API_BASE:http://localhost:8080/}
   file-api:
     file:
-      tmp-file-dir: .
+      tmp-file-dir: /opt/example-file-api/cache
     bucket-name:
       public: test
       private: test
     storage:
-      type: local
+      type: ${BELLA_STORAGE_TYPE:local}
   server:
     initializer:
       enabled: true
@@ -43,8 +52,9 @@ apollo:
   property:
     order:
       enabled: true
-  cacheDir: ./config-cache
+  cacheDir: /opt/example-file-api/config-cache
   cluster: default
+
 management:
   endpoints:
     web:
@@ -59,10 +69,8 @@ management:
   health:
     redis:
       enabled: false
-server:
-  port: 8081
 
-# ----- 日志级别配置 测试环境 -----
+# ----- 日志级别配置 Docker环境 -----
 logging:
   level:
     root: INFO
@@ -70,4 +78,4 @@ logging:
     executableSql: INFO
     org:
       springframework: INFO
-      jooq: DEBUG
+      jooq: INFO

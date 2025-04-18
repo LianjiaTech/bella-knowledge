@@ -2,6 +2,8 @@
 # PREVIEW环境配置区域
 #-------------------------------------------------------
 apollo:
+  bootstrap:
+    enabled: true
   meta: http://example.com
 # ----- 日志级别配置 生产环境 -----
 logging:
@@ -45,23 +47,24 @@ spring:
 bella:
   open-api-base: https://api.example.com/
   file-api:
-    processer-name:
-      - indexing
-      - parser
     file:
       tmp-file-dir: /data0/www/privdata/example-file-api
     bucket-name:
-      vision: bella-file-public
-      general: bella-file-private
-s3:
-  ak: 57856TV6QN2MEEQL27AL
-  sk: 6e0SprFtGzl4jFSOFta9KxTgeXPn62pOeqg7TnAq
-  endpoint_write: https://example.com
-  endpoint_read_private: https://example.com
-  endpoint_read_public: https://file.ljcdn.com
-  endpoint_preview: https://example.com
-  ak_preview: BBNQW9PF2N9IYI8MUEEC
-  sk_preview: dl4MXzlqCFEmf0KBHn/l2eK5nipqkIbehI7eo5hI
+      public: bella-file-public
+      private: bella-file-private
+    storage:
+      type: ke
+      ke:
+        ak: 57856TV6QN2MEEQL27AL
+        sk: 6e0SprFtGzl4jFSOFta9KxTgeXPn62pOeqg7TnAq
+        endpoint: https://example.com
+        endpoint_read_private: https://example.com
+        endpoint_read_public: https://file.ljcdn.com
+        endpoint_preview: https://example.com
+        ak_preview: BBNQW9PF2N9IYI8MUEEC
+        sk_preview: dl4MXzlqCFEmf0KBHn/l2eK5nipqkIbehI7eo5hI
+        region: cn-north-1
 server:
   tomcat:
     max-swallow-size: -1
+  port: 8080

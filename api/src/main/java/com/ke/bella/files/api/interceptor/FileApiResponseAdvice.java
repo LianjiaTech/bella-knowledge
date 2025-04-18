@@ -4,7 +4,9 @@ import static com.ke.bella.files.configuration.Configs.MAX_FILE_SIZE;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.nio.file.AccessDeniedException;
 
+import org.apache.commons.lang3.NotImplementedException;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -75,6 +77,10 @@ public class FileApiResponseAdvice implements ResponseBodyAdvice<Object> {
             msg = String.format("File size exceeds the maximum limit of %s.", MAX_FILE_SIZE);
         } else if(e instanceof IllegalArgumentException) {
             code = 400;
+        } else if(e instanceof NotImplementedException) {
+            code = 405;
+        } else if (e instanceof AccessDeniedException) {
+            code = 403;
         }
         if(code == 500) {
             errorType = "internal_server_error";

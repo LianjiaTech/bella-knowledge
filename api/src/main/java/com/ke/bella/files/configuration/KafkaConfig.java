@@ -1,29 +1,36 @@
 package com.ke.bella.files.configuration;
 
-import java.util.HashMap;
-import java.util.Map;
-
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.PropertyNamingStrategy;
+import com.ke.bella.files.service.broadcast.BroadcastService;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.core.ProducerFactory;
 import org.springframework.kafka.support.serializer.JsonSerializer;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.PropertyNamingStrategy;
+import java.util.HashMap;
+import java.util.Map;
 
+@ConditionalOnProperty(name = "kafka.enabled", havingValue = "true", matchIfMissing = false)
 @Configuration
 @EnableKafka
 public class KafkaConfig {
 
     @Value("${spring.kafka.producer.bootstrap-servers}")
     private String bootstrapServers;
+
+    @Value("${spring.kafka.producer.topic.broadcast}")
+    private String topic;
+
 
     @Bean
     public ProducerFactory<String, Object> producerFactory() {
@@ -43,5 +50,14 @@ public class KafkaConfig {
     @Bean
     public KafkaTemplate<String, Object> kafkaTemplate(ProducerFactory<String, Object> producerFactory) {
         return new KafkaTemplate<>(producerFactory);
+    }
+
+    @Primary
+    @Bean
+    public BroadcastService kafkaBroadcastService(KafkaTemplate<String, Object> kafkaTemplate) {
+        return (message, successCallback, failCallback) ->
+           kafkaTemplate.send(topic, message).addCallback(
+                   success -> successCallback.run(),
+                   failure -> failCallback.run());
     }
 }
