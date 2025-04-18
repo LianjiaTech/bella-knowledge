@@ -2,3 +2,8 @@ bella:
   file-api:
     file:
       tmp-file-dir: .
+
+apollo:
+  bootstrap:
+    enabled: true
+

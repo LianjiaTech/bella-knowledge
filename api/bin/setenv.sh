@@ -5,6 +5,7 @@ export LOG_PATH="/data0/www/applogs/"
 
 # 启用apollo配置中心
 export APOLLO_ENABLED='true'
+export KAFKA_ENABLED='true'
 
 if [ "x$ENVTYPE" = "xpreview" ]; then
   export SPRING_PROFILES_ACTIVE='preview'

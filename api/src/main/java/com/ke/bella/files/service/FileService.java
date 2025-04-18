@@ -1,28 +1,7 @@
 package com.ke.bella.files.service;
 
-import static com.ke.bella.files.db.IDGenerator.FILEID_GEN;
-
-import java.io.File;
-import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
-
-import javax.annotation.Resource;
-
-import org.apache.commons.lang3.StringUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.stereotype.Component;
-import org.springframework.util.DigestUtils;
-
 import com.ke.bella.files.BellaContext;
-import com.ke.bella.files.configuration.S3Config;
-import com.ke.bella.files.configuration.S3Config.MediaServiceConfig;
+import com.ke.bella.files.configuration.BucketConfig;
 import com.ke.bella.files.db.repo.FileRepo;
 import com.ke.bella.files.db.tables.pojos.FileDB;
 import com.ke.bella.files.db.tables.pojos.FileProgressDB;
@@ -35,8 +14,20 @@ import com.ke.bella.files.protocol.ListFileOps;
 import com.ke.bella.files.protocol.OpenAIFile;
 import com.ke.bella.files.protocol.Progress;
 import com.ke.bella.files.protocol.UpdateProgressRequestData;
-
+import com.ke.bella.files.service.broadcast.BroadcastService;
+import com.ke.bella.files.service.storage.StorageService;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import java.io.File;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import static com.ke.bella.files.db.IDGenerator.FILEID_GEN;
 
 @Slf4j
 @Component
@@ -44,19 +35,14 @@ public class FileService {
     public static final Long ONE_DAY = 24 * 60 * 60L;
     public static final String ONE_DAY_STRING = (24 * 60 * 60) + "";
     private static final String VISION = "vision";
-    private static final String PREVIEW_INSTRUCTION = "!m_convert,o_pdf_view";
     @Autowired
-    FileRepo fileRepo;
+    private FileRepo fileRepo;
     @Autowired
-    AmazonS3Service amazonS3Service;
+    private StorageService storageService;
     @Autowired
-    private MediaServiceConfig previewServiceConfig;
+    private BucketConfig bucketConfig;
     @Autowired
-    private S3Config s3Config;
-    @Value("${spring.kafka.producer.topic.broadcast}")
-    private String topic;
-    @Resource
-    private KafkaTemplate<String, Object> kafkaTemplate;
+    private BroadcastService broadcastService;
 
     private void updateBroadcastStatus(String fileId, BroadcastStatus status) {
         FileOps op = new FileOps();
@@ -118,12 +104,12 @@ public class FileService {
             String extension) {
         String spaceCode = BellaContext.getOperator().getSpaceCode();
         String fileId = FILEID_GEN.generate();
-        String bucketName = purpose.equals(VISION) ? s3Config.getVisionBucket() : s3Config.getGeneralBucket();
+        String bucketName = purpose.equals(VISION) ? bucketConfig.getPublicBucket() : bucketConfig.getPrivateBucket();
         String keyName = String.format("%s/%s", purpose, fileId);
         if(StringUtils.isNotEmpty(extension)) {
             keyName += "." + extension;
         }
-        amazonS3Service.putObject(bucketName, keyName, mimeType, file, filename);
+        storageService.putObject(bucketName, keyName, mimeType, file, filename);
 
         // 保存文件信息到数据库
         FileDB fileDB = new FileDB();
@@ -143,16 +129,12 @@ public class FileService {
         FileDB res = fileRepo.queryFile(fileId);
         OpenAIFile openAIFile = res == null ? null : transferToOpenAIFile(res);
 
-        // Kafka发送消息
+        // 文件创建后的广播机制
         FileBroadcasting<OpenAIFile> message = new FileBroadcasting<>();
         message.setEvent(EventType.FILE_CREATED);
         message.setData(openAIFile);
         message.setMetadata(metadata);
-        kafkaTemplate.send(topic, message).addCallback(success -> {
-            updateBroadcastStatus(fileId, BroadcastStatus.SUCCESS);
-        }, failure -> {
-            updateBroadcastStatus(fileId, BroadcastStatus.FAILED);
-        });
+        broadcastService.broadcast(message, () -> updateBroadcastStatus(fileId, BroadcastStatus.SUCCESS), () -> updateBroadcastStatus(fileId, BroadcastStatus.FAILED));
         return openAIFile;
     }
 
@@ -196,8 +178,8 @@ public class FileService {
         String bucketName = file.getBucket();
         String keyName = file.getPath();
         String purpose = file.getPurpose();
-        return purpose.equals(VISION) ? amazonS3Service.getPublicUrl(bucketName, keyName)
-                : amazonS3Service.getPresignedUrl(bucketName, keyName, expires);
+        return purpose.equals(VISION) ? storageService.getPublicUrl(bucketName, keyName)
+                : storageService.getPresignedUrl(bucketName, keyName, expires);
     }
 
     public void updateProgress(
@@ -236,38 +218,9 @@ public class FileService {
 
     public String getPreviewUrl(String fileId, Long expires) {
         FileDB file = fileRepo.queryFile(fileId);
-        String purpose = file.getPurpose();
+        String bucketName = file.getBucket();
         String keyName = file.getPath();
-        return purpose.equals(VISION) ? getPreviewUrlPublic(keyName, file.getBucket())
-                : getPreviewUrlPrivate(keyName, file.getBucket(), expires);
+        return storageService.getPreviewUrl(bucketName, keyName, expires);
     }
 
-    public String getPreviewUrlPublic(String keyName, String bucketName) {
-        return String.format("%s/%s/%s%s", previewServiceConfig.getEndpoint(), bucketName, keyName, PREVIEW_INSTRUCTION);
-    }
-
-    public String getPreviewUrlPrivate(String keyName, String bucketName, Long expires) {
-        String path = String.format("/%s/%s%s", bucketName, keyName, PREVIEW_INSTRUCTION);
-        long timestamp = System.currentTimeMillis() / 1000;
-
-        Map<String, String> parameters = new HashMap<>();
-
-        parameters.put("ak", previewServiceConfig.getAk());
-        parameters.put("exp", String.valueOf(expires));
-        parameters.put("path", path);
-        parameters.put("ts", String.valueOf(timestamp));
-
-        List<String> paramsKey = new ArrayList<>(parameters.keySet());
-        Collections.sort(paramsKey);
-        StringBuilder verifyStr = new StringBuilder();
-        for (String s : paramsKey) {
-            verifyStr.append(s.trim()).append("=").append(parameters.get(s).trim()).append("&");
-        }
-        verifyStr.append("sk=").append(previewServiceConfig.getSk());
-
-        String sign = DigestUtils.md5DigestAsHex(verifyStr.toString().getBytes());
-        String params = "ak=" + parameters.get("ak") + "&exp=" + parameters.get("exp") + "&ts=" + parameters.get("ts") + "&sign=" + sign;
-
-        return String.format("%s%s?%s", previewServiceConfig.getEndpoint(), path, params);
-    }
 }

@@ -36,3 +36,7 @@ build/
 /.idea/
 
 api/config-cache/example-file-api/config-cache/
+
+api/logs/
+
+mysql/data/

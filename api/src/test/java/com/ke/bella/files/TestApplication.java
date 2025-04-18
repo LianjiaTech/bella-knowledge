@@ -6,6 +6,5 @@ import org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerA
 import com.ctrip.framework.apollo.spring.annotation.EnableApolloConfig;
 
 @SpringBootApplication(exclude = { DataSourceTransactionManagerAutoConfiguration.class }, scanBasePackages = { "com.ke.bella.files" })
-@EnableApolloConfig
 public class TestApplication {
 }
