@@ -1,13 +1,13 @@
 services:
   api:
-    image: ${REGISTRY:-saizhuolin}/example-file-api:${VERSION:-latest}
+    image: ${REGISTRY:-bellatop}/example-file-api:${VERSION:-latest}
     build: 
       context: ./api
     container_name: example-file-api
     ports:
       - "8081:8081"
     environment:
-      - JAVA_OPTS=-server -Xms2048m -Xmx2048m -XX:MetaspaceSize=256m -XX:MaxMetaspaceSize=256m -Dbella.proxy.host=${PROXY_HOST:-} -Dbella.proxy.port=${PROXY_PORT:-} -Dbella.proxy.type=${PROXY_TYPE:-} -Dbella.storage.config=${STORAGE_CONFIG:-}
+      - JAVA_OPTS=-server -Xms1024m -Xmx1024m -XX:MetaspaceSize=256m -XX:MaxMetaspaceSize=256m -Dbella.proxy.host=${PROXY_HOST:-} -Dbella.proxy.port=${PROXY_PORT:-} -Dbella.proxy.type=${PROXY_TYPE:-} -Dbella.storage.config=${STORAGE_CONFIG:-}
       - SPRING_PROFILES_ACTIVE=docker
       - BELLA_OPEN_API_BASE=${OPENAPI_URL:-https://localhost:8080/}
       - BELLA_STORAGE_TYPE=${STORAGE_TYPE:-local}
