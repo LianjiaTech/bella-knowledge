@@ -117,7 +117,7 @@ pull_app_image_if_not_exists() {
     local version=${VERSION:-latest}
     
     # 镜像名称（带仓库前缀）
-    local image_name="${REGISTRY:-saizhuolin}/example-file-api:$version"
+    local image_name="${REGISTRY:-bellatop}/example-file-api:$version"
     
     # 检查镜像是否存在
     if [ "$UPDATE_IMAGE" = true ] || ! image_exists $image_name; then
@@ -213,6 +213,11 @@ check_local_mysql_database() {
         echo "数据库 bella_file_api 不存在，将创建数据库并初始化"
         docker exec -i bella-openapi-mysql mysql -h localhost -u root --password=123456 -e "CREATE DATABASE IF NOT EXISTS bella_file_api CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;"
         
+        # 授权给bella_user用户
+        echo "授权bella_user用户访问bella_file_api数据库..."
+        docker exec -i bella-openapi-mysql mysql -h localhost -u root --password=123456 -e "GRANT ALL PRIVILEGES ON bella_file_api.* TO 'bella_user'@'%';"
+        docker exec -i bella-openapi-mysql mysql -h localhost -u root --password=123456 -e "FLUSH PRIVILEGES;"
+        
         # 执行SQL初始化脚本
         for sql_file in $(ls -v ./api/sql/*.sql); do
             echo "执行SQL脚本: $sql_file"
@@ -271,15 +276,15 @@ build_services() {
             docker buildx build $CACHE_OPT \
                 --platform $PLATFORMS \
                 --build-arg VERSION=${VERSION:-v1.0.0} \
-                --build-arg REGISTRY=${REGISTRY:-saizhuolin} \
-                -t ${REGISTRY:-saizhuolin}/example-file-api:${VERSION:-v1.0.0} \
-                -t ${REGISTRY:-saizhuolin}/example-file-api:latest \
+                --build-arg REGISTRY=${REGISTRY:-bellatop} \
+                -t ${REGISTRY:-bellatop}/example-file-api:${VERSION:-v1.0.0} \
+                -t ${REGISTRY:-bellatop}/example-file-api:latest \
                 --push ./api
                 
             echo "验证多架构镜像..."
-            docker buildx imagetools inspect ${REGISTRY:-saizhuolin}/example-file-api:${VERSION:-v1.0.0}
+            docker buildx imagetools inspect ${REGISTRY:-bellatop}/example-file-api:${VERSION:-v1.0.0}
                 
-            echo "✅ 多架构镜像已成功推送到 ${REGISTRY:-saizhuolin}"
+            echo "✅ 多架构镜像已成功推送到 ${REGISTRY:-bellatop}"
             echo "   这些镜像可以在任何支持的平台上运行，包括:"
             echo "   - x86_64/amd64 系统 (大多数 Linux 服务器、Intel Mac、Windows)"
             echo "   - ARM64 系统 (Apple Silicon Mac、AWS Graviton、树莓派 4 64位)"
@@ -297,10 +302,10 @@ build_services() {
         echo "本地构建，使用 docker-compose..."
         if [ -n "$NO_CACHE" ]; then
             echo "强制重新构建（不使用缓存）..."
-            docker-compose build --no-cache --build-arg VERSION=${VERSION:-v1.0.0} --build-arg REGISTRY=${REGISTRY:-saizhuolin}
+            docker-compose build --no-cache --build-arg VERSION=${VERSION:-v1.0.0} --build-arg REGISTRY=${REGISTRY:-bellatop}
         else
             echo "重新构建..."
-            docker-compose build --build-arg VERSION=${VERSION:-v1.0.0} --build-arg REGISTRY=${REGISTRY:-saizhuolin}
+            docker-compose build --build-arg VERSION=${VERSION:-v1.0.0} --build-arg REGISTRY=${REGISTRY:-bellatop}
         fi
     fi
 }
@@ -380,7 +385,7 @@ done
 
 # 设置环境变量
 export VERSION=${VERSION:-latest}
-export REGISTRY=${REGISTRY:-saizhuolin}
+export REGISTRY=${REGISTRY:-bellatop}
 
 # 设置代理环境变量
 if [ -n "$PROXY_HOST" ] && [ -n "$PROXY_PORT" ] && [ -n "$PROXY_TYPE" ]; then
