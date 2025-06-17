@@ -111,6 +111,9 @@ public class FileRepo implements BaseRepo {
         if(op.getBroadcastStatus() != null) {
             rec.setBroadcastStatus(op.getBroadcastStatus().getValue());
         }
+        if(op.getDomTreeFileId() != null) {
+            rec.setDomTreeFileId(op.getDomTreeFileId());
+        }
         fillUpdatorInfo(rec);
         int updatedNum = db(shardingKey).update(FILE)
                 .set(rec)

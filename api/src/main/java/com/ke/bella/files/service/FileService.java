@@ -1,5 +1,18 @@
 package com.ke.bella.files.service;
 
+import static com.ke.bella.files.db.IDGenerator.FILEID_GEN;
+
+import java.io.File;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.ke.bella.files.BellaContext;
 import com.ke.bella.files.configuration.BucketConfig;
 import com.ke.bella.files.db.repo.FileRepo;
@@ -16,18 +29,8 @@ import com.ke.bella.files.protocol.Progress;
 import com.ke.bella.files.protocol.UpdateProgressRequestData;
 import com.ke.bella.files.service.broadcast.BroadcastService;
 import com.ke.bella.files.service.storage.StorageService;
+
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
-
-import java.io.File;
-import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.stream.Collectors;
-
-import static com.ke.bella.files.db.IDGenerator.FILEID_GEN;
 
 @Slf4j
 @Component
@@ -70,6 +73,7 @@ public class FileService {
                 .mimeType(fileDB.getMimeType())
                 .type(fileDB.getType())
                 .purpose(fileDB.getPurpose())
+                .domTreeFileId(fileDB.getDomTreeFileId())
                 .build();
     }
 
@@ -134,7 +138,8 @@ public class FileService {
         message.setEvent(EventType.FILE_CREATED);
         message.setData(openAIFile);
         message.setMetadata(metadata);
-        broadcastService.broadcast(message, () -> updateBroadcastStatus(fileId, BroadcastStatus.SUCCESS), () -> updateBroadcastStatus(fileId, BroadcastStatus.FAILED));
+        broadcastService.broadcast(message, () -> updateBroadcastStatus(fileId, BroadcastStatus.SUCCESS),
+                () -> updateBroadcastStatus(fileId, BroadcastStatus.FAILED));
         return openAIFile;
     }
 
@@ -151,6 +156,13 @@ public class FileService {
 
     public OpenAIFile getFile(String fileId) {
         FileDB fileDB = fileRepo.queryFile(fileId);
+        return fileDB == null ? null : transferToOpenAIFile(fileDB);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public OpenAIFile updateFile(FileOps ops) {
+        fileRepo.updateFile(ops);
+        FileDB fileDB = fileRepo.queryFile(ops.getFileId());
         return fileDB == null ? null : transferToOpenAIFile(fileDB);
     }
 
