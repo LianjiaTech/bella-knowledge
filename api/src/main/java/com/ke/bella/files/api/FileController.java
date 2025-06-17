@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -28,6 +29,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.ke.bella.files.annotations.FileAPI;
 import com.ke.bella.files.protocol.FileException.FileNotFoundException;
 import com.ke.bella.files.protocol.FileException.ProgressNotFoundException;
+import com.ke.bella.files.protocol.FileOps;
 import com.ke.bella.files.protocol.FileUrl;
 import com.ke.bella.files.protocol.ListFileOps;
 import com.ke.bella.files.protocol.OpenAIFile;
@@ -163,6 +165,77 @@ public class FileController {
                 .id(fileId)
                 .deleted(true)
                 .build();
+    }
+
+    @PutMapping
+    public OpenAIFile updateFile(@RequestBody FileOps ops) {
+        if(ops == null || StringUtils.isEmpty(ops.getFileId())) {
+            throw new IllegalArgumentException("file_id is required, but not provided");
+        }
+        OpenAIFile file = fileService.getFile(ops.getFileId());
+        if(file == null) {
+            throw new FileNotFoundException(ops.getFileId());
+        }
+        return fileService.updateFile(ops);
+    }
+
+    @PostMapping("/dom-tree")
+    public OpenAIFile uploadDomTree(
+            @RequestParam(value = "file_id") String fileId,
+            @RequestPart(value = "file") MultipartFile file,
+            @RequestParam(value = "metadata", required = false) String metadata,
+            @RequestParam(value = "get_url", required = false, defaultValue = "false") boolean getUrl,
+            @RequestParam(value = "expires", required = false, defaultValue = ONE_DAY_STRING) long expires) throws IOException {
+        if(StringUtils.isEmpty(fileId)) {
+            throw new IllegalArgumentException("file_id is required, but not provided");
+        }
+
+        OpenAIFile uploaded = upload(file, "dom_tree", metadata, getUrl, expires);
+
+        FileOps bindOp = FileOps.builder()
+                .fileId(fileId)
+                .domTreeFileId(uploaded.getId())
+                .build();
+
+        fileService.updateFile(bindOp);
+
+        return uploaded;
+    }
+
+    @GetMapping("/{file_id}/dom-tree/content")
+    public void retrieveDomTreeContent(
+            HttpServletResponse response,
+            @PathVariable("file_id") String fileId) {
+        OpenAIFile file = fileService.getFile(fileId);
+        if(file == null) {
+            throw new FileNotFoundException(fileId);
+        }
+        if("dom_tree".equals(file.getPurpose())) {
+            retrieveContentRedirect(response, file.getId());
+        } else if(!StringUtils.isEmpty(file.getDomTreeFileId())) {
+            retrieveContentRedirect(response, file.getDomTreeFileId());
+        } else {
+            throw new IllegalArgumentException(
+                    String.format("the file does not have a legal dom file. file_id = %s", fileId));
+        }
+    }
+
+    @GetMapping("/{file_id}/dom-tree/url")
+    public FileUrl getDomTreeUrl(
+            @PathVariable("file_id") String fileId,
+            @RequestParam(value = "expires", required = false, defaultValue = ONE_DAY_STRING) Long expires) {
+        OpenAIFile file = fileService.getFile(fileId);
+        if(file == null) {
+            throw new FileNotFoundException(fileId);
+        }
+        if("dom_tree".equals(file.getPurpose())) {
+            return getUrl(fileId, expires);
+        } else if(!StringUtils.isEmpty(file.getDomTreeFileId())) {
+            return getUrl(file.getDomTreeFileId(), expires);
+        } else {
+            throw new IllegalArgumentException(
+                    String.format("the file does not have a legal dom file. file_id = %s", fileId));
+        }
     }
 
     @GetMapping("/{file_id}/content")
