@@ -4,6 +4,9 @@
 package com.ke.bella.files.db;
 
 
+import com.ke.bella.files.db.tables.Dataset;
+import com.ke.bella.files.db.tables.DatasetQa;
+import com.ke.bella.files.db.tables.DatasetQaReference;
 import com.ke.bella.files.db.tables.File;
 import com.ke.bella.files.db.tables.FileMapping;
 import com.ke.bella.files.db.tables.FileProgress;
@@ -29,6 +32,21 @@ public class DefaultSchema extends SchemaImpl {
      * The reference instance of <code>DEFAULT_SCHEMA</code>
      */
     public static final DefaultSchema DEFAULT_SCHEMA = new DefaultSchema();
+
+    /**
+     * 数据集
+     */
+    public final Dataset DATASET = Dataset.DATASET;
+
+    /**
+     * 问答数据集表
+     */
+    public final DatasetQa DATASET_QA = DatasetQa.DATASET_QA;
+
+    /**
+     * 数据集问答对引用关系表
+     */
+    public final DatasetQaReference DATASET_QA_REFERENCE = DatasetQaReference.DATASET_QA_REFERENCE;
 
     /**
      * The table <code>file</code>.
@@ -66,6 +84,9 @@ public class DefaultSchema extends SchemaImpl {
     @Override
     public final List<Table<?>> getTables() {
         return Arrays.<Table<?>>asList(
+            Dataset.DATASET,
+            DatasetQa.DATASET_QA,
+            DatasetQaReference.DATASET_QA_REFERENCE,
             File.FILE,
             FileMapping.FILE_MAPPING,
             FileProgress.FILE_PROGRESS,

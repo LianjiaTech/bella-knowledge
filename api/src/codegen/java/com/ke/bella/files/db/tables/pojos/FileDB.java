@@ -21,7 +21,7 @@ public class FileDB implements Operator, Serializable {
     private Long          id;
     private String        fileId;
     private String        filename;
-    private String extension;
+    private String        extension;
     private String        mimeType;
     private String        type;
     private String        bucket;
@@ -39,6 +39,7 @@ public class FileDB implements Operator, Serializable {
     private Integer       status;
     private String        akCode;
     private Long          broadcastStatus;
+    private String        domTreeFileId;
 
     public FileDB() {}
 
@@ -64,13 +65,14 @@ public class FileDB implements Operator, Serializable {
         this.status = value.status;
         this.akCode = value.akCode;
         this.broadcastStatus = value.broadcastStatus;
+        this.domTreeFileId = value.domTreeFileId;
     }
 
     public FileDB(
         Long          id,
         String        fileId,
         String        filename,
-            String extension,
+        String        extension,
         String        mimeType,
         String        type,
         String        bucket,
@@ -87,7 +89,8 @@ public class FileDB implements Operator, Serializable {
         String        metaData,
         Integer       status,
         String        akCode,
-        Long          broadcastStatus
+        Long          broadcastStatus,
+        String        domTreeFileId
     ) {
         this.id = id;
         this.fileId = fileId;
@@ -110,6 +113,7 @@ public class FileDB implements Operator, Serializable {
         this.status = status;
         this.akCode = akCode;
         this.broadcastStatus = broadcastStatus;
+        this.domTreeFileId = domTreeFileId;
     }
 
     /**
@@ -406,6 +410,20 @@ public class FileDB implements Operator, Serializable {
         this.broadcastStatus = broadcastStatus;
     }
 
+    /**
+     * Getter for <code>file.dom_tree_file_id</code>. DOM tree的文件ID
+     */
+    public String getDomTreeFileId() {
+        return this.domTreeFileId;
+    }
+
+    /**
+     * Setter for <code>file.dom_tree_file_id</code>. DOM tree的文件ID
+     */
+    public void setDomTreeFileId(String domTreeFileId) {
+        this.domTreeFileId = domTreeFileId;
+    }
+
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder("FileDB (");
@@ -431,6 +449,7 @@ public class FileDB implements Operator, Serializable {
         sb.append(", ").append(status);
         sb.append(", ").append(akCode);
         sb.append(", ").append(broadcastStatus);
+        sb.append(", ").append(domTreeFileId);
 
         sb.append(")");
         return sb.toString();

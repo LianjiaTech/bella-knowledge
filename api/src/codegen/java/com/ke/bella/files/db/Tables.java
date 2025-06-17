@@ -4,6 +4,9 @@
 package com.ke.bella.files.db;
 
 
+import com.ke.bella.files.db.tables.Dataset;
+import com.ke.bella.files.db.tables.DatasetQa;
+import com.ke.bella.files.db.tables.DatasetQaReference;
 import com.ke.bella.files.db.tables.File;
 import com.ke.bella.files.db.tables.FileMapping;
 import com.ke.bella.files.db.tables.FileProgress;
@@ -15,6 +18,21 @@ import com.ke.bella.files.db.tables.Instance;
  */
 @SuppressWarnings({ "all", "unchecked", "rawtypes" })
 public class Tables {
+
+    /**
+     * 数据集
+     */
+    public static final Dataset DATASET = Dataset.DATASET;
+
+    /**
+     * 问答数据集表
+     */
+    public static final DatasetQa DATASET_QA = DatasetQa.DATASET_QA;
+
+    /**
+     * 数据集问答对引用关系表
+     */
+    public static final DatasetQaReference DATASET_QA_REFERENCE = DatasetQaReference.DATASET_QA_REFERENCE;
 
     /**
      * The table <code>file</code>.

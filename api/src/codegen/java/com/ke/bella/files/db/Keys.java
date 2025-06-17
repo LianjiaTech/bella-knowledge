@@ -4,10 +4,16 @@
 package com.ke.bella.files.db;
 
 
+import com.ke.bella.files.db.tables.Dataset;
+import com.ke.bella.files.db.tables.DatasetQa;
+import com.ke.bella.files.db.tables.DatasetQaReference;
 import com.ke.bella.files.db.tables.File;
 import com.ke.bella.files.db.tables.FileMapping;
 import com.ke.bella.files.db.tables.FileProgress;
 import com.ke.bella.files.db.tables.Instance;
+import com.ke.bella.files.db.tables.records.DatasetQaRecord;
+import com.ke.bella.files.db.tables.records.DatasetQaReferenceRecord;
+import com.ke.bella.files.db.tables.records.DatasetRecord;
 import com.ke.bella.files.db.tables.records.FileMappingRecord;
 import com.ke.bella.files.db.tables.records.FileProgressRecord;
 import com.ke.bella.files.db.tables.records.FileRecord;
@@ -30,6 +36,12 @@ public class Keys {
     // UNIQUE and PRIMARY KEY definitions
     // -------------------------------------------------------------------------
 
+    public static final UniqueKey<DatasetRecord> KEY_DATASET_IDX_DATASET_ID = Internal.createUniqueKey(Dataset.DATASET, DSL.name("KEY_dataset_idx_dataset_id"), new TableField[] { Dataset.DATASET.DATASET_ID }, true);
+    public static final UniqueKey<DatasetRecord> KEY_DATASET_PRIMARY = Internal.createUniqueKey(Dataset.DATASET, DSL.name("KEY_dataset_PRIMARY"), new TableField[] { Dataset.DATASET.ID }, true);
+    public static final UniqueKey<DatasetQaRecord> KEY_DATASET_QA_IDX_ITEM_ID = Internal.createUniqueKey(DatasetQa.DATASET_QA, DSL.name("KEY_dataset_qa_idx_item_id"), new TableField[] { DatasetQa.DATASET_QA.ITEM_ID }, true);
+    public static final UniqueKey<DatasetQaRecord> KEY_DATASET_QA_PRIMARY = Internal.createUniqueKey(DatasetQa.DATASET_QA, DSL.name("KEY_dataset_qa_PRIMARY"), new TableField[] { DatasetQa.DATASET_QA.ID }, true);
+    public static final UniqueKey<DatasetQaReferenceRecord> KEY_DATASET_QA_REFERENCE_IDX_REFERENCE_ID = Internal.createUniqueKey(DatasetQaReference.DATASET_QA_REFERENCE, DSL.name("KEY_dataset_qa_reference_idx_reference_id"), new TableField[] { DatasetQaReference.DATASET_QA_REFERENCE.REFERENCE_ID }, true);
+    public static final UniqueKey<DatasetQaReferenceRecord> KEY_DATASET_QA_REFERENCE_PRIMARY = Internal.createUniqueKey(DatasetQaReference.DATASET_QA_REFERENCE, DSL.name("KEY_dataset_qa_reference_PRIMARY"), new TableField[] { DatasetQaReference.DATASET_QA_REFERENCE.ID }, true);
     public static final UniqueKey<FileRecord> KEY_FILE_IDX_FILE_SPACE = Internal.createUniqueKey(File.FILE, DSL.name("KEY_file_idx_file_space"), new TableField[] { File.FILE.FILE_ID, File.FILE.SPACE_CODE }, true);
     public static final UniqueKey<FileRecord> KEY_FILE_PRIMARY = Internal.createUniqueKey(File.FILE, DSL.name("KEY_file_PRIMARY"), new TableField[] { File.FILE.ID }, true);
     public static final UniqueKey<FileMappingRecord> KEY_FILE_MAPPING_IDX_FILE_ID_NEW_OLD = Internal.createUniqueKey(FileMapping.FILE_MAPPING, DSL.name("KEY_file_mapping_idx_file_id_new_old"), new TableField[] { FileMapping.FILE_MAPPING.FILE_ID_OLD, FileMapping.FILE_MAPPING.FILE_ID }, true);

@@ -336,6 +336,39 @@
                                             <expression>$0_D_B</expression>
                                         </pojoClass>
                                     </table>
+                                    <table>
+                                        <expression>dataset</expression>
+                                        <daoClass>
+                                            <transform>PASCAL</transform>
+                                            <expression>$0_D_B_Dao</expression>
+                                        </daoClass>
+                                        <pojoClass>
+                                            <transform>PASCAL</transform>
+                                            <expression>$0_D_B</expression>
+                                        </pojoClass>
+                                    </table>
+                                    <table>
+                                        <expression>dataset_qa</expression>
+                                        <daoClass>
+                                            <transform>PASCAL</transform>
+                                            <expression>$0_D_B_Dao</expression>
+                                        </daoClass>
+                                        <pojoClass>
+                                            <transform>PASCAL</transform>
+                                            <expression>$0_D_B</expression>
+                                        </pojoClass>
+                                    </table>
+                                    <table>
+                                        <expression>dataset_qa_reference</expression>
+                                        <daoClass>
+                                            <transform>PASCAL</transform>
+                                            <expression>$0_D_B_Dao</expression>
+                                        </daoClass>
+                                        <pojoClass>
+                                            <transform>PASCAL</transform>
+                                            <expression>$0_D_B</expression>
+                                        </pojoClass>
+                                    </table>
                                 </tables>
                             </matchers>
                         </strategy>
@@ -352,7 +385,7 @@
                                 </forcedType>
                             </forcedTypes>
                             <includes>
-                                file|file_mapping|file_progress|instance
+                                file|file_mapping|file_progress|instance|dataset|dataset_qa|dataset_qa_reference
                             </includes>
                             <unsignedTypes>false</unsignedTypes>
                         </database>
