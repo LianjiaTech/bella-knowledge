@@ -19,7 +19,7 @@ import org.jooq.Identity;
 import org.jooq.Index;
 import org.jooq.Name;
 import org.jooq.Record;
-import org.jooq.Row21;
+import org.jooq.Row22;
 import org.jooq.Schema;
 import org.jooq.Table;
 import org.jooq.TableField;
@@ -69,21 +69,17 @@ public class File extends TableImpl<FileRecord> {
     /**
      * The column <code>file.extension</code>. extension
      */
-    public final TableField<FileRecord, String> EXTENSION = createField(DSL.name("extension"),
-            SQLDataType.VARCHAR(512).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "extension");
+    public final TableField<FileRecord, String> EXTENSION = createField(DSL.name("extension"), SQLDataType.VARCHAR(512).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "extension");
 
     /**
      * The column <code>file.mime_type</code>. mime type
      */
-    public final TableField<FileRecord, String> MIME_TYPE = createField(DSL.name("mime_type"),
-            SQLDataType.VARCHAR(512).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "mime type");
+    public final TableField<FileRecord, String> MIME_TYPE = createField(DSL.name("mime_type"), SQLDataType.VARCHAR(512).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "mime type");
 
     /**
      * The column <code>file.type</code>. subtype of mime type, also known as file type
      */
-    public final TableField<FileRecord, String> TYPE = createField(DSL.name("type"),
-            SQLDataType.VARCHAR(512).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this,
-            "subtype of mime type, also known as file type");
+    public final TableField<FileRecord, String> TYPE = createField(DSL.name("type"), SQLDataType.VARCHAR(512).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "subtype of mime type, also known as file type");
 
     /**
      * The column <code>file.bucket</code>. 存储的地方
@@ -159,6 +155,11 @@ public class File extends TableImpl<FileRecord> {
      * The column <code>file.broadcast_status</code>. 文件是否被广播成功，0表示广播失败，1表示广播成功
      */
     public final TableField<FileRecord, Long> BROADCAST_STATUS = createField(DSL.name("broadcast_status"), SQLDataType.BIGINT.nullable(false).defaultValue(DSL.inline("0", SQLDataType.BIGINT)), this, "文件是否被广播成功，0表示广播失败，1表示广播成功");
+
+    /**
+     * The column <code>file.dom_tree_file_id</code>. DOM tree的文件ID
+     */
+    public final TableField<FileRecord, String> DOM_TREE_FILE_ID = createField(DSL.name("dom_tree_file_id"), SQLDataType.VARCHAR(256).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "DOM tree的文件ID");
 
     private File(Name alias, Table<FileRecord> aliased) {
         this(alias, aliased, null);
@@ -245,11 +246,11 @@ public class File extends TableImpl<FileRecord> {
     }
 
     // -------------------------------------------------------------------------
-    // Row21 type methods
+    // Row22 type methods
     // -------------------------------------------------------------------------
 
     @Override
-    public Row21<Long, String, String, String, String, String, String, String, Long, String, String, Long, String, LocalDateTime, Long, String, LocalDateTime, String, Integer, String, Long> fieldsRow() {
-        return (Row21) super.fieldsRow();
+    public Row22<Long, String, String, String, String, String, String, String, Long, String, String, Long, String, LocalDateTime, Long, String, LocalDateTime, String, Integer, String, Long, String> fieldsRow() {
+        return (Row22) super.fieldsRow();
     }
 }

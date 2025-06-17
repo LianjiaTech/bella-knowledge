@@ -4,6 +4,9 @@
 package com.ke.bella.files.db;
 
 
+import com.ke.bella.files.db.tables.Dataset;
+import com.ke.bella.files.db.tables.DatasetQa;
+import com.ke.bella.files.db.tables.DatasetQaReference;
 import com.ke.bella.files.db.tables.File;
 import com.ke.bella.files.db.tables.Instance;
 
@@ -23,6 +26,13 @@ public class Indexes {
     // INDEX definitions
     // -------------------------------------------------------------------------
 
+    public static final Index DATASET_IDX_CTIME = Internal.createIndex(DSL.name("idx_ctime"), Dataset.DATASET, new OrderField[] { Dataset.DATASET.CTIME }, false);
+    public static final Index DATASET_QA_IDX_CTIME = Internal.createIndex(DSL.name("idx_ctime"), DatasetQa.DATASET_QA, new OrderField[] { DatasetQa.DATASET_QA.CTIME }, false);
+    public static final Index DATASET_QA_REFERENCE_IDX_CTIME = Internal.createIndex(DSL.name("idx_ctime"), DatasetQaReference.DATASET_QA_REFERENCE, new OrderField[] { DatasetQaReference.DATASET_QA_REFERENCE.CTIME }, false);
     public static final Index FILE_IDX_CTIME = Internal.createIndex(DSL.name("idx_ctime"), File.FILE, new OrderField[] { File.FILE.CTIME }, false);
+    public static final Index DATASET_QA_REFERENCE_IDX_DATASET_ID = Internal.createIndex(DSL.name("idx_dataset_id"), DatasetQaReference.DATASET_QA_REFERENCE, new OrderField[] { DatasetQaReference.DATASET_QA_REFERENCE.DATASET_ID }, false);
+    public static final Index DATASET_QA_IDX_DATASET_ITEM = Internal.createIndex(DSL.name("idx_dataset_item"), DatasetQa.DATASET_QA, new OrderField[] { DatasetQa.DATASET_QA.DATASET_ID, DatasetQa.DATASET_QA.ITEM_ID }, false);
     public static final Index INSTANCE_IDX_IP_PORT = Internal.createIndex(DSL.name("idx_ip_port"), Instance.INSTANCE, new OrderField[] { Instance.INSTANCE.IP, Instance.INSTANCE.PORT }, false);
+    public static final Index DATASET_QA_REFERENCE_IDX_ITEM_ID = Internal.createIndex(DSL.name("idx_item_id"), DatasetQaReference.DATASET_QA_REFERENCE, new OrderField[] { DatasetQaReference.DATASET_QA_REFERENCE.ITEM_ID }, false);
+    public static final Index DATASET_IDX_SPACE_CODE = Internal.createIndex(DSL.name("idx_space_code"), Dataset.DATASET, new OrderField[] { Dataset.DATASET.SPACE_CODE }, false);
 }
