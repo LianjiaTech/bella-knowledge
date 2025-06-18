@@ -7,6 +7,7 @@ package com.ke.bella.files.db;
 import com.ke.bella.files.db.tables.Dataset;
 import com.ke.bella.files.db.tables.DatasetQa;
 import com.ke.bella.files.db.tables.DatasetQaReference;
+import com.ke.bella.files.db.tables.DatasetSharding;
 import com.ke.bella.files.db.tables.File;
 import com.ke.bella.files.db.tables.Instance;
 
@@ -34,5 +35,6 @@ public class Indexes {
     public static final Index DATASET_QA_IDX_DATASET_ITEM = Internal.createIndex(DSL.name("idx_dataset_item"), DatasetQa.DATASET_QA, new OrderField[] { DatasetQa.DATASET_QA.DATASET_ID, DatasetQa.DATASET_QA.ITEM_ID }, false);
     public static final Index INSTANCE_IDX_IP_PORT = Internal.createIndex(DSL.name("idx_ip_port"), Instance.INSTANCE, new OrderField[] { Instance.INSTANCE.IP, Instance.INSTANCE.PORT }, false);
     public static final Index DATASET_QA_REFERENCE_IDX_ITEM_ID = Internal.createIndex(DSL.name("idx_item_id"), DatasetQaReference.DATASET_QA_REFERENCE, new OrderField[] { DatasetQaReference.DATASET_QA_REFERENCE.ITEM_ID }, false);
+    public static final Index DATASET_SHARDING_IDX_LAST_KEY = Internal.createIndex(DSL.name("idx_last_key"), DatasetSharding.DATASET_SHARDING, new OrderField[] { DatasetSharding.DATASET_SHARDING.LAST_KEY }, false);
     public static final Index DATASET_IDX_SPACE_CODE = Internal.createIndex(DSL.name("idx_space_code"), Dataset.DATASET, new OrderField[] { Dataset.DATASET.SPACE_CODE }, false);
 }

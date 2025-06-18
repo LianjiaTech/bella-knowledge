@@ -8,7 +8,7 @@
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
         <version>2.3.12.RELEASE</version>
-        <relativePath />
+        <relativePath/>
     </parent>
 
     <groupId>com.ke.bella.files</groupId>
@@ -205,9 +205,9 @@
             <scope>compile</scope>
         </dependency>
         <dependency>
-            <groupId>io.github.bella-top</groupId>
-            <artifactId>spi</artifactId>
-            <version>1.0.0</version>
+            <groupId>top.bella</groupId>
+            <artifactId>openapi-spi</artifactId>
+            <version>1.1.0</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.kafka</groupId>
@@ -346,6 +346,8 @@
                                             <transform>PASCAL</transform>
                                             <expression>$0_D_B</expression>
                                         </pojoClass>
+                                        <pojoImplements>com.ke.bella.files.db.repo.Operator</pojoImplements>
+                                        <recordImplements>com.ke.bella.files.db.repo.Operator</recordImplements>
                                     </table>
                                     <table>
                                         <expression>dataset_qa</expression>
@@ -357,6 +359,8 @@
                                             <transform>PASCAL</transform>
                                             <expression>$0_D_B</expression>
                                         </pojoClass>
+                                        <pojoImplements>com.ke.bella.files.db.repo.Operator</pojoImplements>
+                                        <recordImplements>com.ke.bella.files.db.repo.Operator</recordImplements>
                                     </table>
                                     <table>
                                         <expression>dataset_qa_reference</expression>
@@ -368,6 +372,21 @@
                                             <transform>PASCAL</transform>
                                             <expression>$0_D_B</expression>
                                         </pojoClass>
+                                        <pojoImplements>com.ke.bella.files.db.repo.Operator</pojoImplements>
+                                        <recordImplements>com.ke.bella.files.db.repo.Operator</recordImplements>
+                                    </table>
+                                    <table>
+                                        <expression>dataset_sharding</expression>
+                                        <daoClass>
+                                            <transform>PASCAL</transform>
+                                            <expression>$0_D_B_Dao</expression>
+                                        </daoClass>
+                                        <pojoClass>
+                                            <transform>PASCAL</transform>
+                                            <expression>$0_D_B</expression>
+                                        </pojoClass>
+                                        <pojoImplements>com.ke.bella.files.db.repo.Operator</pojoImplements>
+                                        <recordImplements>com.ke.bella.files.db.repo.Operator</recordImplements>
                                     </table>
                                 </tables>
                             </matchers>
@@ -385,7 +404,7 @@
                                 </forcedType>
                             </forcedTypes>
                             <includes>
-                                file|file_mapping|file_progress|instance|dataset|dataset_qa|dataset_qa_reference
+                                file|file_mapping|file_progress|instance|dataset|dataset_qa|dataset_qa_reference|dataset_sharding
                             </includes>
                             <unsignedTypes>false</unsignedTypes>
                         </database>

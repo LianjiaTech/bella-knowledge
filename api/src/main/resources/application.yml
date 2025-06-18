@@ -33,6 +33,8 @@ bella:
   server:
     initializer:
       enabled: true
+  task:
+    thread-nums: 1000
 
 apollo:
   bootstrap:

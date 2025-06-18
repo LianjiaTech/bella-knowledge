@@ -10,7 +10,7 @@ import javax.servlet.http.HttpServletResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-import com.ke.bella.files.BellaContext;
+import com.ke.bella.openapi.BellaContext;
 
 @Component
 public class FileRequestFilter extends OncePerRequestFilter {

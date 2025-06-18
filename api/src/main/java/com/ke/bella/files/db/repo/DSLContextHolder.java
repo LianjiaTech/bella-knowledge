@@ -1,5 +1,7 @@
 package com.ke.bella.files.db.repo;
 
+import static com.ke.bella.files.db.Tables.DATASET_QA;
+import static com.ke.bella.files.db.Tables.DATASET_QA_REFERENCE;
 import static com.ke.bella.files.db.Tables.FILE;
 import static com.ke.bella.files.db.Tables.FILE_PROGRESS;
 
@@ -40,11 +42,18 @@ public class DSLContextHolder {
                 .withSchemata( // 为对象设置表的映射
                         new MappedSchema()
                                 .withInputExpression(Pattern.compile(".*"))
-                                .withTables(new MappedTable()
-                                        .withInput(FILE.getName())
-                                        .withOutput(targetTableName(FILE.getName(), key)),
+                                .withTables(
+                                        new MappedTable()
+                                                .withInput(FILE.getName())
+                                                .withOutput(targetTableName(FILE.getName(), key)),
                                         new MappedTable().withInput(FILE_PROGRESS.getName())
-                                                .withOutput(targetTableName(FILE_PROGRESS.getName(), key)))));
+                                                .withOutput(targetTableName(FILE_PROGRESS.getName(), key)),
+                                        new MappedTable()
+                                                .withInput(DATASET_QA.getName())
+                                                .withOutput(targetTableName(DATASET_QA.getName(), key)),
+                                        new MappedTable()
+                                                .withInput(DATASET_QA_REFERENCE.getName())
+                                                .withOutput(targetTableName(DATASET_QA_REFERENCE.getName(), key)))));
     }
 
     public static String targetTableName(String orignalName, String key) {

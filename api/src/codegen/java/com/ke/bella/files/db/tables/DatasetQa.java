@@ -19,7 +19,7 @@ import org.jooq.Identity;
 import org.jooq.Index;
 import org.jooq.Name;
 import org.jooq.Record;
-import org.jooq.Row15;
+import org.jooq.Row16;
 import org.jooq.Schema;
 import org.jooq.Table;
 import org.jooq.TableField;
@@ -60,6 +60,11 @@ public class DatasetQa extends TableImpl<DatasetQaRecord> {
      * The column <code>dataset_qa.item_id</code>. QA的ID
      */
     public final TableField<DatasetQaRecord, String> ITEM_ID = createField(DSL.name("item_id"), SQLDataType.VARCHAR(256).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "QA的ID");
+
+    /**
+     * The column <code>dataset_qa.dataset_sharding_key</code>. 数据集分片的key
+     */
+    public final TableField<DatasetQaRecord, String> DATASET_SHARDING_KEY = createField(DSL.name("dataset_sharding_key"), SQLDataType.VARCHAR(256).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "数据集分片的key");
 
     /**
      * The column <code>dataset_qa.dataset_id</code>. 数据集ID
@@ -211,11 +216,11 @@ public class DatasetQa extends TableImpl<DatasetQaRecord> {
     }
 
     // -------------------------------------------------------------------------
-    // Row15 type methods
+    // Row16 type methods
     // -------------------------------------------------------------------------
 
     @Override
-    public Row15<Long, String, String, String, String, String, String, String, Long, String, LocalDateTime, Long, String, LocalDateTime, Integer> fieldsRow() {
-        return (Row15) super.fieldsRow();
+    public Row16<Long, String, String, String, String, String, String, String, String, Long, String, LocalDateTime, Long, String, LocalDateTime, Integer> fieldsRow() {
+        return (Row16) super.fieldsRow();
     }
 }

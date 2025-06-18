@@ -7,6 +7,7 @@ package com.ke.bella.files.db;
 import com.ke.bella.files.db.tables.Dataset;
 import com.ke.bella.files.db.tables.DatasetQa;
 import com.ke.bella.files.db.tables.DatasetQaReference;
+import com.ke.bella.files.db.tables.DatasetSharding;
 import com.ke.bella.files.db.tables.File;
 import com.ke.bella.files.db.tables.FileMapping;
 import com.ke.bella.files.db.tables.FileProgress;
@@ -33,6 +34,11 @@ public class Tables {
      * 数据集问答对引用关系表
      */
     public static final DatasetQaReference DATASET_QA_REFERENCE = DatasetQaReference.DATASET_QA_REFERENCE;
+
+    /**
+     * The table <code>dataset_sharding</code>.
+     */
+    public static final DatasetSharding DATASET_SHARDING = DatasetSharding.DATASET_SHARDING;
 
     /**
      * The table <code>file</code>.

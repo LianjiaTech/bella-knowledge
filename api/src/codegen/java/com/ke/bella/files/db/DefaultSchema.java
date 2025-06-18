@@ -7,6 +7,7 @@ package com.ke.bella.files.db;
 import com.ke.bella.files.db.tables.Dataset;
 import com.ke.bella.files.db.tables.DatasetQa;
 import com.ke.bella.files.db.tables.DatasetQaReference;
+import com.ke.bella.files.db.tables.DatasetSharding;
 import com.ke.bella.files.db.tables.File;
 import com.ke.bella.files.db.tables.FileMapping;
 import com.ke.bella.files.db.tables.FileProgress;
@@ -49,6 +50,11 @@ public class DefaultSchema extends SchemaImpl {
     public final DatasetQaReference DATASET_QA_REFERENCE = DatasetQaReference.DATASET_QA_REFERENCE;
 
     /**
+     * The table <code>dataset_sharding</code>.
+     */
+    public final DatasetSharding DATASET_SHARDING = DatasetSharding.DATASET_SHARDING;
+
+    /**
      * The table <code>file</code>.
      */
     public final File FILE = File.FILE;
@@ -87,6 +93,7 @@ public class DefaultSchema extends SchemaImpl {
             Dataset.DATASET,
             DatasetQa.DATASET_QA,
             DatasetQaReference.DATASET_QA_REFERENCE,
+            DatasetSharding.DATASET_SHARDING,
             File.FILE,
             FileMapping.FILE_MAPPING,
             FileProgress.FILE_PROGRESS,
