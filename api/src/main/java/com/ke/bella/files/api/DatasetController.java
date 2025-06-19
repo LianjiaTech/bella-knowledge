@@ -4,7 +4,6 @@ import java.util.List;
 
 import javax.annotation.Resource;
 
-import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.util.Assert;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -15,7 +14,6 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-import com.ke.bella.files.annotations.FileAPI;
 import com.ke.bella.files.db.repo.Page;
 import com.ke.bella.files.db.tables.pojos.DatasetDB;
 import com.ke.bella.files.db.tables.pojos.DatasetQaDB;
@@ -26,13 +24,8 @@ import com.ke.bella.files.protocol.DatasetOps.DatasetPage;
 import com.ke.bella.files.protocol.DatasetOps.QAOp;
 import com.ke.bella.files.service.DatasetService;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.experimental.SuperBuilder;
 import lombok.extern.slf4j.Slf4j;
 
-@FileAPI
 @RestController
 @RequestMapping("/v1/datasets")
 @Slf4j
@@ -157,15 +150,10 @@ public class DatasetController {
     }
 
     @PostMapping("/qa/list")
-    public ListResponse<List<DatasetQaDB>> list(@RequestBody DatasetOps.QaPage op) {
+    public List<DatasetQaDB> list(@RequestBody DatasetOps.QaPage op) {
         Assert.hasText(op.getDatasetId(), "dataset_id must not be empty");
 
-        List<DatasetQaDB> datasetQaDBS = ds.listQa(op);
-
-        return ListResponse.<List<DatasetQaDB>>builder()
-                .data(datasetQaDBS)
-                .total(CollectionUtils.isEmpty(datasetQaDBS) ? 0 : datasetQaDBS.size())
-                .build();
+        return ds.listQa(op);
     }
 
     @PostMapping("/qa/reference/create")
@@ -217,24 +205,10 @@ public class DatasetController {
     }
 
     @PostMapping("/qa/reference/list")
-    public ListResponse<List<DatasetQaReferenceDB>> list(@RequestBody DatasetOps.QaReferencePage op) {
+    public List<DatasetQaReferenceDB> list(@RequestBody DatasetOps.QaReferencePage op) {
         Assert.hasText(op.getDatasetId(), "dataset_id must not be empty");
 
-        List<DatasetQaReferenceDB> referenceDBS = ds.listQaReferences(op);
-
-        return ListResponse.<List<DatasetQaReferenceDB>>builder()
-                .data(referenceDBS)
-                .total(CollectionUtils.isEmpty(referenceDBS) ? 0 : referenceDBS.size())
-                .build();
-    }
-
-    @AllArgsConstructor
-    @NoArgsConstructor
-    @Data
-    @SuperBuilder(toBuilder = true)
-    public static class ListResponse<T> {
-        private T data;
-        private Integer total;
+        return ds.listQaReferences(op);
     }
 
 }
