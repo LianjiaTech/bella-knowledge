@@ -9,9 +9,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.handler.HandlerInterceptorAdapter;
 
-import com.ke.bella.files.BellaContext;
-import com.ke.bella.files.api.Operator;
 import com.ke.bella.files.protocol.FileException.AuthorizationException;
+import com.ke.bella.openapi.BellaContext;
 import com.ke.bella.openapi.apikey.ApikeyInfo;
 
 @Component
@@ -39,7 +38,7 @@ public class RequestInterceptor extends HandlerInterceptorAdapter {
         Long userId = (bellaOperatorId == null || bellaOperatorId.isEmpty()) ? akOwnerId : Long.valueOf(bellaOperatorId);
         String userName = (bellaOperatorName == null || bellaOperatorName.isEmpty()) ? aKOwnerName : bellaOperatorName;
 
-        BellaContext.setOperator(Operator.builder().userId(userId).userName(userName).spaceCode(bellaSpaceCode).build());
+        BellaContext.setOperator(com.ke.bella.openapi.Operator.builder().userId(userId).userName(userName).spaceCode(bellaSpaceCode).build());
         BellaContext.setApikey(apikeyInfo);
         return true;
     }

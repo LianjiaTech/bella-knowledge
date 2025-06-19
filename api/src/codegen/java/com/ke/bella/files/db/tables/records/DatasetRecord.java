@@ -4,6 +4,7 @@
 package com.ke.bella.files.db.tables.records;
 
 
+import com.ke.bella.files.db.repo.Operator;
 import com.ke.bella.files.db.tables.Dataset;
 
 import java.time.LocalDateTime;
@@ -19,7 +20,7 @@ import org.jooq.impl.UpdatableRecordImpl;
  * 数据集
  */
 @SuppressWarnings({ "all", "unchecked", "rawtypes" })
-public class DatasetRecord extends UpdatableRecordImpl<DatasetRecord> implements Record13<Long, String, String, String, String, String, Long, String, LocalDateTime, Long, String, LocalDateTime, Integer> {
+public class DatasetRecord extends UpdatableRecordImpl<DatasetRecord> implements Operator, Record13<Long, String, String, String, String, String, Long, String, LocalDateTime, Long, String, LocalDateTime, Integer> {
 
     private static final long serialVersionUID = 1L;
 

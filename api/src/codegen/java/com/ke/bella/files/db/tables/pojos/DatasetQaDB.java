@@ -4,6 +4,8 @@
 package com.ke.bella.files.db.tables.pojos;
 
 
+import com.ke.bella.files.db.repo.Operator;
+
 import java.io.Serializable;
 import java.time.LocalDateTime;
 
@@ -12,12 +14,13 @@ import java.time.LocalDateTime;
  * 问答数据集表
  */
 @SuppressWarnings({ "all", "unchecked", "rawtypes" })
-public class DatasetQaDB implements Serializable {
+public class DatasetQaDB implements Operator, Serializable {
 
     private static final long serialVersionUID = 1L;
 
     private Long          id;
     private String        itemId;
+    private String        datasetShardingKey;
     private String        datasetId;
     private String        question;
     private String        similarQ1;
@@ -37,6 +40,7 @@ public class DatasetQaDB implements Serializable {
     public DatasetQaDB(DatasetQaDB value) {
         this.id = value.id;
         this.itemId = value.itemId;
+        this.datasetShardingKey = value.datasetShardingKey;
         this.datasetId = value.datasetId;
         this.question = value.question;
         this.similarQ1 = value.similarQ1;
@@ -55,6 +59,7 @@ public class DatasetQaDB implements Serializable {
     public DatasetQaDB(
         Long          id,
         String        itemId,
+        String        datasetShardingKey,
         String        datasetId,
         String        question,
         String        similarQ1,
@@ -71,6 +76,7 @@ public class DatasetQaDB implements Serializable {
     ) {
         this.id = id;
         this.itemId = itemId;
+        this.datasetShardingKey = datasetShardingKey;
         this.datasetId = datasetId;
         this.question = question;
         this.similarQ1 = similarQ1;
@@ -112,6 +118,20 @@ public class DatasetQaDB implements Serializable {
      */
     public void setItemId(String itemId) {
         this.itemId = itemId;
+    }
+
+    /**
+     * Getter for <code>dataset_qa.dataset_sharding_key</code>. 数据集分片的key
+     */
+    public String getDatasetShardingKey() {
+        return this.datasetShardingKey;
+    }
+
+    /**
+     * Setter for <code>dataset_qa.dataset_sharding_key</code>. 数据集分片的key
+     */
+    public void setDatasetShardingKey(String datasetShardingKey) {
+        this.datasetShardingKey = datasetShardingKey;
     }
 
     /**
@@ -302,6 +322,7 @@ public class DatasetQaDB implements Serializable {
 
         sb.append(id);
         sb.append(", ").append(itemId);
+        sb.append(", ").append(datasetShardingKey);
         sb.append(", ").append(datasetId);
         sb.append(", ").append(question);
         sb.append(", ").append(similarQ1);

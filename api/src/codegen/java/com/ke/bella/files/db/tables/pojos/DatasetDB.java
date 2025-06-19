@@ -4,6 +4,8 @@
 package com.ke.bella.files.db.tables.pojos;
 
 
+import com.ke.bella.files.db.repo.Operator;
+
 import java.io.Serializable;
 import java.time.LocalDateTime;
 
@@ -12,7 +14,7 @@ import java.time.LocalDateTime;
  * 数据集
  */
 @SuppressWarnings({ "all", "unchecked", "rawtypes" })
-public class DatasetDB implements Serializable {
+public class DatasetDB implements Operator, Serializable {
 
     private static final long serialVersionUID = 1L;
 
