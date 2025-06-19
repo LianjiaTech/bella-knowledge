@@ -1,5 +1,7 @@
 package com.ke.bella.files.service;
 
+import java.util.List;
+
 import javax.annotation.PostConstruct;
 import javax.annotation.Resource;
 
@@ -94,6 +96,10 @@ public class DatasetService {
         return repo.pageQa(op);
     }
 
+    public List<DatasetQaDB> listQa(DatasetOps.QaPage op) {
+        return repo.listQa(op);
+    }
+
     public DatasetQaReferenceDB createQaReference(DatasetOps.QAReferenceOp op) {
         return repo.addQaReference(op);
     }
@@ -116,6 +122,10 @@ public class DatasetService {
 
     public Page<DatasetQaReferenceDB> pageQaReferences(DatasetOps.QaReferencePage op) {
         return repo.pageQaReferences(op);
+    }
+
+    public List<DatasetQaReferenceDB> listQaReferences(DatasetOps.QaReferencePage op) {
+        return repo.listQaReferences(op);
     }
 
     @PostConstruct

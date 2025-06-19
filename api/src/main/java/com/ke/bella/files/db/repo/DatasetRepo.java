@@ -284,6 +284,16 @@ public class DatasetRepo implements BaseRepo {
         return queryPage(db0, sql, op.getPage(), op.getPageSize(), DatasetQaDB.class);
     }
 
+    public List<DatasetQaDB> listQa(DatasetOps.QaPage op) {
+        String shardingKey = shardingKeyByDatasetId(op.getDatasetId());
+        DSLContext db0 = db(shardingKey);
+
+        return db0.selectFrom(DATASET_QA)
+                .where(DATASET_QA.DATASET_ID.eq(op.getDatasetId()))
+                .and(DATASET_QA.STATUS.eq(0))
+                .orderBy("asc".equals(op.getOrder()) ? DATASET_QA.ID.asc() : DATASET_QA.ID.desc()).fetch().into(DatasetQaDB.class);
+    }
+
     public List<DatasetQaReferenceDB> addQaReferences(String itemId, String datasetId, List<DatasetOps.QAReferenceOp> referenceOps) {
         String shardingKey = shardingKeyByDatasetId(datasetId);
 
@@ -391,11 +401,22 @@ public class DatasetRepo implements BaseRepo {
         DSLContext dslContext = db(shardingKey);
 
         SelectSeekStep1<DatasetQaReferenceRecord, Long> sql = dslContext.selectFrom(DATASET_QA_REFERENCE)
-                .where(DATASET_QA_REFERENCE.ITEM_ID.eq(op.getItemId()))
+                .where(StringUtils.isEmpty(op.getItemId()) ? DSL.noCondition() : DATASET_QA_REFERENCE.ITEM_ID.eq(op.getItemId()))
                 .and(DATASET_QA_REFERENCE.STATUS.eq(0))
                 .orderBy("asc".equals(op.getOrder()) ? DATASET_QA_REFERENCE.ID.asc() : DATASET_QA_REFERENCE.ID.desc());
 
         return queryPage(dslContext, sql, 1, 30, DatasetQaReferenceDB.class);
+    }
+
+    public List<DatasetQaReferenceDB> listQaReferences(DatasetOps.QaReferencePage op) {
+        String shardingKey = shardingKeyByDatasetId(op.getDatasetId());
+        DSLContext dslContext = db(shardingKey);
+
+        return dslContext.selectFrom(DATASET_QA_REFERENCE)
+                .where(StringUtils.isEmpty(op.getItemId()) ? DSL.noCondition() : DATASET_QA_REFERENCE.ITEM_ID.eq(op.getItemId()))
+                .and(DATASET_QA_REFERENCE.STATUS.eq(0))
+                .orderBy("asc".equals(op.getOrder()) ? DATASET_QA_REFERENCE.ID.asc() : DATASET_QA_REFERENCE.ID.desc())
+                .fetch().into(DatasetQaReferenceDB.class);
     }
 
     public void increaseShardingCount(String key, long delta) {
