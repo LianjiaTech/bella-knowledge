@@ -35,7 +35,15 @@ bella:
       enabled: true
   task:
     thread-nums: 1000
-
+  login:
+    type: ${BELLA_LOGIN_TYPE:client}
+    openapi-base: ${BELLA_OPENAPI_BASE:http://localhost}
+  session:
+    cookie-name: ${BELLA_COOKIE_NAME:bella_openapi_sessionId}
+    max-inactive-interval: 60
+    cookie-max-age: -1
+    cookie-domain: ${BELLA_COOKIE_DOMAIN:localhost}
+    cookie-context-path: /
 apollo:
   bootstrap:
     enabled: false
