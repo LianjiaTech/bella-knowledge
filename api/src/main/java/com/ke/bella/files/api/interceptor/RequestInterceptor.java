@@ -13,11 +13,18 @@ import com.ke.bella.files.protocol.FileException.AuthorizationException;
 import com.ke.bella.openapi.BellaContext;
 import com.ke.bella.openapi.apikey.ApikeyInfo;
 
+import lombok.extern.slf4j.Slf4j;
+
 @Component
+@Slf4j
 public class RequestInterceptor extends HandlerInterceptorAdapter {
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+        if(BellaContext.getOperatorIgnoreNull() != null) {
+            LOGGER.info("operator already set in BellaContext, skipping api key interceptor logic.");
+            return true;
+        }
         String auth = request.getHeader(HttpHeaders.AUTHORIZATION);
         if(auth == null || !auth.startsWith("Bearer ")) {
             throw new AuthorizationException(auth);
