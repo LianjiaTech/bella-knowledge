@@ -24,6 +24,7 @@ public class DatasetDB implements Operator, Serializable {
     private String        name;
     private String        type;
     private String        remark;
+    private Long          count;
     private Long          cuid;
     private String        cuName;
     private LocalDateTime ctime;
@@ -41,6 +42,7 @@ public class DatasetDB implements Operator, Serializable {
         this.name = value.name;
         this.type = value.type;
         this.remark = value.remark;
+        this.count = value.count;
         this.cuid = value.cuid;
         this.cuName = value.cuName;
         this.ctime = value.ctime;
@@ -57,6 +59,7 @@ public class DatasetDB implements Operator, Serializable {
         String        name,
         String        type,
         String        remark,
+        Long          count,
         Long          cuid,
         String        cuName,
         LocalDateTime ctime,
@@ -71,6 +74,7 @@ public class DatasetDB implements Operator, Serializable {
         this.name = name;
         this.type = type;
         this.remark = remark;
+        this.count = count;
         this.cuid = cuid;
         this.cuName = cuName;
         this.ctime = ctime;
@@ -162,6 +166,20 @@ public class DatasetDB implements Operator, Serializable {
      */
     public void setRemark(String remark) {
         this.remark = remark;
+    }
+
+    /**
+     * Getter for <code>dataset.count</code>. 数量
+     */
+    public Long getCount() {
+        return this.count;
+    }
+
+    /**
+     * Setter for <code>dataset.count</code>. 数量
+     */
+    public void setCount(Long count) {
+        this.count = count;
     }
 
     /**
@@ -272,6 +290,7 @@ public class DatasetDB implements Operator, Serializable {
         sb.append(", ").append(name);
         sb.append(", ").append(type);
         sb.append(", ").append(remark);
+        sb.append(", ").append(count);
         sb.append(", ").append(cuid);
         sb.append(", ").append(cuName);
         sb.append(", ").append(ctime);

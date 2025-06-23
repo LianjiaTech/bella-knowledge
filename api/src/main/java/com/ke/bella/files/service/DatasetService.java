@@ -70,6 +70,8 @@ public class DatasetService {
             TaskExecutor.submit(() -> counter.increase(qaDB.getDatasetShardingKey()));
         }
 
+        repo.increaseQaCount(qaDB.getDatasetId());
+
         if(!CollectionUtils.isEmpty(op.getReferences())) {
             repo.addQaReferences(qaDB.getItemId(), op.getDatasetId(), op.getReferences());
         }
@@ -85,6 +87,7 @@ public class DatasetService {
     @Transactional(rollbackFor = Exception.class)
     public DatasetQaDB deleteQa(QAOp op) {
         repo.deleteQa(op);
+        repo.decreaseQaCount(op.getDatasetId());
         return repo.getQa(op, -1);
     }
 
