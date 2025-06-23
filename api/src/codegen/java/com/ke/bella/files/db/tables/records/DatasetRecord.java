@@ -11,8 +11,8 @@ import java.time.LocalDateTime;
 
 import org.jooq.Field;
 import org.jooq.Record1;
-import org.jooq.Record13;
-import org.jooq.Row13;
+import org.jooq.Record14;
+import org.jooq.Row14;
 import org.jooq.impl.UpdatableRecordImpl;
 
 
@@ -20,7 +20,7 @@ import org.jooq.impl.UpdatableRecordImpl;
  * 数据集
  */
 @SuppressWarnings({ "all", "unchecked", "rawtypes" })
-public class DatasetRecord extends UpdatableRecordImpl<DatasetRecord> implements Operator, Record13<Long, String, String, String, String, String, Long, String, LocalDateTime, Long, String, LocalDateTime, Integer> {
+public class DatasetRecord extends UpdatableRecordImpl<DatasetRecord> implements Operator, Record14<Long, String, String, String, String, String, Long, Long, String, LocalDateTime, Long, String, LocalDateTime, Integer> {
 
     private static final long serialVersionUID = 1L;
 
@@ -109,101 +109,115 @@ public class DatasetRecord extends UpdatableRecordImpl<DatasetRecord> implements
     }
 
     /**
+     * Setter for <code>dataset.count</code>. 数量
+     */
+    public void setCount(Long value) {
+        set(6, value);
+    }
+
+    /**
+     * Getter for <code>dataset.count</code>. 数量
+     */
+    public Long getCount() {
+        return (Long) get(6);
+    }
+
+    /**
      * Setter for <code>dataset.cuid</code>.
      */
     public void setCuid(Long value) {
-        set(6, value);
+        set(7, value);
     }
 
     /**
      * Getter for <code>dataset.cuid</code>.
      */
     public Long getCuid() {
-        return (Long) get(6);
+        return (Long) get(7);
     }
 
     /**
      * Setter for <code>dataset.cu_name</code>.
      */
     public void setCuName(String value) {
-        set(7, value);
+        set(8, value);
     }
 
     /**
      * Getter for <code>dataset.cu_name</code>.
      */
     public String getCuName() {
-        return (String) get(7);
+        return (String) get(8);
     }
 
     /**
      * Setter for <code>dataset.ctime</code>.
      */
     public void setCtime(LocalDateTime value) {
-        set(8, value);
+        set(9, value);
     }
 
     /**
      * Getter for <code>dataset.ctime</code>.
      */
     public LocalDateTime getCtime() {
-        return (LocalDateTime) get(8);
+        return (LocalDateTime) get(9);
     }
 
     /**
      * Setter for <code>dataset.muid</code>.
      */
     public void setMuid(Long value) {
-        set(9, value);
+        set(10, value);
     }
 
     /**
      * Getter for <code>dataset.muid</code>.
      */
     public Long getMuid() {
-        return (Long) get(9);
+        return (Long) get(10);
     }
 
     /**
      * Setter for <code>dataset.mu_name</code>.
      */
     public void setMuName(String value) {
-        set(10, value);
+        set(11, value);
     }
 
     /**
      * Getter for <code>dataset.mu_name</code>.
      */
     public String getMuName() {
-        return (String) get(10);
+        return (String) get(11);
     }
 
     /**
      * Setter for <code>dataset.mtime</code>.
      */
     public void setMtime(LocalDateTime value) {
-        set(11, value);
+        set(12, value);
     }
 
     /**
      * Getter for <code>dataset.mtime</code>.
      */
     public LocalDateTime getMtime() {
-        return (LocalDateTime) get(11);
+        return (LocalDateTime) get(12);
     }
 
     /**
      * Setter for <code>dataset.status</code>. 数据集是否被删除，0表示未删除，-1表示已删除
      */
     public void setStatus(Integer value) {
-        set(12, value);
+        set(13, value);
     }
 
     /**
      * Getter for <code>dataset.status</code>. 数据集是否被删除，0表示未删除，-1表示已删除
      */
     public Integer getStatus() {
-        return (Integer) get(12);
+        return (Integer) get(13);
     }
 
     // -------------------------------------------------------------------------
@@ -216,17 +230,17 @@ public class DatasetRecord extends UpdatableRecordImpl<DatasetRecord> implements
     }
 
     // -------------------------------------------------------------------------
-    // Record13 type implementation
+    // Record14 type implementation
     // -------------------------------------------------------------------------
 
     @Override
-    public Row13<Long, String, String, String, String, String, Long, String, LocalDateTime, Long, String, LocalDateTime, Integer> fieldsRow() {
-        return (Row13) super.fieldsRow();
+    public Row14<Long, String, String, String, String, String, Long, Long, String, LocalDateTime, Long, String, LocalDateTime, Integer> fieldsRow() {
+        return (Row14) super.fieldsRow();
     }
 
     @Override
-    public Row13<Long, String, String, String, String, String, Long, String, LocalDateTime, Long, String, LocalDateTime, Integer> valuesRow() {
-        return (Row13) super.valuesRow();
+    public Row14<Long, String, String, String, String, String, Long, Long, String, LocalDateTime, Long, String, LocalDateTime, Integer> valuesRow() {
+        return (Row14) super.valuesRow();
     }
 
     @Override
@@ -261,36 +275,41 @@ public class DatasetRecord extends UpdatableRecordImpl<DatasetRecord> implements
 
     @Override
     public Field<Long> field7() {
+        return Dataset.DATASET.COUNT;
+    }
+
+    @Override
+    public Field<Long> field8() {
         return Dataset.DATASET.CUID;
     }
 
     @Override
-    public Field<String> field8() {
+    public Field<String> field9() {
         return Dataset.DATASET.CU_NAME;
     }
 
     @Override
-    public Field<LocalDateTime> field9() {
+    public Field<LocalDateTime> field10() {
         return Dataset.DATASET.CTIME;
     }
 
     @Override
-    public Field<Long> field10() {
+    public Field<Long> field11() {
         return Dataset.DATASET.MUID;
     }
 
     @Override
-    public Field<String> field11() {
+    public Field<String> field12() {
         return Dataset.DATASET.MU_NAME;
     }
 
     @Override
-    public Field<LocalDateTime> field12() {
+    public Field<LocalDateTime> field13() {
         return Dataset.DATASET.MTIME;
     }
 
     @Override
-    public Field<Integer> field13() {
+    public Field<Integer> field14() {
         return Dataset.DATASET.STATUS;
     }
 
@@ -326,36 +345,41 @@ public class DatasetRecord extends UpdatableRecordImpl<DatasetRecord> implements
 
     @Override
     public Long component7() {
+        return getCount();
+    }
+
+    @Override
+    public Long component8() {
         return getCuid();
     }
 
     @Override
-    public String component8() {
+    public String component9() {
         return getCuName();
     }
 
     @Override
-    public LocalDateTime component9() {
+    public LocalDateTime component10() {
         return getCtime();
     }
 
     @Override
-    public Long component10() {
+    public Long component11() {
         return getMuid();
     }
 
     @Override
-    public String component11() {
+    public String component12() {
         return getMuName();
     }
 
     @Override
-    public LocalDateTime component12() {
+    public LocalDateTime component13() {
         return getMtime();
     }
 
     @Override
-    public Integer component13() {
+    public Integer component14() {
         return getStatus();
     }
 
@@ -391,36 +415,41 @@ public class DatasetRecord extends UpdatableRecordImpl<DatasetRecord> implements
 
     @Override
     public Long value7() {
+        return getCount();
+    }
+
+    @Override
+    public Long value8() {
         return getCuid();
     }
 
     @Override
-    public String value8() {
+    public String value9() {
         return getCuName();
     }
 
     @Override
-    public LocalDateTime value9() {
+    public LocalDateTime value10() {
         return getCtime();
     }
 
     @Override
-    public Long value10() {
+    public Long value11() {
         return getMuid();
     }
 
     @Override
-    public String value11() {
+    public String value12() {
         return getMuName();
     }
 
     @Override
-    public LocalDateTime value12() {
+    public LocalDateTime value13() {
         return getMtime();
     }
 
     @Override
-    public Integer value13() {
+    public Integer value14() {
         return getStatus();
     }
 
@@ -462,48 +491,54 @@ public class DatasetRecord extends UpdatableRecordImpl<DatasetRecord> implements
 
     @Override
     public DatasetRecord value7(Long value) {
+        setCount(value);
+        return this;
+    }
+
+    @Override
+    public DatasetRecord value8(Long value) {
         setCuid(value);
         return this;
     }
 
     @Override
-    public DatasetRecord value8(String value) {
+    public DatasetRecord value9(String value) {
         setCuName(value);
         return this;
     }
 
     @Override
-    public DatasetRecord value9(LocalDateTime value) {
+    public DatasetRecord value10(LocalDateTime value) {
         setCtime(value);
         return this;
     }
 
     @Override
-    public DatasetRecord value10(Long value) {
+    public DatasetRecord value11(Long value) {
         setMuid(value);
         return this;
     }
 
     @Override
-    public DatasetRecord value11(String value) {
+    public DatasetRecord value12(String value) {
         setMuName(value);
         return this;
     }
 
     @Override
-    public DatasetRecord value12(LocalDateTime value) {
+    public DatasetRecord value13(LocalDateTime value) {
         setMtime(value);
         return this;
     }
 
     @Override
-    public DatasetRecord value13(Integer value) {
+    public DatasetRecord value14(Integer value) {
         setStatus(value);
         return this;
     }
 
     @Override
-    public DatasetRecord values(Long value1, String value2, String value3, String value4, String value5, String value6, Long value7, String value8, LocalDateTime value9, Long value10, String value11, LocalDateTime value12, Integer value13) {
+    public DatasetRecord values(Long value1, String value2, String value3, String value4, String value5, String value6, Long value7, Long value8, String value9, LocalDateTime value10, Long value11, String value12, LocalDateTime value13, Integer value14) {
         value1(value1);
         value2(value2);
         value3(value3);
@@ -517,6 +552,7 @@ public class DatasetRecord extends UpdatableRecordImpl<DatasetRecord> implements
         value11(value11);
         value12(value12);
         value13(value13);
+        value14(value14);
         return this;
     }
 
@@ -534,7 +570,7 @@ public class DatasetRecord extends UpdatableRecordImpl<DatasetRecord> implements
     /**
      * Create a detached, initialised DatasetRecord
      */
-    public DatasetRecord(Long id, String spaceCode, String datasetId, String name, String type, String remark, Long cuid, String cuName, LocalDateTime ctime, Long muid, String muName, LocalDateTime mtime, Integer status) {
+    public DatasetRecord(Long id, String spaceCode, String datasetId, String name, String type, String remark, Long count, Long cuid, String cuName, LocalDateTime ctime, Long muid, String muName, LocalDateTime mtime, Integer status) {
         super(Dataset.DATASET);
 
         setId(id);
@@ -543,6 +579,7 @@ public class DatasetRecord extends UpdatableRecordImpl<DatasetRecord> implements
         setName(name);
         setType(type);
         setRemark(remark);
+        setCount(count);
         setCuid(cuid);
         setCuName(cuName);
         setCtime(ctime);

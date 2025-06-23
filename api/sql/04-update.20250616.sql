@@ -6,6 +6,7 @@ CREATE TABLE `bella_file_api`.`dataset`
     `name`       varchar(128) NOT NULL DEFAULT '' COMMENT '数据集名称',
     `type`       varchar(32)  NOT NULL DEFAULT '' COMMENT '类型；QA：QA类型',
     `remark`     varchar(128) NOT NULL DEFAULT '' COMMENT '备注',
+    `count`      bigint       NOT NULL DEFAULT 0 COMMENT '数量',
     `cuid`       bigint       NOT NULL DEFAULT 0,
     `cu_name`    varchar(32)  NOT NULL DEFAULT '',
     `ctime`      datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP,

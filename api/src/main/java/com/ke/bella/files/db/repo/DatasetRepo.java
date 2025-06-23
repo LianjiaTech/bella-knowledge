@@ -201,6 +201,36 @@ public class DatasetRepo implements BaseRepo {
         return queryPage(db, sql, page.getPage(), page.getPageSize(), DatasetDB.class);
     }
 
+    public Long increaseQaCount(String datasetId) {
+        int execute = db.update(DATASET)
+                .set(DATASET.COUNT, DATASET.COUNT.add(1))
+                .where(DATASET.DATASET_ID.eq(datasetId))
+                .execute();
+
+        Assert.isTrue(execute == 1, "dataset qa_count update failed");
+
+        return db.select(DATASET.COUNT)
+                .from(DATASET)
+                .where(DATASET.DATASET_ID.eq(datasetId))
+                .and(DATASET.STATUS.eq(0))
+                .fetchOne(DATASET.COUNT);
+    }
+
+    public Long decreaseQaCount(String datasetId) {
+        int execute = db.update(DATASET)
+                .set(DATASET.COUNT, DATASET.COUNT.sub(1))
+                .where(DATASET.DATASET_ID.eq(datasetId))
+                .execute();
+
+        Assert.isTrue(execute == 1, "dataset qa_count update failed");
+
+        return db.select(DATASET.COUNT)
+                .from(DATASET)
+                .where(DATASET.DATASET_ID.eq(datasetId))
+                .and(DATASET.STATUS.eq(0))
+                .fetchOne(DATASET.COUNT);
+    }
+
     public DatasetQaDB addQa(DatasetOps.QAOp op) {
         String shardingKey = shardingKeyByDatasetId(op.getDatasetId());
 

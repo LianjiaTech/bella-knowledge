@@ -19,7 +19,7 @@ import org.jooq.Identity;
 import org.jooq.Index;
 import org.jooq.Name;
 import org.jooq.Record;
-import org.jooq.Row13;
+import org.jooq.Row14;
 import org.jooq.Schema;
 import org.jooq.Table;
 import org.jooq.TableField;
@@ -80,6 +80,11 @@ public class Dataset extends TableImpl<DatasetRecord> {
      * The column <code>dataset.remark</code>. 备注
      */
     public final TableField<DatasetRecord, String> REMARK = createField(DSL.name("remark"), SQLDataType.VARCHAR(128).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "备注");
+
+    /**
+     * The column <code>dataset.count</code>. 数量
+     */
+    public final TableField<DatasetRecord, Long> COUNT = createField(DSL.name("count"), SQLDataType.BIGINT.nullable(false).defaultValue(DSL.inline("0", SQLDataType.BIGINT)), this, "数量");
 
     /**
      * The column <code>dataset.cuid</code>.
@@ -201,11 +206,11 @@ public class Dataset extends TableImpl<DatasetRecord> {
     }
 
     // -------------------------------------------------------------------------
-    // Row13 type methods
+    // Row14 type methods
     // -------------------------------------------------------------------------
 
     @Override
-    public Row13<Long, String, String, String, String, String, Long, String, LocalDateTime, Long, String, LocalDateTime, Integer> fieldsRow() {
-        return (Row13) super.fieldsRow();
+    public Row14<Long, String, String, String, String, String, Long, Long, String, LocalDateTime, Long, String, LocalDateTime, Integer> fieldsRow() {
+        return (Row14) super.fieldsRow();
     }
 }
