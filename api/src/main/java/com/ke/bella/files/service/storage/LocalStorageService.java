@@ -1,15 +1,18 @@
 package com.ke.bella.files.service.storage;
 
-import com.ke.bella.files.service.storage.config.LocalStorageConfig;
-import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.io.FileUtils;
-
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+
+import org.apache.commons.io.FileUtils;
+
+import com.ke.bella.files.service.storage.config.LocalStorageConfig;
+
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class LocalStorageService implements StorageService {
@@ -32,17 +35,17 @@ public class LocalStorageService implements StorageService {
             // 构建目标路径：rootPath/bucketName/fileKey
             Path targetDir = Paths.get(config.getRootPath(), bucketName);
             Files.createDirectories(targetDir);
-            
+
             Path targetPath = targetDir.resolve(fileKey);
-            
+
             // 复制文件到目标路径
             FileUtils.copyFile(file, targetPath.toFile());
-            
+
             // 保存文件元数据
             Path metadataPath = targetDir.resolve(fileKey + ".meta");
             String metadata = String.format("filename=%s\nmimeType=%s", filename, mimeType);
             Files.write(metadataPath, metadata.getBytes(StandardCharsets.UTF_8));
-            
+
             return fileKey;
         } catch (IOException e) {
             LOGGER.error("Failed to store file locally: {}", fileKey, e);
@@ -50,7 +53,7 @@ public class LocalStorageService implements StorageService {
         }
     }
 
-    //本地存储不支持url访问
+    // 本地存储不支持url访问
     @Override
     public String getPresignedUrl(String bucketName, String fileKey, long expirationSeconds) {
         return "http://example.com/" + bucketName + "/" + fileKey;
@@ -64,6 +67,23 @@ public class LocalStorageService implements StorageService {
     @Override
     public String getPreviewUrl(String bucketName, String fileKey, long expirationSeconds) {
         return "http://example.com/" + bucketName + "/" + fileKey;
+    }
+
+    @Override
+    public InputStream getObjectInputStream(String bucketName, String fileKey) {
+        try {
+            Path filePath = Paths.get(config.getRootPath(), bucketName, fileKey);
+
+            if(!Files.exists(filePath)) {
+                LOGGER.warn("file not found: {}/{}", bucketName, fileKey);
+                throw new IllegalArgumentException("object not found, file_key : " + fileKey);
+            }
+
+            return Files.newInputStream(filePath);
+        } catch (IOException e) {
+            LOGGER.error("failed to get input stream for file: {}/{}", bucketName, fileKey, e);
+            throw new RuntimeException("failed to get input stream for file: " + fileKey, e);
+        }
     }
 
 }

@@ -1,5 +1,7 @@
 package com.ke.bella.files.service.storage;
+
 import java.io.File;
+import java.io.InputStream;
 
 public interface StorageService {
     // 上传文件
@@ -13,4 +15,7 @@ public interface StorageService {
 
     // 获取预览URL
     String getPreviewUrl(String bucketName, String fileKey, long expirationSeconds);
+
+    // 获取文件输入流
+    InputStream getObjectInputStream(String bucketName, String fileKey);
 }

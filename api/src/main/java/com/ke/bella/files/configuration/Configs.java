@@ -9,6 +9,7 @@ public class Configs {
     public static String OPEN_API_BASE;
 
     public static Integer TASK_THREAD_NUMS;
+    public static Integer DATASETS_IMPORT_BATCH_SIZE;
 
     @Value("${spring.servlet.multipart.max-file-size}")
     public void setMaxSizeInMB(String maxFileSize) {
@@ -23,5 +24,10 @@ public class Configs {
     @Value("${bella.task.thread-nums}")
     public void setTaskThreadNums(Integer taskThreadNums) {
         TASK_THREAD_NUMS = taskThreadNums;
+    }
+
+    @Value("${bella.datasets.import.batch-size}")
+    public void setDatasetsImportBatchSize(Integer batchSize) {
+        DATASETS_IMPORT_BATCH_SIZE = batchSize;
     }
 }

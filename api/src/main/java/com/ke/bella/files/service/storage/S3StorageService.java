@@ -1,5 +1,17 @@
 package com.ke.bella.files.service.storage;
 
+import java.io.File;
+import java.io.InputStream;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.Date;
+
+import org.apache.commons.lang3.NotImplementedException;
+import org.springframework.web.util.UriUtils;
+
 import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration;
@@ -9,18 +21,8 @@ import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.google.common.base.Throwables;
 import com.ke.bella.files.service.storage.config.S3StorageConfig;
-import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.NotImplementedException;
-import org.springframework.web.util.UriUtils;
 
-import java.io.File;
-import java.io.InputStream;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.util.Date;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class S3StorageService implements StorageService {
@@ -89,5 +91,14 @@ public class S3StorageService implements StorageService {
     @Override
     public String getPreviewUrl(String bucketName, String fileKey, long expirationSeconds) {
         throw new NotImplementedException("当前对象存储服务不支持预览功能");
+    }
+
+    @Override
+    public InputStream getObjectInputStream(String bucketName, String fileKey) {
+        com.amazonaws.services.s3.model.S3Object s3Object = client.getObject(bucketName, fileKey);
+        if(s3Object != null) {
+            return s3Object.getObjectContent();
+        }
+        throw new IllegalArgumentException("object not found, file_key : " + fileKey);
     }
 }

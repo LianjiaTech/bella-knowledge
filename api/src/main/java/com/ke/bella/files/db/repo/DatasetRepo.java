@@ -240,6 +240,9 @@ public class DatasetRepo implements BaseRepo {
         rec.setItemId(itemId);
         rec.setDatasetId(op.getDatasetId());
         rec.setQuestion(op.getQuestion());
+        rec.setSimilarQ1(op.getSimilarQ1());
+        rec.setSimilarQ2(op.getSimilarQ2());
+        rec.setSimilarQ3(op.getSimilarQ3());
         rec.setAnswer(op.getAnswer());
         rec.setDatasetShardingKey(shardingKey);
 
@@ -324,10 +327,15 @@ public class DatasetRepo implements BaseRepo {
                 .orderBy("asc".equals(op.getOrder()) ? DATASET_QA.ID.asc() : DATASET_QA.ID.desc()).fetch().into(DatasetQaDB.class);
     }
 
-    public List<DatasetQaReferenceDB> addQaReferences(String itemId, String datasetId, List<DatasetOps.QAReferenceOp> referenceOps) {
+    @Transactional(rollbackFor = Exception.class)
+    public void addQaReferences(String itemId, String datasetId, List<DatasetOps.QAReferenceOp> referenceOps) {
         String shardingKey = shardingKeyByDatasetId(datasetId);
+        DSLContext db0 = db(shardingKey);
 
-        List<DatasetQaReferenceDB> result = new ArrayList<>();
+        List<String> referenceIds = new ArrayList<>();
+
+        List<DatasetQaReferenceRecord> toInsert = new ArrayList<>(referenceOps.size());
+
         for (DatasetOps.QAReferenceOp referenceOp : referenceOps) {
             String referenceId = genReferenceId(itemId, datasetId, referenceOp.getFileId());
 
@@ -341,13 +349,11 @@ public class DatasetRepo implements BaseRepo {
 
             fillCreatorInfo(rec);
 
-            DatasetQaReferenceDB referenceDB = db(shardingKey).insertInto(DATASET_QA_REFERENCE).set(rec).returningResult().fetchOne()
-                    .into(DatasetQaReferenceDB.class);
-
-            result.add(referenceDB);
+            toInsert.add(rec);
+            referenceIds.add(referenceId);
         }
 
-        return result;
+        db0.batchInsert(toInsert).execute();
     }
 
     public DatasetQaReferenceDB getQaReference(DatasetOps.QAReferenceOp op) {
