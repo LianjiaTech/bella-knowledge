@@ -239,4 +239,23 @@ public class FileService {
         return storageService.getPreviewUrl(bucketName, keyName, expires);
     }
 
+    public java.io.InputStream getFileInputStream(String fileId) {
+        try {
+            // 获取文件信息
+            FileDB file = fileRepo.queryFile(fileId);
+            if(file == null) {
+                LOGGER.warn("file not found, file_id = {}", fileId);
+                return null;
+            }
+
+            String bucketName = file.getBucket();
+            String keyName = file.getPath();
+
+            return storageService.getObjectInputStream(bucketName, keyName);
+        } catch (Exception e) {
+            String errMsg = String.format("failed to get input stream for file: %s, error: %s", fileId, e.getMessage());
+            LOGGER.error(errMsg, e);
+            throw new IllegalStateException(errMsg, e);
+        }
+    }
 }

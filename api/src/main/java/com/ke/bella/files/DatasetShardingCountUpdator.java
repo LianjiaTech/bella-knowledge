@@ -27,13 +27,17 @@ public class DatasetShardingCountUpdator {
             .build();
 
     public void increase(String datasetShardingKey) {
+        increase(datasetShardingKey, 1L);
+    }
+
+    public void increase(String datasetShardingKey, Long count) {
         try {
             deltas.get(datasetShardingKey, new Callable<AtomicLong>() {
                 @Override
                 public AtomicLong call() throws Exception {
                     return new AtomicLong(0);
                 }
-            }).addAndGet(1L);
+            }).addAndGet(count);
         } catch (ExecutionException e) {
             throw new RuntimeException(e);
         }
