@@ -40,21 +40,17 @@ bella:
   task:
     thread-nums: 1000
   login:
-    type: cas
-    login-page-url: ${BELLA_LOGIN_CAS_SERVER_LOGIN_URL:http://localhost/login}
-    validation-url-patterns: ${BELLA_LOGIN_CAS_VALIDATION_URL_PATTERNS:/v1/*}
+    type: client
+    openapi-base: ${BELLA_LOGIN_OPENAPI_BASE:http://localhost}
   session:
     cookie-name: ${BELLA_COOKIE_NAME:bella_openapi_sessionId}
     max-inactive-interval: 60
     cookie-max-age: -1
     cookie-domain: ${BELLA_COOKIE_DOMAIN:localhost}
     cookie-context-path: /
-  cas:
-    source: ${BELLA_LOGIN_CAS_SOURCE:ke}
-    server-url-prefix: ${BELLA_LOGIN_CAS_SERVER_URL_PREFIX:http://localhost/}
-    server-login-url: ${BELLA_LOGIN_CAS_SERVER_LOGIN_URL:http://localhost/login}
-    client-host: ${BELLA_LOGIN_CAS_CLIENT_HOST:http://localhost}
-    client-support: true
+  datasets:
+    import:
+      batch-size: 500
 apollo:
   bootstrap:
     enabled: false

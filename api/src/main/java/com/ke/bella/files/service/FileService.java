@@ -6,6 +6,7 @@ import java.io.File;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
@@ -29,6 +30,7 @@ import com.ke.bella.files.protocol.UpdateProgressRequestData;
 import com.ke.bella.files.service.broadcast.BroadcastService;
 import com.ke.bella.files.service.storage.StorageService;
 import com.ke.bella.openapi.BellaContext;
+import com.ke.bella.openapi.apikey.ApikeyInfo;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -115,6 +117,8 @@ public class FileService {
         }
         storageService.putObject(bucketName, keyName, mimeType, file, filename);
 
+        String akCode = Optional.ofNullable(BellaContext.getApikeyIgnoreNull()).map(ApikeyInfo::getCode)
+                .orElse(BellaContext.getOperator().getManagerAk());
         // 保存文件信息到数据库
         FileDB fileDB = new FileDB();
         fileDB.setFileId(fileId);
@@ -128,7 +132,7 @@ public class FileService {
         fileDB.setSpaceCode(spaceCode);
         fileDB.setPurpose(purpose);
         fileDB.setMetaData(metadata);
-        fileDB.setAkCode(BellaContext.getApikey().getCode());
+        fileDB.setAkCode(akCode);
         fileRepo.addFile(fileDB);
         FileDB res = fileRepo.queryFile(fileId);
         OpenAIFile openAIFile = res == null ? null : transferToOpenAIFile(res);
