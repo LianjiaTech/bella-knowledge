@@ -4,8 +4,8 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.ke.bella.files.utils.BellaContextHelper;
 import com.ke.bella.files.utils.CustomStringUtils;
-import com.ke.bella.openapi.BellaContext;
 
 public class IDGenerator {
     public interface IdGenerateStrategy {
@@ -13,7 +13,7 @@ public class IDGenerator {
     }
 
     private static final IdGenerateStrategy SPACE_CODE_STRATEGY = (prefix, now, instanceId, nextTick) -> {
-        String spaceCode = BellaContext.getOperator().getSpaceCode();
+        String spaceCode = BellaContextHelper.getOperateSpaceCode();
         String spaceCodeHash = String.valueOf(Math.abs(CustomStringUtils.hashCode(spaceCode)));
         return String.format("%s%s%s%s-%s", prefix, now, instanceId, nextTick, spaceCodeHash);
     };
