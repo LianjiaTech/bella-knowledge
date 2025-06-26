@@ -5,6 +5,8 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class Configs {
+
+    public static String SERVICE_NAME = "file-api";
     public static String MAX_FILE_SIZE;
     public static String OPEN_API_BASE;
 

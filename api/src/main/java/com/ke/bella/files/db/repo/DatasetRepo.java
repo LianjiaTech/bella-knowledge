@@ -32,8 +32,8 @@ import com.ke.bella.files.db.tables.records.DatasetQaReferenceRecord;
 import com.ke.bella.files.db.tables.records.DatasetRecord;
 import com.ke.bella.files.db.tables.records.DatasetShardingRecord;
 import com.ke.bella.files.protocol.DatasetOps;
+import com.ke.bella.files.utils.BellaContextHelper;
 import com.ke.bella.files.utils.DigestUtils;
-import com.ke.bella.openapi.BellaContext;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -122,7 +122,7 @@ public class DatasetRepo implements BaseRepo {
         rec.setDatasetId(datasetId);
         rec.set(DATASET.NAME, op.getName());
         rec.set(DATASET.TYPE, op.getType());
-        rec.set(DATASET.SPACE_CODE, BellaContext.getOperator().getSpaceCode());
+        rec.set(DATASET.SPACE_CODE, BellaContextHelper.getOperateSpaceCode());
 
         if(!StringUtils.isEmpty(op.getRemark())) {
             rec.set(DATASET.REMARK, op.getRemark());
@@ -144,7 +144,7 @@ public class DatasetRepo implements BaseRepo {
                         : DATASET.NAME.like("%" + DSL.escape(op.getName(), '\\') + "%"))
                 .and(StringUtils.isEmpty(op.getType()) ? DSL.noCondition()
                         : DATASET.TYPE.eq(op.getType()))
-                .and(DATASET.SPACE_CODE.eq(BellaContext.getOperator().getSpaceCode()))
+                .and(DATASET.SPACE_CODE.eq(BellaContextHelper.getOperateSpaceCode()))
                 .and(DATASET.STATUS.eq(status))
                 .fetchOneInto(DatasetDB.class);
     }
@@ -194,7 +194,7 @@ public class DatasetRepo implements BaseRepo {
                         : DATASET.NAME.like("%" + DSL.escape(page.getName(), '\\') + "%"))
                 .and(StringUtils.isEmpty(page.getType()) ? DSL.noCondition()
                         : DATASET.TYPE.eq(page.getType()))
-                .and(DATASET.SPACE_CODE.eq(BellaContext.getOperator().getSpaceCode()))
+                .and(DATASET.SPACE_CODE.eq(BellaContextHelper.getOperateSpaceCode()))
                 .and(DATASET.STATUS.eq(0))
                 .orderBy("asc".equals(page.getOrder()) ? DATASET.ID.asc() : DATASET.ID.desc());
 

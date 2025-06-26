@@ -53,8 +53,9 @@ public class DatasetController {
         return dataset;
     }
 
-    private DatasetQaDB checkQaExist(String itemId) {
+    private DatasetQaDB checkQaExist(String datasetId, String itemId) {
         DatasetQaDB qa = ds.getQa(QAOp.builder()
+                .datasetId(datasetId)
                 .itemId(itemId)
                 .build());
 
@@ -260,7 +261,7 @@ public class DatasetController {
 
         checkDatasetExist(op.getDatasetId());
 
-        checkQaExist(op.getItemId());
+        checkQaExist(op.getDatasetId(), op.getItemId());
 
         return ds.createQaReference(op);
     }

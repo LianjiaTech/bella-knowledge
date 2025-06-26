@@ -6,7 +6,6 @@ import java.io.File;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
@@ -29,8 +28,7 @@ import com.ke.bella.files.protocol.Progress;
 import com.ke.bella.files.protocol.UpdateProgressRequestData;
 import com.ke.bella.files.service.broadcast.BroadcastService;
 import com.ke.bella.files.service.storage.StorageService;
-import com.ke.bella.openapi.BellaContext;
-import com.ke.bella.openapi.apikey.ApikeyInfo;
+import com.ke.bella.files.utils.BellaContextHelper;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -108,7 +106,7 @@ public class FileService {
             String mimeType,
             String type,
             String extension) {
-        String spaceCode = BellaContext.getOperator().getSpaceCode();
+        String spaceCode = BellaContextHelper.getOperateSpaceCode();
         String fileId = FILEID_GEN.generate();
         String bucketName = purpose.equals(VISION) ? bucketConfig.getPublicBucket() : bucketConfig.getPrivateBucket();
         String keyName = String.format("%s/%s", purpose, fileId);
@@ -117,8 +115,8 @@ public class FileService {
         }
         storageService.putObject(bucketName, keyName, mimeType, file, filename);
 
-        String akCode = Optional.ofNullable(BellaContext.getApikeyIgnoreNull()).map(ApikeyInfo::getCode)
-                .orElse(BellaContext.getOperator().getManagerAk());
+        String akCode = BellaContextHelper.getOperatorAkCode();
+
         // 保存文件信息到数据库
         FileDB fileDB = new FileDB();
         fileDB.setFileId(fileId);
@@ -152,7 +150,7 @@ public class FileService {
             Integer limit,
             String order,
             String after) {
-        String spaceCode = BellaContext.getOperator().getSpaceCode();
+        String spaceCode = BellaContextHelper.getOperateSpaceCode();
         List<FileDB> files = fileRepo.listFile(purpose, limit, order, after, spaceCode);
         List<OpenAIFile> emptyList = new ArrayList<>();
         return files == null ? emptyList : files.stream().map(this::transferToOpenAIFile).collect(Collectors.toList());

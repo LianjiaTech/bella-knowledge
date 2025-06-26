@@ -6,33 +6,32 @@ import org.apache.commons.lang3.StringUtils;
 import org.jooq.DSLContext;
 import org.jooq.SelectLimitStep;
 
-import com.ke.bella.openapi.BellaContext;
+import com.ke.bella.files.utils.BellaContextHelper;
 
 public interface BaseRepo {
     default void fillCreatorInfo(Operator db) {
-        com.ke.bella.openapi.Operator operator = BellaContext.getOperatorIgnoreNull();
-        if(operator != null) {
-            if(operator.getUserId() != null) {
-                db.setCuid(operator.getUserId());
-            }
-
-            if(!StringUtils.isEmpty(operator.getUserName())) {
-                db.setCuName(operator.getUserName());
-            }
-            db.setCtime(LocalDateTime.now());
-            fillUpdatorInfo(db);
+        Long userId = BellaContextHelper.getOperatorUserId();
+        String userName = BellaContextHelper.getOperatorUserName();
+        if(userId != null) {
+            db.setCuid(userId);
         }
+
+        if(!StringUtils.isEmpty(userName)) {
+            db.setCuName(userName);
+        }
+        db.setCtime(LocalDateTime.now());
+        fillUpdatorInfo(db);
     }
 
     default void fillUpdatorInfo(Operator db) {
-        com.ke.bella.openapi.Operator operator = BellaContext.getOperatorIgnoreNull();
-        if(operator != null) {
-            if(operator.getUserId() != null) {
-                db.setMuid(operator.getUserId());
-            }
-            if(!StringUtils.isEmpty(operator.getUserName())) {
-                db.setMuName(operator.getUserName());
-            }
+        Long userId = BellaContextHelper.getOperatorUserId();
+        String userName = BellaContextHelper.getOperatorUserName();
+        if(userId != null) {
+            db.setCuid(userId);
+        }
+
+        if(!StringUtils.isEmpty(userName)) {
+            db.setCuName(userName);
         }
         db.setMtime(LocalDateTime.now());
     }
