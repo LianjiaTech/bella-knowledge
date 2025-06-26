@@ -36,7 +36,10 @@ public class DatasetOps {
         private int page = 1;
         @Builder.Default
         private int pageSize = 30;
-        private String order;
+        @Builder.Default
+        private String order = "desc";
+        @Builder.Default
+        private String orderBy = "ctime";
     }
 
     @Data
@@ -63,7 +66,10 @@ public class DatasetOps {
         private int page = 1;
         @Builder.Default
         private int pageSize = 30;
-        private String order;
+        @Builder.Default
+        private String order = "desc";
+        @Builder.Default
+        private String orderBy = "ctime";
     }
 
     @Data
@@ -91,7 +97,10 @@ public class DatasetOps {
         private int page = 1;
         @Builder.Default
         private int pageSize = 30;
-        private String order;
+        @Builder.Default
+        private String order = "desc";
+        @Builder.Default
+        private String orderBy = "ctime";
     }
 
     @Getter
