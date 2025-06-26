@@ -1,5 +1,8 @@
 package com.ke.bella.files.db.repo;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 
 import org.apache.commons.lang3.StringUtils;
@@ -17,7 +20,11 @@ public interface BaseRepo {
         }
 
         if(!StringUtils.isEmpty(userName)) {
-            db.setCuName(userName);
+            try {
+                db.setCuName(URLDecoder.decode(userName, StandardCharsets.UTF_8.name()));
+            } catch (UnsupportedEncodingException ignored) {
+                // ignore
+            }
         }
         db.setCtime(LocalDateTime.now());
         fillUpdatorInfo(db);
