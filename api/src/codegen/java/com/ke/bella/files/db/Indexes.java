@@ -36,5 +36,8 @@ public class Indexes {
     public static final Index INSTANCE_IDX_IP_PORT = Internal.createIndex(DSL.name("idx_ip_port"), Instance.INSTANCE, new OrderField[] { Instance.INSTANCE.IP, Instance.INSTANCE.PORT }, false);
     public static final Index DATASET_QA_REFERENCE_IDX_ITEM_ID = Internal.createIndex(DSL.name("idx_item_id"), DatasetQaReference.DATASET_QA_REFERENCE, new OrderField[] { DatasetQaReference.DATASET_QA_REFERENCE.ITEM_ID }, false);
     public static final Index DATASET_SHARDING_IDX_LAST_KEY = Internal.createIndex(DSL.name("idx_last_key"), DatasetSharding.DATASET_SHARDING, new OrderField[] { DatasetSharding.DATASET_SHARDING.LAST_KEY }, false);
+    public static final Index DATASET_IDX_MTIME = Internal.createIndex(DSL.name("idx_mtime"), Dataset.DATASET, new OrderField[] { Dataset.DATASET.MTIME }, false);
+    public static final Index DATASET_QA_IDX_MTIME = Internal.createIndex(DSL.name("idx_mtime"), DatasetQa.DATASET_QA, new OrderField[] { DatasetQa.DATASET_QA.MTIME }, false);
+    public static final Index DATASET_QA_REFERENCE_IDX_MTIME = Internal.createIndex(DSL.name("idx_mtime"), DatasetQaReference.DATASET_QA_REFERENCE, new OrderField[] { DatasetQaReference.DATASET_QA_REFERENCE.MTIME }, false);
     public static final Index DATASET_IDX_SPACE_CODE = Internal.createIndex(DSL.name("idx_space_code"), Dataset.DATASET, new OrderField[] { Dataset.DATASET.SPACE_CODE }, false);
 }

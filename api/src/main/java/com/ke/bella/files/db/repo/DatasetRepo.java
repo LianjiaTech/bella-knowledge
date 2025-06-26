@@ -17,7 +17,7 @@ import javax.annotation.Resource;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jooq.DSLContext;
-import org.jooq.SelectSeekStep1;
+import org.jooq.SelectConditionStep;
 import org.jooq.impl.DSL;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -189,14 +189,18 @@ public class DatasetRepo implements BaseRepo {
     }
 
     public Page<DatasetDB> pageDataset(DatasetOps.DatasetPage page) {
-        SelectSeekStep1<DatasetRecord, Long> sql = db.selectFrom(DATASET)
+        SelectConditionStep<DatasetRecord> sql = db.selectFrom(DATASET)
                 .where(StringUtils.isEmpty(page.getName()) ? DSL.noCondition()
                         : DATASET.NAME.like("%" + DSL.escape(page.getName(), '\\') + "%"))
                 .and(StringUtils.isEmpty(page.getType()) ? DSL.noCondition()
                         : DATASET.TYPE.eq(page.getType()))
                 .and(DATASET.SPACE_CODE.eq(BellaContextHelper.getOperateSpaceCode()))
-                .and(DATASET.STATUS.eq(0))
-                .orderBy("asc".equals(page.getOrder()) ? DATASET.ID.asc() : DATASET.ID.desc());
+                .and(DATASET.STATUS.eq(0));
+
+        String orderBy = StringUtils.isEmpty(page.getOrderBy()) ? "ctime" : page.getOrderBy().toLowerCase();
+        boolean isAsc = "asc".equals(page.getOrder());
+
+        sql.orderBy(isAsc ? DSL.field(orderBy).asc() : DSL.field(orderBy).desc());
 
         return queryPage(db, sql, page.getPage(), page.getPageSize(), DatasetDB.class);
     }
@@ -309,10 +313,14 @@ public class DatasetRepo implements BaseRepo {
         String shardingKey = shardingKeyByDatasetId(op.getDatasetId());
         DSLContext db0 = db(shardingKey);
 
-        SelectSeekStep1<DatasetQaRecord, Long> sql = db0.selectFrom(DATASET_QA)
+        SelectConditionStep<DatasetQaRecord> sql = db0.selectFrom(DATASET_QA)
                 .where(DATASET_QA.DATASET_ID.eq(op.getDatasetId()))
-                .and(DATASET_QA.STATUS.eq(0))
-                .orderBy("asc".equals(op.getOrder()) ? DATASET_QA.ID.asc() : DATASET_QA.ID.desc());
+                .and(DATASET_QA.STATUS.eq(0));
+
+        String orderBy = StringUtils.isEmpty(op.getOrderBy()) ? "ctime" : op.getOrderBy().toLowerCase();
+        boolean isAsc = "asc".equals(op.getOrder());
+
+        sql.orderBy(isAsc ? DSL.field(orderBy).asc() : DSL.field(orderBy).desc());
 
         return queryPage(db0, sql, op.getPage(), op.getPageSize(), DatasetQaDB.class);
     }
@@ -321,10 +329,15 @@ public class DatasetRepo implements BaseRepo {
         String shardingKey = shardingKeyByDatasetId(op.getDatasetId());
         DSLContext db0 = db(shardingKey);
 
-        return db0.selectFrom(DATASET_QA)
+        SelectConditionStep<DatasetQaRecord> sql = db0.selectFrom(DATASET_QA)
                 .where(DATASET_QA.DATASET_ID.eq(op.getDatasetId()))
-                .and(DATASET_QA.STATUS.eq(0))
-                .orderBy("asc".equals(op.getOrder()) ? DATASET_QA.ID.asc() : DATASET_QA.ID.desc()).fetch().into(DatasetQaDB.class);
+                .and(DATASET_QA.STATUS.eq(0));
+
+        String orderBy = StringUtils.isEmpty(op.getOrderBy()) ? "ctime" : op.getOrderBy().toLowerCase();
+        boolean isAsc = "asc".equals(op.getOrder());
+
+        return sql.orderBy(isAsc ? DSL.field(orderBy).asc() : DSL.field(orderBy).desc())
+                .fetch().into(DatasetQaDB.class);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -436,22 +449,30 @@ public class DatasetRepo implements BaseRepo {
         String shardingKey = shardingKeyByDatasetId(op.getDatasetId());
         DSLContext dslContext = db(shardingKey);
 
-        SelectSeekStep1<DatasetQaReferenceRecord, Long> sql = dslContext.selectFrom(DATASET_QA_REFERENCE)
+        SelectConditionStep<DatasetQaReferenceRecord> sql = dslContext.selectFrom(DATASET_QA_REFERENCE)
                 .where(StringUtils.isEmpty(op.getItemId()) ? DSL.noCondition() : DATASET_QA_REFERENCE.ITEM_ID.eq(op.getItemId()))
-                .and(DATASET_QA_REFERENCE.STATUS.eq(0))
-                .orderBy("asc".equals(op.getOrder()) ? DATASET_QA_REFERENCE.ID.asc() : DATASET_QA_REFERENCE.ID.desc());
+                .and(DATASET_QA_REFERENCE.STATUS.eq(0));
 
-        return queryPage(dslContext, sql, 1, 30, DatasetQaReferenceDB.class);
+        String orderBy = StringUtils.isEmpty(op.getOrderBy()) ? "ctime" : op.getOrderBy().toLowerCase();
+        boolean isAsc = "asc".equals(op.getOrder());
+
+        sql.orderBy(isAsc ? DSL.field(orderBy).asc() : DSL.field(orderBy).desc());
+
+        return queryPage(dslContext, sql, op.getPage(), op.getPageSize(), DatasetQaReferenceDB.class);
     }
 
     public List<DatasetQaReferenceDB> listQaReferences(DatasetOps.QaReferencePage op) {
         String shardingKey = shardingKeyByDatasetId(op.getDatasetId());
         DSLContext dslContext = db(shardingKey);
 
-        return dslContext.selectFrom(DATASET_QA_REFERENCE)
+        SelectConditionStep<DatasetQaReferenceRecord> sql = dslContext.selectFrom(DATASET_QA_REFERENCE)
                 .where(StringUtils.isEmpty(op.getItemId()) ? DSL.noCondition() : DATASET_QA_REFERENCE.ITEM_ID.eq(op.getItemId()))
-                .and(DATASET_QA_REFERENCE.STATUS.eq(0))
-                .orderBy("asc".equals(op.getOrder()) ? DATASET_QA_REFERENCE.ID.asc() : DATASET_QA_REFERENCE.ID.desc())
+                .and(DATASET_QA_REFERENCE.STATUS.eq(0));
+
+        String orderBy = StringUtils.isEmpty(op.getOrderBy()) ? "ctime" : op.getOrderBy().toLowerCase();
+        boolean isAsc = "asc".equals(op.getOrder());
+
+        return sql.orderBy(isAsc ? DSL.field(orderBy).asc() : DSL.field(orderBy).desc())
                 .fetch().into(DatasetQaReferenceDB.class);
     }
 

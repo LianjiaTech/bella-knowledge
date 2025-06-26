@@ -99,6 +99,11 @@ public class DatasetController {
 
     @PostMapping("/page")
     public Page<DatasetDB> page(@RequestBody DatasetPage page) {
+        Assert.isTrue(page.getOrder().equals("desc") || page.getOrder().equals("asc"),
+                "order must be 'desc' or 'asc', but got: " + page.getOrder());
+        Assert.isTrue(page.getOrderBy().equals("ctime") || page.getOrderBy().equals("mtime"),
+                "order_by must be 'ctime' or 'mtime', but got: " + page.getOrderBy());
+
         return ds.pageDataset(page);
     }
 
@@ -242,6 +247,10 @@ public class DatasetController {
     @PostMapping("/qa/page")
     public Page<DatasetQaDB> page(@RequestBody DatasetOps.QaPage op) {
         Assert.hasText(op.getDatasetId(), "dataset_id must not be empty");
+        Assert.isTrue(op.getOrder().equals("desc") || op.getOrder().equals("asc"),
+                "order must be 'desc' or 'asc', but got: " + op.getOrder());
+        Assert.isTrue(op.getOrderBy().equals("ctime") || op.getOrderBy().equals("mtime"),
+                "order_by must be 'ctime' or 'mtime', but got: " + op.getOrderBy());
 
         return ds.pageQa(op);
     }
@@ -249,6 +258,10 @@ public class DatasetController {
     @PostMapping("/qa/list")
     public List<DatasetQaDB> list(@RequestBody DatasetOps.QaPage op) {
         Assert.hasText(op.getDatasetId(), "dataset_id must not be empty");
+        Assert.isTrue(op.getOrder().equals("desc") || op.getOrder().equals("asc"),
+                "order must be 'desc' or 'asc', but got: " + op.getOrder());
+        Assert.isTrue(op.getOrderBy().equals("ctime") || op.getOrderBy().equals("mtime"),
+                "order_by must be 'ctime' or 'mtime', but got: " + op.getOrderBy());
 
         return ds.listQa(op);
     }
@@ -297,6 +310,10 @@ public class DatasetController {
     @PostMapping("/qa/reference/page")
     public Page<DatasetQaReferenceDB> page(@RequestBody DatasetOps.QaReferencePage op) {
         Assert.hasText(op.getDatasetId(), "dataset_id must not be empty");
+        Assert.isTrue(op.getOrder().equals("desc") || op.getOrder().equals("asc"),
+                "order must be 'desc' or 'asc', but got: " + op.getOrder());
+        Assert.isTrue(op.getOrderBy().equals("ctime") || op.getOrderBy().equals("mtime"),
+                "order_by must be 'ctime' or 'mtime', but got: " + op.getOrderBy());
 
         return ds.pageQaReferences(op);
     }
@@ -304,6 +321,10 @@ public class DatasetController {
     @PostMapping("/qa/reference/list")
     public List<DatasetQaReferenceDB> list(@RequestBody DatasetOps.QaReferencePage op) {
         Assert.hasText(op.getDatasetId(), "dataset_id must not be empty");
+        Assert.isTrue(op.getOrder().equals("desc") || op.getOrder().equals("asc"),
+                "order must be 'desc' or 'asc', but got: " + op.getOrder());
+        Assert.isTrue(op.getOrderBy().equals("ctime") || op.getOrderBy().equals("mtime"),
+                "order_by must be 'ctime' or 'mtime', but got: " + op.getOrderBy());
 
         return ds.listQaReferences(op);
     }

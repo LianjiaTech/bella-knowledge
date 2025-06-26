@@ -161,7 +161,7 @@ public class Dataset extends TableImpl<DatasetRecord> {
 
     @Override
     public List<Index> getIndexes() {
-        return Arrays.<Index>asList(Indexes.DATASET_IDX_CTIME, Indexes.DATASET_IDX_SPACE_CODE);
+        return Arrays.<Index>asList(Indexes.DATASET_IDX_CTIME, Indexes.DATASET_IDX_MTIME, Indexes.DATASET_IDX_SPACE_CODE);
     }
 
     @Override

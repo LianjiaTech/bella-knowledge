@@ -171,7 +171,7 @@ public class DatasetQa extends TableImpl<DatasetQaRecord> {
 
     @Override
     public List<Index> getIndexes() {
-        return Arrays.<Index>asList(Indexes.DATASET_QA_IDX_CTIME, Indexes.DATASET_QA_IDX_DATASET_ITEM);
+        return Arrays.<Index>asList(Indexes.DATASET_QA_IDX_CTIME, Indexes.DATASET_QA_IDX_DATASET_ITEM, Indexes.DATASET_QA_IDX_MTIME);
     }
 
     @Override

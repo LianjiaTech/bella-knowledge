@@ -156,7 +156,7 @@ public class DatasetQaReference extends TableImpl<DatasetQaReferenceRecord> {
 
     @Override
     public List<Index> getIndexes() {
-        return Arrays.<Index>asList(Indexes.DATASET_QA_REFERENCE_IDX_CTIME, Indexes.DATASET_QA_REFERENCE_IDX_DATASET_ID, Indexes.DATASET_QA_REFERENCE_IDX_ITEM_ID);
+        return Arrays.<Index>asList(Indexes.DATASET_QA_REFERENCE_IDX_CTIME, Indexes.DATASET_QA_REFERENCE_IDX_DATASET_ID, Indexes.DATASET_QA_REFERENCE_IDX_ITEM_ID, Indexes.DATASET_QA_REFERENCE_IDX_MTIME);
     }
 
     @Override
