@@ -141,6 +141,8 @@ public class FileService {
         message.setEvent(EventType.FILE_CREATED);
         message.setData(openAIFile);
         message.setMetadata(metadata);
+        message.setUserId(BellaContextHelper.getOperatorUserId());
+        message.setUserName(BellaContextHelper.getOperatorUserName());
         broadcastService.broadcast(message, () -> updateBroadcastStatus(fileId, BroadcastStatus.SUCCESS),
                 () -> updateBroadcastStatus(fileId, BroadcastStatus.FAILED));
         return openAIFile;
@@ -182,6 +184,8 @@ public class FileService {
         message.setEvent(EventType.FILE_UPDATED);
         message.setData(openAIFile);
         message.setMetadata(fileDB.getMetaData());
+        message.setUserId(BellaContextHelper.getOperatorUserId());
+        message.setUserName(BellaContextHelper.getOperatorUserName());
         broadcastService.broadcast(message, () -> updateBroadcastStatus(openAIFile.getId(), BroadcastStatus.SUCCESS),
                 () -> updateBroadcastStatus(openAIFile.getId(), BroadcastStatus.FAILED));
 

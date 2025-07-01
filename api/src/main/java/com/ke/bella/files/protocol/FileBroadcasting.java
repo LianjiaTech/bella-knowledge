@@ -11,6 +11,8 @@ public class FileBroadcasting<T> {
     private String event;
     private T data;
     private String metadata;
+    private Long userId;
+    private String userName;
 
     public void setEvent(EventType eventType) {
         this.event = eventType.getValue();
