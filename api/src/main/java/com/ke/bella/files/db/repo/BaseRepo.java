@@ -34,11 +34,11 @@ public interface BaseRepo {
         Long userId = BellaContextHelper.getOperatorUserId();
         String userName = BellaContextHelper.getOperatorUserName();
         if(userId != null) {
-            db.setCuid(userId);
+            db.setMuid(userId);
         }
 
         if(!StringUtils.isEmpty(userName)) {
-            db.setCuName(userName);
+            db.setMuName(userName);
         }
         db.setMtime(LocalDateTime.now());
     }
