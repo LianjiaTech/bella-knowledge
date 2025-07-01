@@ -350,7 +350,7 @@ public class DatasetRepo implements BaseRepo {
         List<DatasetQaReferenceRecord> toInsert = new ArrayList<>(referenceOps.size());
 
         for (DatasetOps.QAReferenceOp referenceOp : referenceOps) {
-            String referenceId = genReferenceId(itemId, datasetId, referenceOp.getFileId());
+            String referenceId = genReferenceId(itemId, referenceOp.getFileId(), referenceOp.getPath());
 
             DatasetQaReferenceRecord rec = DATASET_QA_REFERENCE.newRecord();
 
@@ -389,7 +389,7 @@ public class DatasetRepo implements BaseRepo {
         rec.setItemId(op.getItemId());
         rec.setDatasetId(op.getDatasetId());
         rec.setFileId(op.getFileId());
-        rec.setReferenceId(genReferenceId(op.getItemId(), op.getDatasetId(), op.getFileId()));
+        rec.setReferenceId(genReferenceId(op.getItemId(), op.getFileId(), op.getPath()));
         rec.setPath(op.getPath());
 
         fillCreatorInfo(rec);
@@ -402,8 +402,8 @@ public class DatasetRepo implements BaseRepo {
     }
 
     @NotNull
-    private static String genReferenceId(String itemId, String datasetId, String fileId) {
-        return "reference-" + DigestUtils.sha256(String.format("%s-%s-%s", itemId, datasetId, fileId));
+    private static String genReferenceId(String itemId, String fileId, String path) {
+        return "reference-" + DigestUtils.sha256(String.format("%s-%s-%s", itemId, fileId, path));
     }
 
     public void updateQaReference(DatasetOps.QAReferenceOp op) {
