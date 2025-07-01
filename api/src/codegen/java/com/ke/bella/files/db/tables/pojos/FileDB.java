@@ -20,6 +20,7 @@ public class FileDB implements Operator, Serializable {
 
     private Long          id;
     private String        fileId;
+    private Long          version;
     private String        filename;
     private String        extension;
     private String        mimeType;
@@ -46,6 +47,7 @@ public class FileDB implements Operator, Serializable {
     public FileDB(FileDB value) {
         this.id = value.id;
         this.fileId = value.fileId;
+        this.version = value.version;
         this.filename = value.filename;
         this.extension = value.extension;
         this.mimeType = value.mimeType;
@@ -71,6 +73,7 @@ public class FileDB implements Operator, Serializable {
     public FileDB(
         Long          id,
         String        fileId,
+        Long          version,
         String        filename,
         String        extension,
         String        mimeType,
@@ -94,6 +97,7 @@ public class FileDB implements Operator, Serializable {
     ) {
         this.id = id;
         this.fileId = fileId;
+        this.version = version;
         this.filename = filename;
         this.extension = extension;
         this.mimeType = mimeType;
@@ -142,6 +146,20 @@ public class FileDB implements Operator, Serializable {
      */
     public void setFileId(String fileId) {
         this.fileId = fileId;
+    }
+
+    /**
+     * Getter for <code>file.version</code>. 文件版本号, 每次变更+1
+     */
+    public Long getVersion() {
+        return this.version;
+    }
+
+    /**
+     * Setter for <code>file.version</code>. 文件版本号, 每次变更+1
+     */
+    public void setVersion(Long version) {
+        this.version = version;
     }
 
     /**
@@ -430,6 +448,7 @@ public class FileDB implements Operator, Serializable {
 
         sb.append(id);
         sb.append(", ").append(fileId);
+        sb.append(", ").append(version);
         sb.append(", ").append(filename);
         sb.append(", ").append(extension);
         sb.append(", ").append(mimeType);

@@ -20,6 +20,7 @@ import org.jooq.DSLContext;
 import org.jooq.Record;
 import org.jooq.SelectConditionStep;
 import org.jooq.SelectOrderByStep;
+import org.jooq.UpdateSetMoreStep;
 import org.jooq.impl.DSL;
 import org.springframework.stereotype.Component;
 
@@ -100,7 +101,7 @@ public class FileRepo implements BaseRepo {
         }
     }
 
-    public void updateFile(FileOps op) {
+    public void updateFile(FileOps op, boolean increaseVersion) {
         String fileId = queryNewFileId(op.getFileId());
         String shardingKey = getShardingKeyByFileId(fileId);
         FileRecord rec = FILE.newRecord();
@@ -114,14 +115,46 @@ public class FileRepo implements BaseRepo {
         if(op.getDomTreeFileId() != null) {
             rec.setDomTreeFileId(op.getDomTreeFileId());
         }
+        if(op.getFilename() != null) {
+            rec.setFilename(op.getFilename());
+        }
+        if(op.getPurpose() != null) {
+            rec.setPurpose(op.getPurpose());
+        }
+        if(op.getMetadata() != null) {
+            rec.setMetaData(op.getMetadata());
+        }
+        if(op.getMimeType() != null) {
+            rec.setMimeType(op.getMimeType());
+        }
+        if(op.getType() != null) {
+            rec.setType(op.getType());
+        }
+        if(op.getExtension() != null) {
+            rec.setExtension(op.getExtension());
+        }
+        if(op.getPath() != null) {
+            rec.setPath(op.getPath());
+        }
+
         fillUpdatorInfo(rec);
-        int updatedNum = db(shardingKey).update(FILE)
-                .set(rec)
+
+        UpdateSetMoreStep<FileRecord> sql = db(shardingKey).update(FILE)
+                .set(rec);
+        if(increaseVersion) {
+            sql.set(FILE.VERSION, FILE.VERSION.add(1));
+        }
+        int updatedNum = sql
                 .where(FILE.FILE_ID.eq(fileId).and(FILE.STATUS.eq(FileStatus.NOT_DELETED.getValue())))
                 .execute();
+
         if(updatedNum != 1) {
             throw new IllegalStateException("update file failed, fileId: " + fileId);
         }
+    }
+
+    public void updateFile(FileOps op) {
+        updateFile(op, false);
     }
 
     public List<FileDB> listFile(

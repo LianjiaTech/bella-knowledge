@@ -74,6 +74,7 @@ public class FileService {
                 .type(fileDB.getType())
                 .purpose(fileDB.getPurpose())
                 .domTreeFileId(fileDB.getDomTreeFileId())
+                .version(fileDB.getVersion())
                 .build();
     }
 
@@ -161,11 +162,30 @@ public class FileService {
         return fileDB == null ? null : transferToOpenAIFile(fileDB);
     }
 
+    public String updateRealFile(String fileId, String filename, File file, String mimeType) {
+        FileDB fileDB = fileRepo.queryFile(fileId);
+        return storageService.putObject(fileDB.getBucket(), fileDB.getPath(), mimeType, file, filename);
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public OpenAIFile updateFile(FileOps ops) {
-        fileRepo.updateFile(ops);
+        return updateFile(ops, false);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public OpenAIFile updateFile(FileOps ops, boolean increaseVersion) {
+        fileRepo.updateFile(ops, increaseVersion);
         FileDB fileDB = fileRepo.queryFile(ops.getFileId());
-        return fileDB == null ? null : transferToOpenAIFile(fileDB);
+        OpenAIFile openAIFile = transferToOpenAIFile(fileDB);
+
+        FileBroadcasting<OpenAIFile> message = new FileBroadcasting<>();
+        message.setEvent(EventType.FILE_UPDATED);
+        message.setData(openAIFile);
+        message.setMetadata(fileDB.getMetaData());
+        broadcastService.broadcast(message, () -> updateBroadcastStatus(openAIFile.getId(), BroadcastStatus.SUCCESS),
+                () -> updateBroadcastStatus(openAIFile.getId(), BroadcastStatus.FAILED));
+
+        return openAIFile;
     }
 
     public void delete(String fileId) {

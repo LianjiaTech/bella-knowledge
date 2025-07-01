@@ -19,7 +19,6 @@ import org.jooq.Identity;
 import org.jooq.Index;
 import org.jooq.Name;
 import org.jooq.Record;
-import org.jooq.Row22;
 import org.jooq.Schema;
 import org.jooq.Table;
 import org.jooq.TableField;
@@ -60,6 +59,11 @@ public class File extends TableImpl<FileRecord> {
      * The column <code>file.file_id</code>. 文件ID
      */
     public final TableField<FileRecord, String> FILE_ID = createField(DSL.name("file_id"), SQLDataType.VARCHAR(256).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "文件ID");
+
+    /**
+     * The column <code>file.version</code>. 文件版本号, 每次变更+1
+     */
+    public final TableField<FileRecord, Long> VERSION = createField(DSL.name("version"), SQLDataType.BIGINT.nullable(false).defaultValue(DSL.inline("0", SQLDataType.BIGINT)), this, "文件版本号, 每次变更+1");
 
     /**
      * The column <code>file.filename</code>. 文件名
@@ -243,14 +247,5 @@ public class File extends TableImpl<FileRecord> {
     @Override
     public File rename(Name name) {
         return new File(name, null);
-    }
-
-    // -------------------------------------------------------------------------
-    // Row22 type methods
-    // -------------------------------------------------------------------------
-
-    @Override
-    public Row22<Long, String, String, String, String, String, String, String, Long, String, String, Long, String, LocalDateTime, Long, String, LocalDateTime, String, Integer, String, Long, String> fieldsRow() {
-        return (Row22) super.fieldsRow();
     }
 }
