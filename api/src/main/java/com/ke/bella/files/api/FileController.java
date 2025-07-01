@@ -39,6 +39,8 @@ import com.ke.bella.files.protocol.UpdateProgressRequestData;
 import com.ke.bella.files.service.FileService;
 import com.ke.bella.openapi.utils.FileUtils;
 
+import lombok.AllArgsConstructor;
+import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.MediaType;
 
@@ -60,23 +62,12 @@ public class FileController {
             @RequestParam(value = "metadata", required = false) String metadata,
             @RequestParam(value = "get_url", required = false, defaultValue = "false") boolean getUrl,
             @RequestParam(value = "expires", required = false, defaultValue = ONE_DAY_STRING) long expires) throws IOException {
-        File tmpFile = null;
+        TmpFileInfo tmpFileInfo = null;
         try {
-            MediaType mimeTypeSource = Optional.ofNullable(file.getContentType()).map(MediaType::parse).orElse(null);
-            String type = "";
-            String mimeType = "";
-            if(mimeTypeSource != null) {
-                type = FileUtils.getType(mimeTypeSource);
-                mimeType = FileUtils.extraPureMediaType(mimeTypeSource);
-            }
+            tmpFileInfo = createTempFile(file);
 
-            String extension = FileUtils.getFileExtension(file.getOriginalFilename());
-            String suffix = StringUtils.isEmpty(extension) ? "" : "." + extension;
-
-            File tmpDir = new File(tmpFileDir);
-            tmpFile = File.createTempFile("tmp", suffix, tmpDir);
-            file.transferTo(tmpFile);
-            OpenAIFile openaiFile = fileService.upload(tmpFile, file.getOriginalFilename(), purpose, metadata, mimeType, type, extension);
+            OpenAIFile openaiFile = fileService.upload(tmpFileInfo.getTmpFile(), file.getOriginalFilename(), purpose, metadata,
+                    tmpFileInfo.getMimeType(), tmpFileInfo.getType(), tmpFileInfo.getExtension());
 
             if(getUrl) {
                 String url = fileService.getUrl(openaiFile.getId(), expires);
@@ -85,6 +76,40 @@ public class FileController {
 
             return openaiFile;
         } finally {
+            if(tmpFileInfo != null) {
+                tmpFileInfo.close();
+            }
+        }
+    }
+
+    private TmpFileInfo createTempFile(MultipartFile file) throws IOException {
+        MediaType mimeTypeSource = Optional.ofNullable(file.getContentType()).map(MediaType::parse).orElse(null);
+        String type = "";
+        String mimeType = "";
+        if(mimeTypeSource != null) {
+            type = FileUtils.getType(mimeTypeSource);
+            mimeType = FileUtils.extraPureMediaType(mimeTypeSource);
+        }
+
+        String extension = FileUtils.getFileExtension(file.getOriginalFilename());
+        String suffix = StringUtils.isEmpty(extension) ? "" : "." + extension;
+
+        File tmpDir = new File(tmpFileDir);
+        File tmpFile = File.createTempFile("tmp", suffix, tmpDir);
+        file.transferTo(tmpFile);
+
+        return new TmpFileInfo(tmpFile, type, mimeType, extension);
+    }
+
+    @Data
+    @AllArgsConstructor
+    private static class TmpFileInfo implements AutoCloseable {
+        public final File tmpFile;
+        public final String type;
+        public final String mimeType;
+        public final String extension;
+
+        public void close() {
             if(tmpFile != null) {
                 boolean deleteSuccess = tmpFile.delete();
                 if(!deleteSuccess) {
@@ -168,15 +193,40 @@ public class FileController {
     }
 
     @PutMapping
-    public OpenAIFile updateFile(@RequestBody FileOps ops) {
-        if(ops == null || StringUtils.isEmpty(ops.getFileId())) {
+    public OpenAIFile updateFile(
+            @RequestPart(value = "file") MultipartFile file0,
+            @RequestParam(value = "file_id") String fileId) throws IOException {
+        if(StringUtils.isEmpty(fileId)) {
             throw new IllegalArgumentException("file_id is required, but not provided");
         }
-        OpenAIFile file = fileService.getFile(ops.getFileId());
+
+        OpenAIFile file = fileService.getFile(fileId);
         if(file == null) {
-            throw new FileNotFoundException(ops.getFileId());
+            throw new FileNotFoundException(fileId);
         }
-        return fileService.updateFile(ops);
+
+        TmpFileInfo tmpFileInfo = null;
+        try {
+            tmpFileInfo = createTempFile(file0);
+
+            String fileKey = fileService.updateRealFile(fileId,
+                    file0.getOriginalFilename(), tmpFileInfo.getTmpFile(), tmpFileInfo.getMimeType());
+
+            FileOps ops = FileOps.builder()
+                    .fileId(fileId)
+                    .filename(file0.getOriginalFilename())
+                    .mimeType(tmpFileInfo.getMimeType())
+                    .type(tmpFileInfo.getType())
+                    .extension(tmpFileInfo.getExtension())
+                    .path(fileKey)
+                    .build();
+
+            return fileService.updateFile(ops, true);
+        } finally {
+            if(tmpFileInfo != null) {
+                tmpFileInfo.close();
+            }
+        }
     }
 
     @PostMapping("/dom-tree")

@@ -46,4 +46,5 @@ public class OpenAIFile {
     private String type;
     private String extension;
     private String domTreeFileId;
+    private Long version;
 }

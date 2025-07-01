@@ -14,4 +14,11 @@ public class FileOps {
     private FileStatus status;
     private BroadcastStatus broadcastStatus;
     private String domTreeFileId;
+    private String filename;
+    private String purpose;
+    private String metadata;
+    private String mimeType;
+    private String type;
+    private String extension;
+    private String path;
 }
