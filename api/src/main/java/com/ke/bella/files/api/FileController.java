@@ -4,6 +4,7 @@ import static com.ke.bella.files.service.FileService.ONE_DAY_STRING;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.Charset;
 import java.util.List;
 import java.util.Optional;
 
@@ -67,7 +68,7 @@ public class FileController {
             tmpFileInfo = createTempFile(file);
 
             OpenAIFile openaiFile = fileService.upload(tmpFileInfo.getTmpFile(), file.getOriginalFilename(), purpose, metadata,
-                    tmpFileInfo.getMimeType(), tmpFileInfo.getType(), tmpFileInfo.getExtension());
+                    tmpFileInfo.getMimeType(), tmpFileInfo.getType(), tmpFileInfo.getExtension(), tmpFileInfo.getCharset());
 
             if(getUrl) {
                 String url = fileService.getUrl(openaiFile.getId(), expires);
@@ -86,9 +87,11 @@ public class FileController {
         MediaType mimeTypeSource = Optional.ofNullable(file.getContentType()).map(MediaType::parse).orElse(null);
         String type = "";
         String mimeType = "";
+        String charset = "";
         if(mimeTypeSource != null) {
             type = FileUtils.getType(mimeTypeSource);
             mimeType = FileUtils.extraPureMediaType(mimeTypeSource);
+            charset = Optional.ofNullable(mimeTypeSource.charset()).map(Charset::name).orElse(null);
         }
 
         String extension = FileUtils.getFileExtension(file.getOriginalFilename());
@@ -98,7 +101,7 @@ public class FileController {
         File tmpFile = File.createTempFile("tmp", suffix, tmpDir);
         file.transferTo(tmpFile);
 
-        return new TmpFileInfo(tmpFile, type, mimeType, extension);
+        return new TmpFileInfo(tmpFile, type, mimeType, extension, charset);
     }
 
     @Data
@@ -108,6 +111,7 @@ public class FileController {
         public final String type;
         public final String mimeType;
         public final String extension;
+        public final String charset;
 
         public void close() {
             if(tmpFile != null) {
@@ -209,8 +213,8 @@ public class FileController {
         try {
             tmpFileInfo = createTempFile(file0);
 
-            String fileKey = fileService.updateRealFile(fileId,
-                    file0.getOriginalFilename(), tmpFileInfo.getTmpFile(), tmpFileInfo.getMimeType());
+            String fileKey = fileService.updateRealFile(fileId, file0.getOriginalFilename(), tmpFileInfo.getTmpFile(), tmpFileInfo.getMimeType(),
+                    tmpFileInfo.getCharset());
 
             FileOps ops = FileOps.builder()
                     .fileId(fileId)

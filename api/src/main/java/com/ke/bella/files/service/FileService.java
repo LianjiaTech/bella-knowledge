@@ -30,6 +30,9 @@ import com.ke.bella.files.service.broadcast.BroadcastService;
 import com.ke.bella.files.service.storage.StorageService;
 import com.ke.bella.files.utils.BellaContextHelper;
 
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -106,7 +109,8 @@ public class FileService {
             String metadata,
             String mimeType,
             String type,
-            String extension) {
+            String extension,
+            String charset) {
         String spaceCode = BellaContextHelper.getOperateSpaceCode();
         String fileId = FILEID_GEN.generate();
         String bucketName = purpose.equals(VISION) ? bucketConfig.getPublicBucket() : bucketConfig.getPrivateBucket();
@@ -114,7 +118,7 @@ public class FileService {
         if(StringUtils.isNotEmpty(extension)) {
             keyName += "." + extension;
         }
-        storageService.putObject(bucketName, keyName, mimeType, file, filename);
+        storageService.putObject(bucketName, keyName, mimeType, file, filename, charset);
 
         String akCode = BellaContextHelper.getOperatorAkCode();
 
@@ -164,9 +168,9 @@ public class FileService {
         return fileDB == null ? null : transferToOpenAIFile(fileDB);
     }
 
-    public String updateRealFile(String fileId, String filename, File file, String mimeType) {
+    public String updateRealFile(String fileId, String filename, File file, String mimeType, String charset) {
         FileDB fileDB = fileRepo.queryFile(fileId);
-        return storageService.putObject(fileDB.getBucket(), fileDB.getPath(), mimeType, file, filename);
+        return storageService.putObject(fileDB.getBucket(), fileDB.getPath(), mimeType, file, filename, charset);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -261,7 +265,7 @@ public class FileService {
         return storageService.getPreviewUrl(bucketName, keyName, expires);
     }
 
-    public java.io.InputStream getFileInputStream(String fileId) {
+    public InputStreamWithCharset getFileInputStream(String fileId) {
         try {
             // 获取文件信息
             FileDB file = fileRepo.queryFile(fileId);
@@ -279,5 +283,13 @@ public class FileService {
             LOGGER.error(errMsg, e);
             throw new IllegalStateException(errMsg, e);
         }
+    }
+
+    @Data
+    @AllArgsConstructor
+    @Builder
+    public static class InputStreamWithCharset {
+        private java.io.InputStream inputStream;
+        private String charset;
     }
 }

@@ -2,7 +2,6 @@ package com.ke.bella.files.service.storage;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -10,6 +9,7 @@ import java.nio.file.Paths;
 
 import org.apache.commons.io.FileUtils;
 
+import com.ke.bella.files.service.FileService;
 import com.ke.bella.files.service.storage.config.LocalStorageConfig;
 
 import lombok.extern.slf4j.Slf4j;
@@ -30,7 +30,7 @@ public class LocalStorageService implements StorageService {
     }
 
     @Override
-    public String putObject(String bucketName, String fileKey, String mimeType, File file, String filename) {
+    public String putObject(String bucketName, String fileKey, String mimeType, File file, String filename, String charset) {
         try {
             // 构建目标路径：rootPath/bucketName/fileKey
             Path targetDir = Paths.get(config.getRootPath(), bucketName);
@@ -43,7 +43,7 @@ public class LocalStorageService implements StorageService {
 
             // 保存文件元数据
             Path metadataPath = targetDir.resolve(fileKey + ".meta");
-            String metadata = String.format("filename=%s\nmimeType=%s", filename, mimeType);
+            String metadata = String.format("filename=%s\nmimeType=%s\ncharset=%s", filename, mimeType, charset);
             Files.write(metadataPath, metadata.getBytes(StandardCharsets.UTF_8));
 
             return fileKey;
@@ -70,7 +70,7 @@ public class LocalStorageService implements StorageService {
     }
 
     @Override
-    public InputStream getObjectInputStream(String bucketName, String fileKey) {
+    public FileService.InputStreamWithCharset getObjectInputStream(String bucketName, String fileKey) {
         try {
             Path filePath = Paths.get(config.getRootPath(), bucketName, fileKey);
 
@@ -79,7 +79,19 @@ public class LocalStorageService implements StorageService {
                 throw new IllegalArgumentException("object not found, file_key : " + fileKey);
             }
 
-            return Files.newInputStream(filePath);
+            Path metadataPath = filePath.resolveSibling(fileKey + ".meta");
+
+            String charset = null;
+            if(Files.exists(metadataPath)) {
+                String metadata = new String(Files.readAllBytes(metadataPath), StandardCharsets.UTF_8);
+                for (String line : metadata.split("\n")) {
+                    if(line.startsWith("charset=")) {
+                        charset = line.substring("charset=".length()).trim();
+                    }
+                }
+            }
+
+            return new FileService.InputStreamWithCharset(Files.newInputStream(filePath), charset);
         } catch (IOException e) {
             LOGGER.error("failed to get input stream for file: {}/{}", bucketName, fileKey, e);
             throw new RuntimeException("failed to get input stream for file: " + fileKey, e);

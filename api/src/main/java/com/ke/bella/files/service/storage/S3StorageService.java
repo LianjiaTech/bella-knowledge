@@ -3,13 +3,16 @@ package com.ke.bella.files.service.storage;
 import java.io.File;
 import java.io.InputStream;
 import java.net.URL;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Date;
+import java.util.Optional;
 
 import org.apache.commons.lang3.NotImplementedException;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.web.util.UriUtils;
 
 import com.amazonaws.auth.AWSStaticCredentialsProvider;
@@ -20,9 +23,11 @@ import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.google.common.base.Throwables;
+import com.ke.bella.files.service.FileService;
 import com.ke.bella.files.service.storage.config.S3StorageConfig;
 
 import lombok.extern.slf4j.Slf4j;
+import okhttp3.MediaType;
 
 @Slf4j
 public class S3StorageService implements StorageService {
@@ -42,12 +47,17 @@ public class S3StorageService implements StorageService {
     }
 
     @Override
-    public String putObject(String bucketName, String fileKey, String mimeType, File file, String filename) {
+    public String putObject(String bucketName, String fileKey, String mimeType, File file, String filename, String charset) {
         InputStream inputStream = null;
         try {
 
+            String contentType = null;
+            if(StringUtils.isNotEmpty(mimeType)) {
+                contentType = mimeType + (StringUtils.isNotEmpty(charset) ? "; charset=" + charset : "");
+            }
+
             ObjectMetadata metadata = new ObjectMetadata();
-            metadata.setContentType(mimeType);
+            metadata.setContentType(contentType);
             metadata.setContentLength(Files.size(file.toPath()));
 
             String filenameEncoded = UriUtils.encodeFragment(filename, StandardCharsets.UTF_8);
@@ -94,10 +104,15 @@ public class S3StorageService implements StorageService {
     }
 
     @Override
-    public InputStream getObjectInputStream(String bucketName, String fileKey) {
+    public FileService.InputStreamWithCharset getObjectInputStream(String bucketName, String fileKey) {
         com.amazonaws.services.s3.model.S3Object s3Object = client.getObject(bucketName, fileKey);
         if(s3Object != null) {
-            return s3Object.getObjectContent();
+            MediaType parse = MediaType.parse(s3Object.getObjectMetadata().getContentType());
+            String charset = null;
+            if(parse != null) {
+                charset = Optional.ofNullable(parse.charset()).map(Charset::name).orElse(null);
+            }
+            return new FileService.InputStreamWithCharset(s3Object.getObjectContent(), charset);
         }
         throw new IllegalArgumentException("object not found, file_key : " + fileKey);
     }
