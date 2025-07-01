@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -384,7 +385,7 @@ public class DatasetService {
      *
      * @throws Exception processing exception
      */
-    public int processCSVFile(InputStream inputStream, DatasetDB dataset, int batchSize,
+    public int processCSVFile(InputStream inputStream, String charset, DatasetDB dataset, int batchSize,
             TriConsumer<DatasetImportingProgress, Integer, String> progressCallback)
             throws Exception {
         List<QAOp> qaOps = new ArrayList<>();
@@ -393,7 +394,9 @@ public class DatasetService {
 
         // Use Apache Commons CSV to parse CSV files, which correctly handles
         // commas within quotes
-        BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
+        BufferedReader reader = new BufferedReader(
+                new InputStreamReader(inputStream,
+                        (StringUtils.isEmpty(charset) || !Charset.isSupported(charset)) ? StandardCharsets.UTF_8 : Charset.forName(charset)));
         CSVParser csvParser = new CSVParser(reader, CSVFormat.DEFAULT.withFirstRecordAsHeader().withTrim());
 
         // Get header row information

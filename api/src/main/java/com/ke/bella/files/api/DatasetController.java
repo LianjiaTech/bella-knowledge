@@ -1,6 +1,5 @@
 package com.ke.bella.files.api;
 
-import java.io.InputStream;
 import java.util.List;
 
 import javax.annotation.Resource;
@@ -155,7 +154,7 @@ public class DatasetController {
     private DatasetDB processImport(String fileId, DatasetDB dataset, TriConsumer<DatasetImportingProgress, Integer, String> progressCallback) {
         progressCallback.accept(DatasetImportingProgress.preprocessing, 0, DatasetImportingProgress.preprocessing.getDescription());
 
-        InputStream inputStream = null;
+        FileService.InputStreamWithCharset inputStream = null;
         try {
             inputStream = fs.getFileInputStream(fileId);
 
@@ -174,9 +173,9 @@ public class DatasetController {
             progressCallback.accept(DatasetImportingProgress.processing, 0, "开始批量处理数据");
 
             if(isExcel) {
-                totalRows = ds.processExcelFile(inputStream, dataset, batchSize, progressCallback);
+                totalRows = ds.processExcelFile(inputStream.getInputStream(), dataset, batchSize, progressCallback);
             } else if(isCSV) {
-                totalRows = ds.processCSVFile(inputStream, dataset, batchSize, progressCallback);
+                totalRows = ds.processCSVFile(inputStream.getInputStream(), inputStream.getCharset(), dataset, batchSize, progressCallback);
             }
 
             if(totalRows == 0) {
@@ -192,9 +191,9 @@ public class DatasetController {
             progressCallback.accept(DatasetImportingProgress.failed, 0, "failed to import dataset, e: " + e.getMessage());
             throw new IllegalStateException("failed to import dataset, " + e.getMessage());
         } finally {
-            if(inputStream != null) {
+            if(inputStream != null && inputStream.getInputStream() != null) {
                 try {
-                    inputStream.close();
+                    inputStream.getInputStream().close();
                 } catch (Exception e) {
                     LOGGER.error("failed to close input stream", e);
                 }
