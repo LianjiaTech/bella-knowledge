@@ -17,6 +17,8 @@ import javax.annotation.Resource;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jooq.DSLContext;
+import org.jooq.InsertOnDuplicateSetMoreStep;
+import org.jooq.Record;
 import org.jooq.SelectConditionStep;
 import org.jooq.impl.DSL;
 import org.springframework.stereotype.Component;
@@ -345,28 +347,24 @@ public class DatasetRepo implements BaseRepo {
         String shardingKey = shardingKeyByDatasetId(datasetId);
         DSLContext db0 = db(shardingKey);
 
-        List<String> referenceIds = new ArrayList<>();
-
-        List<DatasetQaReferenceRecord> toInsert = new ArrayList<>(referenceOps.size());
+        List<InsertOnDuplicateSetMoreStep<DatasetQaReferenceRecord>> queries = new ArrayList<>(referenceOps.size());
 
         for (DatasetOps.QAReferenceOp referenceOp : referenceOps) {
             String referenceId = genReferenceId(itemId, referenceOp.getFileId(), referenceOp.getPath());
 
-            DatasetQaReferenceRecord rec = DATASET_QA_REFERENCE.newRecord();
+            InsertOnDuplicateSetMoreStep<DatasetQaReferenceRecord> sql = db0.insertInto(DATASET_QA_REFERENCE)
+                    .set(DATASET_QA_REFERENCE.ITEM_ID, itemId)
+                    .set(DATASET_QA_REFERENCE.DATASET_ID, datasetId)
+                    .set(DATASET_QA_REFERENCE.FILE_ID, referenceOp.getFileId())
+                    .set(DATASET_QA_REFERENCE.REFERENCE_ID, referenceId)
+                    .set(DATASET_QA_REFERENCE.PATH, referenceOp.getPath())
+                    .onDuplicateKeyUpdate()
+                    .set(DATASET_QA_REFERENCE.STATUS, 0);
 
-            rec.setItemId(itemId);
-            rec.setDatasetId(datasetId);
-            rec.setFileId(referenceOp.getFileId());
-            rec.setReferenceId(referenceId);
-            rec.setPath(referenceOp.getPath());
-
-            fillCreatorInfo(rec);
-
-            toInsert.add(rec);
-            referenceIds.add(referenceId);
+            queries.add(sql);
         }
 
-        db0.batchInsert(toInsert).execute();
+        db0.batch(queries).execute();
     }
 
     public DatasetQaReferenceDB getQaReference(DatasetOps.QAReferenceOp op) {
@@ -394,11 +392,16 @@ public class DatasetRepo implements BaseRepo {
 
         fillCreatorInfo(rec);
 
-        return db(shardingKey).insertInto(DATASET_QA_REFERENCE)
+        Record result = db(shardingKey).insertInto(DATASET_QA_REFERENCE)
                 .set(rec)
+                .onDuplicateKeyUpdate()
+                .set(DATASET_QA_REFERENCE.STATUS, 0)
                 .returningResult()
-                .fetchOne()
-                .into(DatasetQaReferenceDB.class);
+                .fetchOne();
+
+        Assert.notNull(result, "qa reference is already exists");
+
+        return result.into(DatasetQaReferenceDB.class);
     }
 
     @NotNull
