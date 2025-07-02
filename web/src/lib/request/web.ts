@@ -1,0 +1,41 @@
+interface WebResponse<T> {
+  code: number;
+  data: T;
+  message: string;
+}
+interface WebRequestParams {
+  path: string;
+  method: "GET" | "POST" | "PUT" | "DELETE";
+  query?: Record<string, string>;
+  body?: Record<string, unknown>;
+  headers?: Record<string, string>;
+}
+export async function webRequest<T>(
+  params: WebRequestParams
+): Promise<WebResponse<T>> {
+  const { path, method, query, body, headers } = params;
+  const currentWorkspace = JSON.parse(
+    localStorage.getItem("current_workspace") || "{}"
+  );
+  const response = await fetch(
+    path + (query ? "?" + new URLSearchParams(query).toString() : ""),
+    {
+      credentials: "same-origin",
+      method,
+      body: JSON.stringify(body),
+      headers: {
+        "Content-Type": "application/json",
+        "X-USER-ID": localStorage.getItem("user_id") || "",
+        "X-BELLA-SPACE-CODE": currentWorkspace.spaceCode || "",
+        ...headers,
+      },
+    }
+  );
+
+  const data = await response.json();
+  if (data.code === 401) {
+    window.location.href =
+      data.data.redirectUrl + encodeURIComponent(window.location.href);
+  }
+  return data as WebResponse<T>;
+}

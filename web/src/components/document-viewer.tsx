@@ -1,0 +1,506 @@
+"use client";
+
+import React, {
+  useState,
+  useRef,
+  forwardRef,
+  useImperativeHandle,
+  useEffect,
+} from "react";
+import { cn } from "@/lib/utils";
+import {
+  DocumentData,
+  DocumentNode,
+  DocumentElement,
+} from "@/lib/types/documents";
+import { ScrollArea } from "./ui/scroll-area";
+import { Button } from "./ui/button";
+import { ChevronRight, ChevronDown, List } from "lucide-react";
+import { webRequest } from "@/lib/request/web";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
+import { TableRenderer } from "./table-renderer";
+
+interface NodeComponentProps {
+  node: DocumentNode;
+  level: number;
+  highlightedPath: number[] | null;
+  onNodeClick: (node: DocumentNode) => void;
+  onNodeDoubleClick: (node: DocumentNode) => void;
+  nodeRefs: React.MutableRefObject<Map<string, HTMLDivElement>>;
+}
+
+const NodeComponent: React.FC<NodeComponentProps> = ({
+  node,
+  level,
+  highlightedPath,
+  onNodeClick,
+  onNodeDoubleClick,
+  nodeRefs,
+}) => {
+  const nodeKey = node.path ? node.path.join("-") : "";
+  const isHighlighted =
+    highlightedPath &&
+    node.path &&
+    highlightedPath.length === node.path.length &&
+    highlightedPath.every((v, i) => v === node.path[i]);
+  const nodeRef = useRef<HTMLDivElement>(null);
+  const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  React.useEffect(() => {
+    if (nodeRef.current && node.path) {
+      nodeRefs.current.set(nodeKey, nodeRef.current);
+    }
+    return () => {
+      if (node.path) {
+        nodeRefs.current.delete(nodeKey);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodeKey, nodeRefs]);
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    // 如果已经有点击等待，说明这是双击
+    if (clickTimeoutRef.current) {
+      clearTimeout(clickTimeoutRef.current);
+      clickTimeoutRef.current = null;
+      onNodeDoubleClick(node);
+      return;
+    }
+
+    // 设置单击延迟，等待可能的双击
+    clickTimeoutRef.current = setTimeout(() => {
+      clickTimeoutRef.current = null;
+      onNodeClick(node);
+    }, 250); // 250ms 延迟来区分单击和双击
+  };
+
+  const renderElement = (element: DocumentElement) => {
+    const baseClasses = cn(
+      "transition-all duration-50 cursor-pointer rounded-md p-2 hover:bg-gray-50",
+      isHighlighted && "bg-blue-100 border-2 border-blue-300 shadow-md"
+    );
+
+    switch (element.type) {
+      case "Title":
+        return (
+          <div
+            className={cn(baseClasses, "font-bold text-lg mb-2", {
+              "text-2xl": level === 0,
+              "text-xl": level === 1,
+              "text-lg": level === 2,
+              "text-base": level > 2,
+            })}
+          >
+            {element.text || ""}
+          </div>
+        );
+
+      case "List":
+        return (
+          <div
+            className={cn(baseClasses, "mb-2 pl-4 border-l-2 border-gray-200")}
+          >
+            <span className="text-gray-700">{element.text || ""}</span>
+          </div>
+        );
+
+      case "Table":
+        return (
+          <div className={cn(baseClasses, "mb-4")}>
+            {element.text && (
+              <div className="mb-2 font-medium">{element.text}</div>
+            )}
+            <div className="overflow-x-auto">
+              <TableRenderer rows={element.rows || []} />
+            </div>
+          </div>
+        );
+      case "Figure":
+        return (
+          <figure className={cn(baseClasses)}>
+            {element.image?.type === "image_base64" && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                className="max-w-123"
+                src={element.image.base64}
+                alt="figure"
+              ></img>
+            )}
+            {element.image?.type === "image_url" && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img className="max-w-123" src={element.image.url} alt="figure" />
+            )}
+          </figure>
+        );
+      case "Code":
+        return (
+          <code className={cn(baseClasses, "mb-2 leading-relaxed")}>
+            {element.text || ""}
+          </code>
+        );
+      case "Formula":
+        return (
+          <div className={cn(baseClasses, "mb-2 leading-relaxed")}>
+            {element.text || ""}
+          </div>
+        );
+      case "Text":
+
+      default:
+        return (
+          <div className={cn(baseClasses, "mb-2 leading-relaxed")}>
+            <span className="text-gray-800 whitespace-pre-wrap">
+              {element.text || ""}
+            </span>
+          </div>
+        );
+    }
+  };
+
+  return (
+    <div className={cn("mb-1")}>
+      <div className="cursor-pointer" ref={nodeRef} onClick={handleClick}>
+        {renderElement(node.element)}
+      </div>
+      {node.children &&
+        node.children.length > 0 &&
+        node.children.map((childNode, index) => (
+          <NodeComponent
+            key={childNode.path ? childNode.path.join("-") : index}
+            node={childNode}
+            level={level + 1}
+            highlightedPath={highlightedPath}
+            onNodeClick={onNodeClick}
+            onNodeDoubleClick={onNodeDoubleClick}
+            nodeRefs={nodeRefs}
+          />
+        ))}
+    </div>
+  );
+};
+
+// 大纲树节点组件
+interface OutlineNodeProps {
+  node: DocumentNode;
+  level: number;
+  onNodeClick: (node: DocumentNode) => void;
+  highlightedPath: number[] | null;
+}
+
+const OutlineNode: React.FC<OutlineNodeProps> = ({
+  node,
+  level,
+  onNodeClick,
+  highlightedPath,
+}) => {
+  const [isExpanded, setIsExpanded] = useState(true);
+  const hasChildren = node.children && node.children.length > 0;
+  const nodeKey = node.path ? node.path.join("-") : "";
+  const isHighlighted =
+    highlightedPath &&
+    node.path &&
+    highlightedPath.length === node.path.length &&
+    highlightedPath.every((v, i) => v === node.path[i]);
+  const shouldShowInOutline = node.element.type === "Title";
+  if (!shouldShowInOutline && !hasChildren) {
+    return null;
+  }
+  return (
+    <div className="outline-node">
+      {shouldShowInOutline && (
+        <div
+          className={cn(
+            "flex items-center gap-1 py-1 px-2 rounded cursor-pointer hover:bg-gray-100 transition-colors",
+            isHighlighted && "bg-blue-100 text-blue-800"
+          )}
+          style={{ paddingLeft: `${level * 12 + 8}px` }}
+          onClick={() => onNodeClick(node)}
+        >
+          {hasChildren && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-4 w-4 p-0"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsExpanded(!isExpanded);
+              }}
+            >
+              {isExpanded ? (
+                <ChevronDown className="h-3 w-3" />
+              ) : (
+                <ChevronRight className="h-3 w-3" />
+              )}
+            </Button>
+          )}
+          <Tooltip>
+            <TooltipTrigger>
+              <span className="text-sm truncate" title={node.element.text}>
+                {node.element.text || `节点 ${nodeKey}`}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              {node.element.text || `节点 ${nodeKey}`}
+            </TooltipContent>
+          </Tooltip>
+        </div>
+      )}
+      {hasChildren && isExpanded && (
+        <div>
+          {node.children!.map((childNode, index) => (
+            <OutlineNode
+              key={childNode.path ? childNode.path.join("-") : index}
+              node={childNode}
+              level={shouldShowInOutline ? level + 1 : level}
+              onNodeClick={onNodeClick}
+              highlightedPath={highlightedPath}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// 大纲面板组件
+interface OutlinePanelProps {
+  data: DocumentData;
+  onInternalNodeClick: (node: DocumentNode) => void;
+  highlightedPath: number[] | null;
+}
+
+const OutlinePanel: React.FC<OutlinePanelProps> = ({
+  data,
+  onInternalNodeClick,
+  highlightedPath,
+}) => {
+  return (
+    <div className="w-64 border-r border-gray-200 bg-gray-50">
+      <div className="p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <List className="h-4 w-4" />
+          <h3 className="font-medium text-sm">文档大纲</h3>
+        </div>
+        <ScrollArea className="h-[calc(100vh-280px)]">
+          <div className="space-y-1">
+            {data.children &&
+              data.children.map((node, index) => (
+                <OutlineNode
+                  key={node.path ? node.path.join("-") : index}
+                  node={node}
+                  level={0}
+                  onNodeClick={onInternalNodeClick}
+                  highlightedPath={highlightedPath}
+                />
+              ))}
+          </div>
+        </ScrollArea>
+      </div>
+    </div>
+  );
+};
+
+export interface DocumentViewerRef {
+  scrollToNode: (path: number[]) => void;
+  highlightNode: (path: number[]) => void;
+  scrollToAndHighlightNode: (path: number[]) => void;
+}
+
+interface DocumentViewerProps {
+  fileId: string;
+  onClickNode: (node: DocumentNode) => void;
+  onDoubleClickNode?: (node: DocumentNode) => void;
+  showOutline?: boolean;
+}
+
+const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
+  function DocumentViewer(
+    { fileId, onClickNode, onDoubleClickNode, showOutline = true },
+    ref
+  ) {
+    const [highlightedPath, setHighlightedPath] = useState<number[] | null>(
+      null
+    );
+    const [showOutlinePanel, setShowOutlinePanel] = useState(showOutline);
+    const [data, setData] = useState<DocumentData | null>(null);
+    const [message, setMessage] = useState("");
+    const fileDomData = useRef<{ fileId: string; data: DocumentData }[]>([]);
+    useEffect(() => {
+      if (fileDomData.current.find((item) => item.fileId === fileId)) {
+        setData(
+          fileDomData.current.find((item) => item.fileId === fileId)!.data
+        );
+      } else if (fileId) {
+        webRequest<{ url: string }>({
+          path: "/api/dom-tree",
+          method: "GET",
+          query: { fileId },
+        }).then((res) => {
+          if (res.data.url) {
+            setMessage("正在获取文档内容，请稍后...");
+            const url = res.data.url;
+            fetch(url).then((res) => {
+              res.json().then((data) => {
+                setData(data);
+                fileDomData.current.push({ fileId, data });
+              });
+            });
+          } else {
+            setMessage("当前文档不支持解析");
+            setData(null);
+          }
+        });
+      }
+    }, [fileId]);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const nodeRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+    const findNodeByPath = (
+      nodes: DocumentNode[],
+      path: number[]
+    ): DocumentNode | null => {
+      for (const node of nodes) {
+        if (
+          node.path &&
+          node.path.length === path.length &&
+          node.path.every((v, i) => v === path[i])
+        ) {
+          return node;
+        }
+        if (node.children && node.children.length > 0) {
+          const found = findNodeByPath(node.children, path);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+
+    const handleNodeClick = (node: DocumentNode) => {
+      setHighlightedPath(node.path || null);
+    };
+
+    const handleNodeDoubleClick = (node: DocumentNode) => {
+      setHighlightedPath(node.path || null);
+      if (onDoubleClickNode) {
+        onDoubleClickNode(node);
+      } else {
+        onClickNode(node);
+      }
+    };
+
+    const handleOutlineNodeClick = (node: DocumentNode) => {
+      setHighlightedPath(node.path || null);
+      if (node.path) {
+        setTimeout(() => {
+          const element = nodeRefs.current.get(node.path.join("-"));
+          if (element) {
+            element.scrollIntoView({
+              behavior: "smooth",
+              block: "center",
+            });
+          }
+        }, 100);
+      }
+    };
+
+    useImperativeHandle(ref, () => ({
+      scrollToNode: (path: number[]) => {
+        const element = nodeRefs.current.get(path.join("-"));
+        if (element) {
+          element.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+        }
+      },
+      highlightNode: (path: number[]) => {
+        if (data) {
+          const node = findNodeByPath(data.children || [], path);
+          if (node) {
+            setHighlightedPath(node.path || null);
+          }
+        }
+      },
+      scrollToAndHighlightNode: (path: number[]) => {
+        if (data) {
+          const node = findNodeByPath(data.children || [], path);
+          if (node) {
+            setHighlightedPath(node.path || null);
+            setTimeout(() => {
+              const element = nodeRefs.current.get(path.join("-"));
+              if (element) {
+                element.scrollIntoView({
+                  behavior: "smooth",
+                  block: "center",
+                });
+              }
+            }, 100);
+          }
+        }
+      },
+    }));
+    if (!fileId) {
+      return (
+        <div className="flex items-center justify-center h-64 text-gray-500">
+          请选择文档
+        </div>
+      );
+    }
+    if (!data) {
+      return (
+        <div className="flex items-center justify-center h-64 text-gray-500">
+          {message}
+        </div>
+      );
+    }
+    return (
+      <div className="flex h-full bg-gray-50 overflow-hidden">
+        {/* 大纲面板 */}
+        {showOutlinePanel && (
+          <OutlinePanel
+            data={data}
+            onInternalNodeClick={handleOutlineNodeClick}
+            highlightedPath={highlightedPath}
+          />
+        )}
+        {/* 主内容区域 */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* 工具栏 */}
+          <div className="flex items-center justify-between p-2 border-b border-gray-200 bg-white">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowOutlinePanel(!showOutlinePanel)}
+            >
+              <List className="h-4 w-4 mr-1" />
+              {showOutlinePanel ? "隐藏大纲" : "显示大纲"}
+            </Button>
+          </div>
+          {/* 文档内容区域 */}
+          <ScrollArea
+            ref={containerRef}
+            className="flex-1 overflow-y-auto p-6 space-y-2 scrollbar-hide"
+          >
+            <div className="max-w-140 mx-auto bg-white rounded-lg shadow-sm p-6">
+              {data.children &&
+                data.children.map((node) => (
+                  <NodeComponent
+                    key={node.path ? node.path.join("-") : undefined}
+                    node={node}
+                    level={0}
+                    highlightedPath={highlightedPath}
+                    onNodeClick={handleNodeClick}
+                    onNodeDoubleClick={handleNodeDoubleClick}
+                    nodeRefs={nodeRefs}
+                  />
+                ))}
+            </div>
+          </ScrollArea>
+        </div>
+      </div>
+    );
+  }
+);
+
+export default DocumentViewer;

@@ -40,3 +40,6 @@ api/config-cache/example-file-api/config-cache/
 api/logs/
 
 mysql/data/
+
+# 前端构建产物
+web/dist/
