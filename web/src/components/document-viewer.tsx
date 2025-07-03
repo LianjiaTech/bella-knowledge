@@ -15,10 +15,17 @@ import {
 } from "@/lib/types/documents";
 import { ScrollArea } from "./ui/scroll-area";
 import { Button } from "./ui/button";
-import { ChevronRight, ChevronDown, List } from "lucide-react";
+import {
+  ChevronRight,
+  ChevronDown,
+  List,
+  ArrowLeft,
+  ArrowRight,
+} from "lucide-react";
 import { webRequest } from "@/lib/request/web";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { TableRenderer } from "./table-renderer";
+import { Input } from "./ui/input";
 
 interface NodeComponentProps {
   node: DocumentNode;
@@ -26,7 +33,7 @@ interface NodeComponentProps {
   highlightedPath: number[] | null;
   onNodeClick: (node: DocumentNode) => void;
   onNodeDoubleClick: (node: DocumentNode) => void;
-  nodeRefs: React.MutableRefObject<Map<string, HTMLDivElement>>;
+  nodeRefs: React.RefObject<Map<string, HTMLDivElement>>;
 }
 
 const NodeComponent: React.FC<NodeComponentProps> = ({
@@ -46,7 +53,7 @@ const NodeComponent: React.FC<NodeComponentProps> = ({
   const nodeRef = useRef<HTMLDivElement>(null);
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (nodeRef.current && node.path) {
       nodeRefs.current.set(nodeKey, nodeRef.current);
     }
@@ -186,6 +193,7 @@ interface OutlineNodeProps {
   node: DocumentNode;
   level: number;
   onNodeClick: (node: DocumentNode) => void;
+  onNodeDoubleClick: (node: DocumentNode) => void;
   highlightedPath: number[] | null;
 }
 
@@ -193,6 +201,7 @@ const OutlineNode: React.FC<OutlineNodeProps> = ({
   node,
   level,
   onNodeClick,
+  onNodeDoubleClick,
   highlightedPath,
 }) => {
   const [isExpanded, setIsExpanded] = useState(true);
@@ -201,8 +210,8 @@ const OutlineNode: React.FC<OutlineNodeProps> = ({
   const isHighlighted =
     highlightedPath &&
     node.path &&
-    highlightedPath.length === node.path.length &&
-    highlightedPath.every((v, i) => v === node.path[i]);
+    node.path.every((v, i) => v === highlightedPath[i]) &&
+    highlightedPath.length - node.path.length <= 1;
   const shouldShowInOutline = node.element.type === "Title";
   if (!shouldShowInOutline && !hasChildren) {
     return null;
@@ -215,14 +224,17 @@ const OutlineNode: React.FC<OutlineNodeProps> = ({
             "flex items-center gap-1 py-1 px-2 rounded cursor-pointer hover:bg-gray-100 transition-colors",
             isHighlighted && "bg-blue-100 text-blue-800"
           )}
-          style={{ paddingLeft: `${level * 12 + 8}px` }}
+          style={{
+            paddingLeft: `${level * 12 + 8}px`,
+          }}
           onClick={() => onNodeClick(node)}
+          onDoubleClick={() => onNodeDoubleClick(node)}
         >
           {hasChildren && (
             <Button
               variant="ghost"
               size="sm"
-              className="h-4 w-4 p-0"
+              className="h-4 w-4 relative"
               onClick={(e) => {
                 e.stopPropagation();
                 setIsExpanded(!isExpanded);
@@ -237,7 +249,10 @@ const OutlineNode: React.FC<OutlineNodeProps> = ({
           )}
           <Tooltip>
             <TooltipTrigger>
-              <span className="text-sm truncate" title={node.element.text}>
+              <span
+                className="text-sm truncate cursor-pointer"
+                title={node.element.text}
+              >
                 {node.element.text || `节点 ${nodeKey}`}
               </span>
             </TooltipTrigger>
@@ -255,6 +270,7 @@ const OutlineNode: React.FC<OutlineNodeProps> = ({
               node={childNode}
               level={shouldShowInOutline ? level + 1 : level}
               onNodeClick={onNodeClick}
+              onNodeDoubleClick={onNodeDoubleClick}
               highlightedPath={highlightedPath}
             />
           ))}
@@ -268,12 +284,14 @@ const OutlineNode: React.FC<OutlineNodeProps> = ({
 interface OutlinePanelProps {
   data: DocumentData;
   onInternalNodeClick: (node: DocumentNode) => void;
+  onInternalNodeDoubleClick: (node: DocumentNode) => void;
   highlightedPath: number[] | null;
 }
 
 const OutlinePanel: React.FC<OutlinePanelProps> = ({
   data,
   onInternalNodeClick,
+  onInternalNodeDoubleClick,
   highlightedPath,
 }) => {
   return (
@@ -292,12 +310,135 @@ const OutlinePanel: React.FC<OutlinePanelProps> = ({
                   node={node}
                   level={0}
                   onNodeClick={onInternalNodeClick}
+                  onNodeDoubleClick={onInternalNodeDoubleClick}
                   highlightedPath={highlightedPath}
                 />
               ))}
           </div>
         </ScrollArea>
       </div>
+    </div>
+  );
+};
+
+const KeywordSearch: React.FC<{
+  data: DocumentData;
+  onScrollToNode: (node: DocumentNode) => void;
+  onClearHighlightedPath: () => void;
+}> = ({ data, onScrollToNode, onClearHighlightedPath }) => {
+  const [keyword, setKeyword] = useState("");
+  const searchNodesRef = useRef<DocumentNode[]>([]);
+  const [searchNodesLength, setSearchNodesLength] = useState(0);
+  const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
+  const preKeywordRef = useRef("");
+  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.nativeEvent.isComposing) {
+      return;
+    }
+    if (e.key === "Enter") {
+      // 如果关键词相同，则跳转到下一个
+      if (
+        preKeywordRef.current === keyword &&
+        searchNodesRef.current.length > 0
+      ) {
+        if (e.shiftKey) {
+          const preIndex =
+            currentSearchIndex - 1 >= 0
+              ? currentSearchIndex - 1
+              : searchNodesLength - 1;
+          setCurrentSearchIndex(preIndex);
+          onScrollToNode(searchNodesRef.current[preIndex]);
+          return;
+        }
+        const nextIndex =
+          currentSearchIndex + 1 >= searchNodesRef.current.length
+            ? 0
+            : currentSearchIndex + 1;
+        setCurrentSearchIndex(nextIndex);
+        onScrollToNode(searchNodesRef.current[nextIndex]);
+        return;
+      }
+      // 如果关键词不同，则重新搜索
+      preKeywordRef.current = keyword;
+      const searchNodes: DocumentNode[] = [];
+      const findNodes = (nodes: DocumentNode[]) => {
+        for (const node of nodes) {
+          if (node.element.text && node.element.text.includes(keyword)) {
+            searchNodes.push(node);
+          }
+          if (node.children && node.children.length > 0) {
+            findNodes(node.children);
+          }
+        }
+      };
+      findNodes(data.children || []);
+      searchNodesRef.current = searchNodes;
+      setSearchNodesLength(searchNodes.length);
+      // 如果搜索到节点，则跳转到第一个
+      if (searchNodes.length > 0) {
+        setCurrentSearchIndex(0);
+        onScrollToNode(searchNodesRef.current[0]);
+      } else {
+        // 如果搜索不到，需要将节点高亮等状态移除
+        setCurrentSearchIndex(0);
+        onClearHighlightedPath();
+      }
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <div className="relative flex items-center gap-2">
+        <Input
+          className="w-70 pr-8"
+          placeholder="请输入关键词，按下回车后搜索"
+          value={keyword}
+          onChange={(e) => setKeyword(e.target.value)}
+          onKeyDown={onKeyDown}
+        />
+        <div className="absolute right-2 text-sm text-gray-500">
+          {searchNodesLength > 0
+            ? `${currentSearchIndex + 1}/${searchNodesLength}`
+            : keyword.length > 0
+            ? "0/0"
+            : ""}
+        </div>
+      </div>
+
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => {
+          if (searchNodesLength === 0) {
+            return;
+          }
+          const preIndex =
+            currentSearchIndex - 1 >= 0
+              ? currentSearchIndex - 1
+              : searchNodesLength - 1;
+          setCurrentSearchIndex(preIndex);
+          onScrollToNode(searchNodesRef.current[preIndex]);
+        }}
+      >
+        <ArrowLeft className="h-4 w-4" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => {
+          if (searchNodesLength === 0) {
+            return;
+          }
+          const nextIndex =
+            currentSearchIndex + 1 >= searchNodesLength
+              ? 0
+              : currentSearchIndex + 1;
+          setCurrentSearchIndex(nextIndex);
+          onScrollToNode(searchNodesRef.current[nextIndex]);
+        }}
+      >
+        <ArrowRight className="h-4 w-4" />
+      </Button>
     </div>
   );
 };
@@ -404,6 +545,24 @@ const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
       }
     };
 
+    const handleOutlineNodeDoubleClick = (node: DocumentNode) => {
+      setHighlightedPath(node.path || null);
+      if (onDoubleClickNode) {
+        onDoubleClickNode(node);
+      }
+    };
+
+    const handleScrollToNode = (node: DocumentNode) => {
+      setHighlightedPath(node.path || null);
+      const element = nodeRefs.current.get(node.path?.join("-") || "");
+      if (element) {
+        element.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      }
+    };
+
     useImperativeHandle(ref, () => ({
       scrollToNode: (path: number[]) => {
         const element = nodeRefs.current.get(path.join("-"));
@@ -461,6 +620,7 @@ const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
           <OutlinePanel
             data={data}
             onInternalNodeClick={handleOutlineNodeClick}
+            onInternalNodeDoubleClick={handleOutlineNodeDoubleClick}
             highlightedPath={highlightedPath}
           />
         )}
@@ -476,6 +636,11 @@ const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
               <List className="h-4 w-4 mr-1" />
               {showOutlinePanel ? "隐藏大纲" : "显示大纲"}
             </Button>
+            <KeywordSearch
+              data={data}
+              onScrollToNode={handleScrollToNode}
+              onClearHighlightedPath={() => setHighlightedPath(null)}
+            />
           </div>
           {/* 文档内容区域 */}
           <ScrollArea

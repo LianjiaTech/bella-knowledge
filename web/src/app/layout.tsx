@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Rag评测集构建工具",
-  description: "Rag评测集构建工具",
+  title: "Bella Knowledge",
+  description: "Bella Knowledge",
 };
 
 export default function RootLayout({

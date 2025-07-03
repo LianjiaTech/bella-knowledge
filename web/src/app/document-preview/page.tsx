@@ -45,6 +45,8 @@ function DocumentPreviewPage() {
     getUploadProgress,
     addReferenceFile,
     clear,
+    initLoading,
+    initReferenceFileList,
   } = useDocumentPreviewStore();
 
   const documentViewerRef = useRef<DocumentViewerRef>(null);
@@ -53,6 +55,7 @@ function DocumentPreviewPage() {
     const init = async () => {
       await initPage(datasetId);
       setSidebarOpen(true);
+      initReferenceFileList(datasetId);
     };
     init();
     return () => {
@@ -110,6 +113,17 @@ function DocumentPreviewPage() {
         <TopBar lastEditTime={lastEditTime} />
       </div>
 
+      <AppSidebar
+        loading={initLoading}
+        questionList={questionList}
+        selectedQuestion={selectedQuestion}
+        datasetId={datasetId}
+        open={sidebarOpen}
+        onOpenChange={setSidebarOpen}
+        onChangeSelectedQuestion={onChangeSelectedQuestion}
+        onDeleteQuestion={deleteQuestion}
+        onAddQuestion={addQuestion}
+      />
       {/* 主要内容区域 */}
       <main className="pt-16 h-screen flex">
         {/* 左侧内容区域 - 撑满剩余宽度 */}
@@ -148,18 +162,6 @@ function DocumentPreviewPage() {
           />
         </div>
       </main>
-
-      {/* Sidebar Sheet */}
-      <AppSidebar
-        questionList={questionList}
-        selectedQuestion={selectedQuestion}
-        datasetId={datasetId}
-        open={sidebarOpen}
-        onOpenChange={setSidebarOpen}
-        onChangeSelectedQuestion={onChangeSelectedQuestion}
-        onDeleteQuestion={deleteQuestion}
-        onAddQuestion={addQuestion}
-      />
 
       <Toaster />
     </div>

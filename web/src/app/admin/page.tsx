@@ -44,7 +44,7 @@ const Page = () => {
         <SheetTrigger asChild>
           <Button>创建数据集</Button>
         </SheetTrigger>
-        <SheetContent className="min-w-[900px]">
+        <SheetContent className="w-[800px] overflow-y-auto pb-4">
           <SheetHeader>
             <SheetTitle>创建数据集</SheetTitle>
           </SheetHeader>
