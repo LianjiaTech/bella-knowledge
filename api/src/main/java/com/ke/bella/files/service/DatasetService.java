@@ -99,6 +99,9 @@ public class DatasetService {
         if(!CollectionUtils.isEmpty(op.getReferences())) {
             repo.addQaReferences(qaDB.getItemId(), op.getDatasetId(), op.getReferences());
         }
+
+        repo.updateDatasetItems(qaDB.getDatasetId());
+
         return qaDB;
     }
 
@@ -115,6 +118,7 @@ public class DatasetService {
     @Transactional(rollbackFor = Exception.class)
     public DatasetQaDB updateQa(QAOp op) {
         repo.updateQa(op);
+        repo.updateDatasetItems(op.getDatasetId());
         return repo.getQa(op);
     }
 
@@ -122,6 +126,7 @@ public class DatasetService {
     public DatasetQaDB deleteQa(QAOp op) {
         repo.deleteQa(op);
         repo.decreaseQaCount(op.getDatasetId());
+        repo.updateDatasetItems(op.getDatasetId());
         return repo.getQa(op, -1);
     }
 
@@ -137,19 +142,24 @@ public class DatasetService {
         return repo.listQa(op);
     }
 
+    @Transactional(rollbackFor = Exception.class)
     public DatasetQaReferenceDB createQaReference(DatasetOps.QAReferenceOp op) {
-        return repo.addQaReference(op);
+        DatasetQaReferenceDB result = repo.addQaReference(op);
+        repo.updateDatasetItems(op.getDatasetId());
+        return result;
     }
 
     @Transactional(rollbackFor = Exception.class)
     public DatasetQaReferenceDB updateQaReference(DatasetOps.QAReferenceOp op) {
         repo.updateQaReference(op);
+        repo.updateDatasetItems(op.getDatasetId());
         return repo.getQaReference(op);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public DatasetQaReferenceDB deleteQaReference(DatasetOps.QAReferenceOp op) {
         repo.deleteQaReference(op);
+        repo.updateDatasetItems(op.getDatasetId());
         return repo.getQaReference(op, -1);
     }
 

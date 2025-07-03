@@ -126,7 +126,7 @@ public class DatasetRepo implements BaseRepo {
         rec.set(DATASET.TYPE, op.getType());
         rec.set(DATASET.SPACE_CODE, BellaContextHelper.getOperateSpaceCode());
 
-        if(!StringUtils.isEmpty(op.getRemark())) {
+        if(op.getRemark() != null) {
             rec.set(DATASET.REMARK, op.getRemark());
         }
 
@@ -154,15 +154,15 @@ public class DatasetRepo implements BaseRepo {
     public void updateDataset(DatasetOps.DatasetOp op) {
         DatasetRecord rec = DATASET.newRecord();
 
-        if(!StringUtils.isEmpty(op.getName())) {
+        if(op.getName() != null) {
             rec.set(DATASET.NAME, op.getName());
         }
 
-        if(!StringUtils.isEmpty(op.getType())) {
+        if(op.getType() != null) {
             rec.set(DATASET.TYPE, op.getType());
         }
 
-        if(!StringUtils.isEmpty(op.getRemark())) {
+        if(op.getRemark() != null) {
             rec.set(DATASET.REMARK, op.getRemark());
         }
 
@@ -175,6 +175,22 @@ public class DatasetRepo implements BaseRepo {
                 .execute();
 
         Assert.isTrue(execute == 1, "dataset update failed");
+    }
+
+    public void updateDatasetItems(String datasetId) {
+        DatasetRecord rec = DATASET.newRecord();
+
+        rec.set(DATASET.MTIME, LocalDateTime.now());
+        rec.set(DATASET.MUID, BellaContextHelper.getOperatorUserId());
+        rec.set(DATASET.MU_NAME, BellaContextHelper.getOperatorUserName());
+
+        int execute = db.update(DATASET)
+                .set(rec)
+                .where(DATASET.DATASET_ID.eq(datasetId))
+                .and(DATASET.STATUS.eq(0))
+                .execute();
+
+        Assert.isTrue(execute == 1, "dataset items update failed");
     }
 
     public void deleteDataset(DatasetOps.DatasetOp op) {
@@ -276,11 +292,11 @@ public class DatasetRepo implements BaseRepo {
 
         DatasetQaRecord rec = DATASET_QA.newRecord();
 
-        if(!StringUtils.isEmpty(op.getQuestion())) {
+        if(op.getQuestion() != null) {
             rec.set(DATASET_QA.QUESTION, op.getQuestion());
         }
 
-        if(!StringUtils.isEmpty(op.getAnswer())) {
+        if(op.getAnswer() != null) {
             rec.set(DATASET_QA.ANSWER, op.getAnswer());
         }
 
@@ -414,11 +430,11 @@ public class DatasetRepo implements BaseRepo {
 
         DatasetQaReferenceRecord rec = DATASET_QA_REFERENCE.newRecord();
 
-        if(!StringUtils.isEmpty(op.getPath())) {
+        if(op.getPath() != null) {
             rec.set(DATASET_QA_REFERENCE.PATH, op.getPath());
         }
 
-        if(!StringUtils.isEmpty(op.getFileId())) {
+        if(op.getFileId() != null) {
             rec.set(DATASET_QA_REFERENCE.FILE_ID, op.getFileId());
         }
 
