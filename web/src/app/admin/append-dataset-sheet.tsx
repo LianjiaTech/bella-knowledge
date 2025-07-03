@@ -77,9 +77,17 @@ export function AppendDatasetSheet({
       const formData = new FormData();
       formData.append("file", selectedFile);
       formData.append("purpose", "datasets_import");
+      const currentWorkspace = JSON.parse(
+        localStorage.getItem("current_workspace") || "{}"
+      );
+
       const response = await fetch("/api/files", {
         method: "POST",
         body: formData,
+        headers: {
+          "X-BELLA-SPACE-CODE": currentWorkspace.spaceCode || "",
+          "X-USER-ID": localStorage.getItem("user_id") || "",
+        },
       });
       const data = await response.json();
       if (data.code === 200) {

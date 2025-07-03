@@ -18,6 +18,8 @@ import Link from "next/link";
 import { Separator } from "./ui/separator";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import Image from "next/image";
+import logo from "@/assets/logo-site.png";
 
 const SpaceSelect = ({
   spaceList,
@@ -108,17 +110,14 @@ const TopBar = () => {
   return (
     <div className="flex justify-between  items-center p-6 h-16 shadow-md relative">
       <div className="flex items-center gap-4">
-        <div className="text-lg font-bold">评测集标注工具</div>
+        <Image src={logo} alt="logo" width={100} height={100} />
         <SpaceSelect
           spaceList={workspaceList}
           onChange={changeCurrentWorkspace}
           currentWorkspace={currentWorkspace}
         />
       </div>
-      {/* 居中 */}
-      <div className="absolute left-1/2 -translate-x-1/2">
-        <TopBarTabs />
-      </div>
+      <TopBarTabs />
       <div className="flex items-center gap-2">
         <User className="box-content size-6 rounded-full text-gray-500" />
         <div className="text-base font-medium">{userInfo?.userName}</div>

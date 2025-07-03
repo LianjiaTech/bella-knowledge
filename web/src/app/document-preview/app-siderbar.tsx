@@ -6,12 +6,23 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { useState } from "react";
-import { X, CornerDownLeft } from "lucide-react";
+import { X, CornerDownLeft, Loader2 } from "lucide-react";
 import { Question, QuestionList } from "@/lib/types/qa";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface AppSidebarProps {
+  loading: boolean;
   questionList: QuestionList;
   selectedQuestion: Question | null;
   datasetId: string;
@@ -27,6 +38,7 @@ interface AppSidebarProps {
 }
 
 export function AppSidebar({
+  loading,
   questionList,
   selectedQuestion,
   datasetId,
@@ -61,14 +73,19 @@ export function AppSidebar({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="left" className="w-100 p-0">
+      <SheetContent side="left" className="flex flex-col w-100 p-0">
         <SheetHeader className="p-4 border-b">
-          <SheetTitle>问题列表</SheetTitle>
+          <SheetTitle>
+            问题列表
+            <span className="text-sm text-gray-500 ml-2">
+              {questionList.length}条
+            </span>
+          </SheetTitle>
         </SheetHeader>
 
-        <div className="p-4 flex flex-col h-full">
+        <div className="p-4 pb-30 flex flex-col flex-1 overflow-hidden">
           {/* 新增问题输入框 */}
-          <div className="mb-4 space-y-2 flex-1">
+          <div className="mb-4 space-y-2">
             <div className="flex gap-2">
               <div className="relative flex-1">
                 <Textarea
@@ -87,13 +104,17 @@ export function AppSidebar({
           </div>
 
           <ScrollArea className="h-full">
-            <div className="flex-1">
-              {questionList.length === 0 ? (
+            <div className="h-full overflow-hidden">
+              {loading ? (
+                <div className="flex items-center justify-center h-full">
+                  <Loader2 className="size-4 animate-spin" />
+                </div>
+              ) : questionList.length === 0 ? (
                 <div className="flex items-center justify-center h-full">
                   <span className="text-gray-500">暂无问题</span>
                 </div>
               ) : (
-                <div className="space-y-1">
+                <div>
                   {questionList.map((question) => {
                     return (
                       <div
@@ -110,13 +131,24 @@ export function AppSidebar({
                         <span className="flex-1 truncate text-sm">
                           {question.question}
                         </span>
-                        <X
-                          className="size-4 flex-shrink-0 hover:text-red-500 transition-colors"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onDeleteQuestion(question);
-                          }}
-                        />
+                        <AlertDialog>
+                          <AlertDialogTrigger>
+                            <X className="size-4 flex-shrink-0 hover:text-red-500 transition-colors" />
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>确定删除吗？</AlertDialogTitle>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>取消</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => onDeleteQuestion(question)}
+                              >
+                                确定
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     );
                   })}
