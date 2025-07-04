@@ -1,6 +1,8 @@
 package com.ke.bella.files.api;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import javax.annotation.Resource;
 
@@ -65,8 +67,10 @@ public class DatasetController {
     @PostMapping("/create")
     public DatasetDB create(@RequestBody DatasetOp op) {
         Assert.hasText(op.getName(), "dataset name must not be empty");
-        Assert.isTrue(DatasetOps.DatasetType.qa.name().equals(op.getType()),
-                String.format("dataset type only support 'qa' currently, but got: %s", op.getType()));
+        Assert.isTrue(Arrays.stream(DatasetOps.DatasetType.values())
+                .map(DatasetOps.DatasetType::name)
+                .collect(Collectors.toList())
+                .contains(op.getType()), String.format("dataset type must be one of: %s", Arrays.toString(DatasetOps.DatasetType.values())));
 
         return ds.createDataset(op);
     }
@@ -74,9 +78,7 @@ public class DatasetController {
     @PostMapping("/update")
     public DatasetDB update(@RequestBody DatasetOp op) {
         Assert.hasText(op.getDatasetId(), "dataset_id must not be empty");
-        Assert.isTrue(DatasetOps.DatasetType.qa.name().equals(op.getType()),
-                String.format("dataset type only support 'qa' currently, but got: %s", op.getType()));
-
+        Assert.isNull(op.getType(), "dataset type cannot be updated");
         return ds.updateDataset(op);
     }
 

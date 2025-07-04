@@ -106,7 +106,8 @@ public class DatasetOps {
     @Getter
     @NoArgsConstructor
     public enum DatasetType {
-        qa
+        qa,
+        document
     }
 
     @Getter
