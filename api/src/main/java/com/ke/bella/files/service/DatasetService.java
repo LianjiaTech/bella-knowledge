@@ -36,6 +36,7 @@ import com.ke.bella.files.TaskExecutor;
 import com.ke.bella.files.db.repo.DatasetRepo;
 import com.ke.bella.files.db.repo.Page;
 import com.ke.bella.files.db.tables.pojos.DatasetDB;
+import com.ke.bella.files.db.tables.pojos.DatasetDocumentDB;
 import com.ke.bella.files.db.tables.pojos.DatasetQaDB;
 import com.ke.bella.files.db.tables.pojos.DatasetQaReferenceDB;
 import com.ke.bella.files.protocol.DatasetOps;
@@ -551,6 +552,32 @@ public class DatasetService {
         default:
             return "";
         }
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public List<DatasetDocumentDB> createDocuments(DatasetOps.DocumentCreateOp op) {
+        List<DatasetDocumentDB> documents = repo.addDocuments(op);
+        repo.updateDatasetItems(op.getDatasetId());
+        return documents;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public DatasetDocumentDB deleteDocument(DatasetOps.DocumentOp op) {
+        repo.deleteDocument(op);
+        repo.updateDatasetItems(op.getDatasetId());
+        return repo.getDocument(op, -1);
+    }
+
+    public DatasetDocumentDB getDocument(DatasetOps.DocumentOp op) {
+        return repo.getDocument(op);
+    }
+
+    public Page<DatasetDocumentDB> pageDocument(DatasetOps.DocumentPage op) {
+        return repo.pageDocument(op);
+    }
+
+    public List<DatasetDocumentDB> listDocument(DatasetOps.DocumentPage op) {
+        return repo.listDocument(op);
     }
 
     @PostConstruct

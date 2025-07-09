@@ -2,12 +2,14 @@ package com.ke.bella.files.api;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import javax.annotation.Resource;
 
 import org.apache.logging.log4j.util.TriConsumer;
 import org.springframework.util.Assert;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,6 +22,7 @@ import com.ke.bella.files.TaskExecutor;
 import com.ke.bella.files.configuration.Configs;
 import com.ke.bella.files.db.repo.Page;
 import com.ke.bella.files.db.tables.pojos.DatasetDB;
+import com.ke.bella.files.db.tables.pojos.DatasetDocumentDB;
 import com.ke.bella.files.db.tables.pojos.DatasetQaDB;
 import com.ke.bella.files.db.tables.pojos.DatasetQaReferenceDB;
 import com.ke.bella.files.protocol.DatasetOps;
@@ -27,9 +30,12 @@ import com.ke.bella.files.protocol.DatasetOps.DatasetImportingProgress;
 import com.ke.bella.files.protocol.DatasetOps.DatasetOp;
 import com.ke.bella.files.protocol.DatasetOps.DatasetPage;
 import com.ke.bella.files.protocol.DatasetOps.QAOp;
+import com.ke.bella.files.protocol.ListFileOps;
+import com.ke.bella.files.protocol.OpenAIFile;
 import com.ke.bella.files.protocol.UpdateProgressRequestData;
 import com.ke.bella.files.service.DatasetService;
 import com.ke.bella.files.service.FileService;
+import com.ke.bella.files.utils.JsonUtils;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -45,12 +51,14 @@ public class DatasetController {
     @Resource
     FileService fs;
 
-    private DatasetDB checkDatasetExist(String datasetId) {
+    private DatasetDB checkDataset(String datasetId, DatasetOps.DatasetType expectedType) {
         DatasetDB dataset = ds.getDataset(DatasetOp.builder()
                 .datasetId(datasetId)
                 .build());
 
         Assert.notNull(dataset, "dataset not found for dataset_id: " + datasetId);
+        Assert.isTrue(expectedType.name().equals(dataset.getType()),
+                String.format("dataset type mismatch: expected '%s', but got '%s'", expectedType, dataset.getType()));
         return dataset;
     }
 
@@ -62,6 +70,26 @@ public class DatasetController {
 
         Assert.notNull(qa, "qa not found for item_id: " + itemId);
         return qa;
+    }
+
+    private List<OpenAIFile> checkFilesExist(List<String> fileIds) {
+        ListFileOps ops = new ListFileOps();
+        ops.setFileIds(fileIds);
+        List<OpenAIFile> existingFiles = fs.getFiles(ops);
+
+        if(existingFiles.size() != fileIds.size()) {
+            Set<String> existingFileIds = existingFiles.stream()
+                    .map(OpenAIFile::getId)
+                    .collect(Collectors.toSet());
+
+            List<String> missingFileIds = fileIds.stream()
+                    .filter(fileId -> !existingFileIds.contains(fileId))
+                    .collect(Collectors.toList());
+
+            Assert.isTrue(false, "files not found for file_ids: " + JsonUtils.toJson(missingFileIds));
+        }
+
+        return existingFiles;
     }
 
     @PostMapping("/create")
@@ -128,7 +156,7 @@ public class DatasetController {
                     .remark(remark)
                     .build());
         } else {
-            dataset = checkDatasetExist(datasetId);
+            dataset = checkDataset(datasetId, DatasetOps.DatasetType.qa);
         }
 
         // step2: import from file using another thread
@@ -213,7 +241,7 @@ public class DatasetController {
         Assert.hasText(op.getDatasetId(), "dataset_id must not be empty");
         Assert.hasText(op.getQuestion(), "question must not be empty");
 
-        checkDatasetExist(op.getDatasetId());
+        checkDataset(op.getDatasetId(), DatasetOps.DatasetType.qa);
 
         return ds.createQa(op);
     }
@@ -273,7 +301,7 @@ public class DatasetController {
         Assert.hasText(op.getItemId(), "item_id must not be empty");
         Assert.hasText(op.getFileId(), "fileId must not be empty");
 
-        checkDatasetExist(op.getDatasetId());
+        checkDataset(op.getDatasetId(), DatasetOps.DatasetType.qa);
 
         checkQaExist(op.getDatasetId(), op.getItemId());
 
@@ -330,4 +358,55 @@ public class DatasetController {
         return ds.listQaReferences(op);
     }
 
+    @PostMapping("/documents/create")
+    public List<DatasetDocumentDB> create(@RequestBody DatasetOps.DocumentCreateOp op) {
+        Assert.hasText(op.getDatasetId(), "dataset_id must not be empty");
+        Assert.isTrue(!CollectionUtils.isEmpty(op.getFileIds()), "file_ids must not be empty. but got: " + JsonUtils.toJson(op.getFileIds()));
+
+        checkDataset(op.getDatasetId(), DatasetOps.DatasetType.document);
+        checkFilesExist(op.getFileIds());
+
+        return ds.createDocuments(op);
+    }
+
+    @PostMapping("/documents/delete")
+    public DatasetDocumentDB delete(@RequestBody DatasetOps.DocumentOp op) {
+        Assert.hasText(op.getDatasetId(), "dataset_id must not be empty");
+        Assert.hasText(op.getFileId(), "file_id must not be empty");
+
+        return ds.deleteDocument(op);
+    }
+
+    @PostMapping("/documents/get")
+    public DatasetDocumentDB get(@RequestBody DatasetOps.DocumentOp op) {
+        Assert.hasText(op.getDatasetId(), "dataset_id must not be empty");
+        Assert.hasText(op.getFileId(), "file_id must not be empty");
+
+        DatasetDocumentDB document = ds.getDocument(op);
+        Assert.notNull(document, "document not found for dataset_id: " + op.getDatasetId() + ", file_id: " + op.getFileId());
+
+        return document;
+    }
+
+    @PostMapping("/documents/page")
+    public Page<DatasetDocumentDB> page(@RequestBody DatasetOps.DocumentPage op) {
+        Assert.hasText(op.getDatasetId(), "dataset_id must not be empty");
+        Assert.isTrue(op.getOrder().equals("desc") || op.getOrder().equals("asc"),
+                "order must be 'desc' or 'asc', but got: " + op.getOrder());
+        Assert.isTrue(op.getOrderBy().equals("ctime") || op.getOrderBy().equals("mtime"),
+                "order_by must be 'ctime' or 'mtime', but got: " + op.getOrderBy());
+
+        return ds.pageDocument(op);
+    }
+
+    @PostMapping("/documents/list")
+    public List<DatasetDocumentDB> list(@RequestBody DatasetOps.DocumentPage op) {
+        Assert.hasText(op.getDatasetId(), "dataset_id must not be empty");
+        Assert.isTrue(op.getOrder().equals("desc") || op.getOrder().equals("asc"),
+                "order must be 'desc' or 'asc', but got: " + op.getOrder());
+        Assert.isTrue(op.getOrderBy().equals("ctime") || op.getOrderBy().equals("mtime"),
+                "order_by must be 'ctime' or 'mtime', but got: " + op.getOrderBy());
+
+        return ds.listDocument(op);
+    }
 }

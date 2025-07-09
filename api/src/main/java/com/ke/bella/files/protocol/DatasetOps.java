@@ -103,6 +103,39 @@ public class DatasetOps {
         private String orderBy = "ctime";
     }
 
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
+    @SuperBuilder(toBuilder = true)
+    public static class DocumentOp {
+        private String datasetId;
+        private String fileId;
+    }
+
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
+    @SuperBuilder(toBuilder = true)
+    public static class DocumentCreateOp {
+        private String datasetId;
+        private List<String> fileIds;
+    }
+
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
+    @SuperBuilder
+    public static class DocumentPage extends DocumentOp {
+        @Builder.Default
+        private int page = 1;
+        @Builder.Default
+        private int pageSize = 30;
+        @Builder.Default
+        private String order = "desc";
+        @Builder.Default
+        private String orderBy = "ctime";
+    }
+
     @Getter
     @NoArgsConstructor
     public enum DatasetType {
