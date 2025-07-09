@@ -3,6 +3,7 @@ package com.ke.bella.files.db.repo;
 import static com.ke.bella.files.db.IDGenerator.DATASET_ID_GEN;
 import static com.ke.bella.files.db.IDGenerator.QA_ID_GEN;
 import static com.ke.bella.files.db.tables.Dataset.DATASET;
+import static com.ke.bella.files.db.tables.DatasetDocument.DATASET_DOCUMENT;
 import static com.ke.bella.files.db.tables.DatasetQa.DATASET_QA;
 import static com.ke.bella.files.db.tables.DatasetQaReference.DATASET_QA_REFERENCE;
 import static com.ke.bella.files.db.tables.DatasetSharding.DATASET_SHARDING;
@@ -26,9 +27,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.Assert;
 
 import com.ke.bella.files.db.tables.pojos.DatasetDB;
+import com.ke.bella.files.db.tables.pojos.DatasetDocumentDB;
 import com.ke.bella.files.db.tables.pojos.DatasetQaDB;
 import com.ke.bella.files.db.tables.pojos.DatasetQaReferenceDB;
 import com.ke.bella.files.db.tables.pojos.DatasetShardingDB;
+import com.ke.bella.files.db.tables.records.DatasetDocumentRecord;
 import com.ke.bella.files.db.tables.records.DatasetQaRecord;
 import com.ke.bella.files.db.tables.records.DatasetQaReferenceRecord;
 import com.ke.bella.files.db.tables.records.DatasetRecord;
@@ -501,6 +504,101 @@ public class DatasetRepo implements BaseRepo {
                 .set(DATASET_SHARDING.MTIME, LocalDateTime.now())
                 .where(DATASET_SHARDING.KEY.eq(key))
                 .execute();
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public List<DatasetDocumentDB> addDocuments(DatasetOps.DocumentCreateOp op) {
+        String shardingKey = shardingKeyByDatasetId(op.getDatasetId());
+
+        List<InsertOnDuplicateSetMoreStep<DatasetDocumentRecord>> queries = new ArrayList<>(op.getFileIds().size());
+
+        for (String fileId : op.getFileIds()) {
+            InsertOnDuplicateSetMoreStep<DatasetDocumentRecord> sql = db.insertInto(DATASET_DOCUMENT)
+                    .set(DATASET_DOCUMENT.DATASET_ID, op.getDatasetId())
+                    .set(DATASET_DOCUMENT.FILE_ID, fileId)
+                    .set(DATASET_DOCUMENT.DATASET_SHARDING_KEY, shardingKey)
+                    .set(DATASET_DOCUMENT.CUID, BellaContextHelper.getOperatorUserId())
+                    .set(DATASET_DOCUMENT.CU_NAME, BellaContextHelper.getOperatorUserName())
+                    .set(DATASET_DOCUMENT.CTIME, LocalDateTime.now())
+                    .set(DATASET_DOCUMENT.MUID, BellaContextHelper.getOperatorUserId())
+                    .set(DATASET_DOCUMENT.MU_NAME, BellaContextHelper.getOperatorUserName())
+                    .set(DATASET_DOCUMENT.MTIME, LocalDateTime.now())
+                    .onDuplicateKeyUpdate()
+                    .set(DATASET_DOCUMENT.STATUS, 0);
+
+            queries.add(sql);
+        }
+
+        int[] batchResults = db.batch(queries).execute();
+
+        for (int i = 0; i < batchResults.length; i++) {
+            if(batchResults[i] == 0) {
+                String failedFileId = op.getFileIds().get(i);
+                Assert.isTrue(false, "failed to insert document for file_id: " + failedFileId);
+            }
+        }
+
+        List<DatasetDocumentDB> results = db.selectFrom(DATASET_DOCUMENT)
+                .where(DATASET_DOCUMENT.DATASET_ID.eq(op.getDatasetId()))
+                .and(DATASET_DOCUMENT.FILE_ID.in(op.getFileIds()))
+                .and(DATASET_DOCUMENT.STATUS.eq(0))
+                .fetch()
+                .into(DatasetDocumentDB.class);
+
+        return results;
+    }
+
+    public DatasetDocumentDB getDocument(DatasetOps.DocumentOp op) {
+        return getDocument(op, 0);
+    }
+
+    public DatasetDocumentDB getDocument(DatasetOps.DocumentOp op, Integer status) {
+        return db.selectFrom(DATASET_DOCUMENT)
+                .where(DATASET_DOCUMENT.DATASET_ID.eq(op.getDatasetId()))
+                .and(DATASET_DOCUMENT.FILE_ID.eq(op.getFileId()))
+                .and(DATASET_DOCUMENT.STATUS.eq(status))
+                .fetchOneInto(DatasetDocumentDB.class);
+    }
+
+    public void deleteDocument(DatasetOps.DocumentOp op) {
+        DatasetDocumentRecord rec = DATASET_DOCUMENT.newRecord();
+        rec.set(DATASET_DOCUMENT.STATUS, -1);
+
+        fillUpdatorInfo(rec);
+
+        int execute = db.update(DATASET_DOCUMENT)
+                .set(rec)
+                .where(DATASET_DOCUMENT.DATASET_ID.eq(op.getDatasetId()))
+                .and(DATASET_DOCUMENT.FILE_ID.eq(op.getFileId()))
+                .and(DATASET_DOCUMENT.STATUS.eq(0))
+                .execute();
+
+        Assert.isTrue(execute == 1, "document delete failed");
+    }
+
+    public Page<DatasetDocumentDB> pageDocument(DatasetOps.DocumentPage op) {
+        SelectConditionStep<DatasetDocumentRecord> sql = db.selectFrom(DATASET_DOCUMENT)
+                .where(DATASET_DOCUMENT.DATASET_ID.eq(op.getDatasetId()))
+                .and(DATASET_DOCUMENT.STATUS.eq(0));
+
+        String orderBy = StringUtils.isEmpty(op.getOrderBy()) ? "ctime" : op.getOrderBy().toLowerCase();
+        boolean isAsc = "asc".equals(op.getOrder());
+
+        sql.orderBy(isAsc ? DSL.field(orderBy).asc() : DSL.field(orderBy).desc());
+
+        return queryPage(db, sql, op.getPage(), op.getPageSize(), DatasetDocumentDB.class);
+    }
+
+    public List<DatasetDocumentDB> listDocument(DatasetOps.DocumentPage op) {
+        SelectConditionStep<DatasetDocumentRecord> sql = db.selectFrom(DATASET_DOCUMENT)
+                .where(DATASET_DOCUMENT.DATASET_ID.eq(op.getDatasetId()))
+                .and(DATASET_DOCUMENT.STATUS.eq(0));
+
+        String orderBy = StringUtils.isEmpty(op.getOrderBy()) ? "ctime" : op.getOrderBy().toLowerCase();
+        boolean isAsc = "asc".equals(op.getOrder());
+
+        return sql.orderBy(isAsc ? DSL.field(orderBy).asc() : DSL.field(orderBy).desc())
+                .fetch().into(DatasetDocumentDB.class);
     }
 
 }

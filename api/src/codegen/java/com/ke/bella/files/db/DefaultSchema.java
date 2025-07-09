@@ -5,6 +5,7 @@ package com.ke.bella.files.db;
 
 
 import com.ke.bella.files.db.tables.Dataset;
+import com.ke.bella.files.db.tables.DatasetDocument;
 import com.ke.bella.files.db.tables.DatasetQa;
 import com.ke.bella.files.db.tables.DatasetQaReference;
 import com.ke.bella.files.db.tables.DatasetSharding;
@@ -38,6 +39,11 @@ public class DefaultSchema extends SchemaImpl {
      * 数据集
      */
     public final Dataset DATASET = Dataset.DATASET;
+
+    /**
+     * 文档数据集表
+     */
+    public final DatasetDocument DATASET_DOCUMENT = DatasetDocument.DATASET_DOCUMENT;
 
     /**
      * 问答数据集表
@@ -91,6 +97,7 @@ public class DefaultSchema extends SchemaImpl {
     public final List<Table<?>> getTables() {
         return Arrays.<Table<?>>asList(
             Dataset.DATASET,
+            DatasetDocument.DATASET_DOCUMENT,
             DatasetQa.DATASET_QA,
             DatasetQaReference.DATASET_QA_REFERENCE,
             DatasetSharding.DATASET_SHARDING,

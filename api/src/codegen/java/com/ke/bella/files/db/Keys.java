@@ -5,6 +5,7 @@ package com.ke.bella.files.db;
 
 
 import com.ke.bella.files.db.tables.Dataset;
+import com.ke.bella.files.db.tables.DatasetDocument;
 import com.ke.bella.files.db.tables.DatasetQa;
 import com.ke.bella.files.db.tables.DatasetQaReference;
 import com.ke.bella.files.db.tables.DatasetSharding;
@@ -12,6 +13,7 @@ import com.ke.bella.files.db.tables.File;
 import com.ke.bella.files.db.tables.FileMapping;
 import com.ke.bella.files.db.tables.FileProgress;
 import com.ke.bella.files.db.tables.Instance;
+import com.ke.bella.files.db.tables.records.DatasetDocumentRecord;
 import com.ke.bella.files.db.tables.records.DatasetQaRecord;
 import com.ke.bella.files.db.tables.records.DatasetQaReferenceRecord;
 import com.ke.bella.files.db.tables.records.DatasetRecord;
@@ -40,6 +42,8 @@ public class Keys {
 
     public static final UniqueKey<DatasetRecord> KEY_DATASET_IDX_DATASET_ID = Internal.createUniqueKey(Dataset.DATASET, DSL.name("KEY_dataset_idx_dataset_id"), new TableField[] { Dataset.DATASET.DATASET_ID }, true);
     public static final UniqueKey<DatasetRecord> KEY_DATASET_PRIMARY = Internal.createUniqueKey(Dataset.DATASET, DSL.name("KEY_dataset_PRIMARY"), new TableField[] { Dataset.DATASET.ID }, true);
+    public static final UniqueKey<DatasetDocumentRecord> KEY_DATASET_DOCUMENT_IDX_DATASET_FILE = Internal.createUniqueKey(DatasetDocument.DATASET_DOCUMENT, DSL.name("KEY_dataset_document_idx_dataset_file"), new TableField[] { DatasetDocument.DATASET_DOCUMENT.DATASET_ID, DatasetDocument.DATASET_DOCUMENT.FILE_ID }, true);
+    public static final UniqueKey<DatasetDocumentRecord> KEY_DATASET_DOCUMENT_PRIMARY = Internal.createUniqueKey(DatasetDocument.DATASET_DOCUMENT, DSL.name("KEY_dataset_document_PRIMARY"), new TableField[] { DatasetDocument.DATASET_DOCUMENT.ID }, true);
     public static final UniqueKey<DatasetQaRecord> KEY_DATASET_QA_IDX_ITEM_ID = Internal.createUniqueKey(DatasetQa.DATASET_QA, DSL.name("KEY_dataset_qa_idx_item_id"), new TableField[] { DatasetQa.DATASET_QA.ITEM_ID }, true);
     public static final UniqueKey<DatasetQaRecord> KEY_DATASET_QA_PRIMARY = Internal.createUniqueKey(DatasetQa.DATASET_QA, DSL.name("KEY_dataset_qa_PRIMARY"), new TableField[] { DatasetQa.DATASET_QA.ID }, true);
     public static final UniqueKey<DatasetQaReferenceRecord> KEY_DATASET_QA_REFERENCE_IDX_REFERENCE_ID = Internal.createUniqueKey(DatasetQaReference.DATASET_QA_REFERENCE, DSL.name("KEY_dataset_qa_reference_idx_reference_id"), new TableField[] { DatasetQaReference.DATASET_QA_REFERENCE.REFERENCE_ID }, true);
