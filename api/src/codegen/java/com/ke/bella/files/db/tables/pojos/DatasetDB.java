@@ -32,6 +32,8 @@ public class DatasetDB implements Operator, Serializable {
     private String        muName;
     private LocalDateTime mtime;
     private Integer       status;
+    private LocalDateTime latestExportTime;
+    private String        latestExportFileId;
 
     public DatasetDB() {}
 
@@ -50,6 +52,8 @@ public class DatasetDB implements Operator, Serializable {
         this.muName = value.muName;
         this.mtime = value.mtime;
         this.status = value.status;
+        this.latestExportTime = value.latestExportTime;
+        this.latestExportFileId = value.latestExportFileId;
     }
 
     public DatasetDB(
@@ -66,7 +70,9 @@ public class DatasetDB implements Operator, Serializable {
         Long          muid,
         String        muName,
         LocalDateTime mtime,
-        Integer       status
+        Integer       status,
+        LocalDateTime latestExportTime,
+        String        latestExportFileId
     ) {
         this.id = id;
         this.spaceCode = spaceCode;
@@ -82,6 +88,8 @@ public class DatasetDB implements Operator, Serializable {
         this.muName = muName;
         this.mtime = mtime;
         this.status = status;
+        this.latestExportTime = latestExportTime;
+        this.latestExportFileId = latestExportFileId;
     }
 
     /**
@@ -280,6 +288,34 @@ public class DatasetDB implements Operator, Serializable {
         this.status = status;
     }
 
+    /**
+     * Getter for <code>dataset.latest_export_time</code>. 数据集最新导出时间
+     */
+    public LocalDateTime getLatestExportTime() {
+        return this.latestExportTime;
+    }
+
+    /**
+     * Setter for <code>dataset.latest_export_time</code>. 数据集最新导出时间
+     */
+    public void setLatestExportTime(LocalDateTime latestExportTime) {
+        this.latestExportTime = latestExportTime;
+    }
+
+    /**
+     * Getter for <code>dataset.latest_export_file_id</code>. 数据集最新导出文件ID
+     */
+    public String getLatestExportFileId() {
+        return this.latestExportFileId;
+    }
+
+    /**
+     * Setter for <code>dataset.latest_export_file_id</code>. 数据集最新导出文件ID
+     */
+    public void setLatestExportFileId(String latestExportFileId) {
+        this.latestExportFileId = latestExportFileId;
+    }
+
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder("DatasetDB (");
@@ -298,6 +334,8 @@ public class DatasetDB implements Operator, Serializable {
         sb.append(", ").append(muName);
         sb.append(", ").append(mtime);
         sb.append(", ").append(status);
+        sb.append(", ").append(latestExportTime);
+        sb.append(", ").append(latestExportFileId);
 
         sb.append(")");
         return sb.toString();

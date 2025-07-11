@@ -11,8 +11,8 @@ import java.time.LocalDateTime;
 
 import org.jooq.Field;
 import org.jooq.Record1;
-import org.jooq.Record14;
-import org.jooq.Row14;
+import org.jooq.Record16;
+import org.jooq.Row16;
 import org.jooq.impl.UpdatableRecordImpl;
 
 
@@ -20,7 +20,7 @@ import org.jooq.impl.UpdatableRecordImpl;
  * 数据集
  */
 @SuppressWarnings({ "all", "unchecked", "rawtypes" })
-public class DatasetRecord extends UpdatableRecordImpl<DatasetRecord> implements Operator, Record14<Long, String, String, String, String, String, Long, Long, String, LocalDateTime, Long, String, LocalDateTime, Integer> {
+public class DatasetRecord extends UpdatableRecordImpl<DatasetRecord> implements Operator, Record16<Long, String, String, String, String, String, Long, Long, String, LocalDateTime, Long, String, LocalDateTime, Integer, LocalDateTime, String> {
 
     private static final long serialVersionUID = 1L;
 
@@ -220,6 +220,34 @@ public class DatasetRecord extends UpdatableRecordImpl<DatasetRecord> implements
         return (Integer) get(13);
     }
 
+    /**
+     * Setter for <code>dataset.latest_export_time</code>. 数据集最新导出时间
+     */
+    public void setLatestExportTime(LocalDateTime value) {
+        set(14, value);
+    }
+
+    /**
+     * Getter for <code>dataset.latest_export_time</code>. 数据集最新导出时间
+     */
+    public LocalDateTime getLatestExportTime() {
+        return (LocalDateTime) get(14);
+    }
+
+    /**
+     * Setter for <code>dataset.latest_export_file_id</code>. 数据集最新导出文件ID
+     */
+    public void setLatestExportFileId(String value) {
+        set(15, value);
+    }
+
+    /**
+     * Getter for <code>dataset.latest_export_file_id</code>. 数据集最新导出文件ID
+     */
+    public String getLatestExportFileId() {
+        return (String) get(15);
+    }
+
     // -------------------------------------------------------------------------
     // Primary key information
     // -------------------------------------------------------------------------
@@ -230,17 +258,17 @@ public class DatasetRecord extends UpdatableRecordImpl<DatasetRecord> implements
     }
 
     // -------------------------------------------------------------------------
-    // Record14 type implementation
+    // Record16 type implementation
     // -------------------------------------------------------------------------
 
     @Override
-    public Row14<Long, String, String, String, String, String, Long, Long, String, LocalDateTime, Long, String, LocalDateTime, Integer> fieldsRow() {
-        return (Row14) super.fieldsRow();
+    public Row16<Long, String, String, String, String, String, Long, Long, String, LocalDateTime, Long, String, LocalDateTime, Integer, LocalDateTime, String> fieldsRow() {
+        return (Row16) super.fieldsRow();
     }
 
     @Override
-    public Row14<Long, String, String, String, String, String, Long, Long, String, LocalDateTime, Long, String, LocalDateTime, Integer> valuesRow() {
-        return (Row14) super.valuesRow();
+    public Row16<Long, String, String, String, String, String, Long, Long, String, LocalDateTime, Long, String, LocalDateTime, Integer, LocalDateTime, String> valuesRow() {
+        return (Row16) super.valuesRow();
     }
 
     @Override
@@ -314,6 +342,16 @@ public class DatasetRecord extends UpdatableRecordImpl<DatasetRecord> implements
     }
 
     @Override
+    public Field<LocalDateTime> field15() {
+        return Dataset.DATASET.LATEST_EXPORT_TIME;
+    }
+
+    @Override
+    public Field<String> field16() {
+        return Dataset.DATASET.LATEST_EXPORT_FILE_ID;
+    }
+
+    @Override
     public Long component1() {
         return getId();
     }
@@ -384,6 +422,16 @@ public class DatasetRecord extends UpdatableRecordImpl<DatasetRecord> implements
     }
 
     @Override
+    public LocalDateTime component15() {
+        return getLatestExportTime();
+    }
+
+    @Override
+    public String component16() {
+        return getLatestExportFileId();
+    }
+
+    @Override
     public Long value1() {
         return getId();
     }
@@ -451,6 +499,16 @@ public class DatasetRecord extends UpdatableRecordImpl<DatasetRecord> implements
     @Override
     public Integer value14() {
         return getStatus();
+    }
+
+    @Override
+    public LocalDateTime value15() {
+        return getLatestExportTime();
+    }
+
+    @Override
+    public String value16() {
+        return getLatestExportFileId();
     }
 
     @Override
@@ -538,7 +596,19 @@ public class DatasetRecord extends UpdatableRecordImpl<DatasetRecord> implements
     }
 
     @Override
-    public DatasetRecord values(Long value1, String value2, String value3, String value4, String value5, String value6, Long value7, Long value8, String value9, LocalDateTime value10, Long value11, String value12, LocalDateTime value13, Integer value14) {
+    public DatasetRecord value15(LocalDateTime value) {
+        setLatestExportTime(value);
+        return this;
+    }
+
+    @Override
+    public DatasetRecord value16(String value) {
+        setLatestExportFileId(value);
+        return this;
+    }
+
+    @Override
+    public DatasetRecord values(Long value1, String value2, String value3, String value4, String value5, String value6, Long value7, Long value8, String value9, LocalDateTime value10, Long value11, String value12, LocalDateTime value13, Integer value14, LocalDateTime value15, String value16) {
         value1(value1);
         value2(value2);
         value3(value3);
@@ -553,6 +623,8 @@ public class DatasetRecord extends UpdatableRecordImpl<DatasetRecord> implements
         value12(value12);
         value13(value13);
         value14(value14);
+        value15(value15);
+        value16(value16);
         return this;
     }
 
@@ -570,7 +642,7 @@ public class DatasetRecord extends UpdatableRecordImpl<DatasetRecord> implements
     /**
      * Create a detached, initialised DatasetRecord
      */
-    public DatasetRecord(Long id, String spaceCode, String datasetId, String name, String type, String remark, Long count, Long cuid, String cuName, LocalDateTime ctime, Long muid, String muName, LocalDateTime mtime, Integer status) {
+    public DatasetRecord(Long id, String spaceCode, String datasetId, String name, String type, String remark, Long count, Long cuid, String cuName, LocalDateTime ctime, Long muid, String muName, LocalDateTime mtime, Integer status, LocalDateTime latestExportTime, String latestExportFileId) {
         super(Dataset.DATASET);
 
         setId(id);
@@ -587,5 +659,7 @@ public class DatasetRecord extends UpdatableRecordImpl<DatasetRecord> implements
         setMuName(muName);
         setMtime(mtime);
         setStatus(status);
+        setLatestExportTime(latestExportTime);
+        setLatestExportFileId(latestExportFileId);
     }
 }

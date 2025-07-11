@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.Resource;
@@ -46,6 +47,8 @@ import com.ke.bella.files.protocol.DatasetOps.DatasetPage;
 import com.ke.bella.files.protocol.DatasetOps.QAOp;
 import com.ke.bella.files.utils.JsonUtils;
 
+import lombok.AllArgsConstructor;
+import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -141,6 +144,17 @@ public class DatasetService {
 
     public List<DatasetQaDB> listQa(DatasetOps.QaPage op) {
         return repo.listQa(op);
+    }
+
+    public void streamQaWithReferences(String datasetId, Consumer<DatasetQaWithReferences> qaConsumer) {
+        repo.streamQaWithReferences(datasetId, qaConsumer);
+    }
+
+    @Data
+    @AllArgsConstructor
+    public static class DatasetQaWithReferences {
+        private final DatasetQaDB qa;
+        private final List<DatasetQaReferenceDB> references;
     }
 
     @Transactional(rollbackFor = Exception.class)

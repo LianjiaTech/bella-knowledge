@@ -1,7 +1,17 @@
 package com.ke.bella.files.api;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -30,6 +40,7 @@ import com.ke.bella.files.protocol.DatasetOps.DatasetImportingProgress;
 import com.ke.bella.files.protocol.DatasetOps.DatasetOp;
 import com.ke.bella.files.protocol.DatasetOps.DatasetPage;
 import com.ke.bella.files.protocol.DatasetOps.QAOp;
+import com.ke.bella.files.protocol.FileUrl;
 import com.ke.bella.files.protocol.ListFileOps;
 import com.ke.bella.files.protocol.OpenAIFile;
 import com.ke.bella.files.protocol.UpdateProgressRequestData;
@@ -232,8 +243,64 @@ public class DatasetController {
     }
 
     @GetMapping("/export")
-    public void export(@RequestParam(name = "dataset_id") String datasetId) {
-        // todo
+    public FileUrl export(@RequestParam(name = "dataset_id") String datasetId,
+            @RequestParam(name = "expires", defaultValue = "3600") Long expires) {
+        Assert.hasText(datasetId, "dataset_id must not be empty");
+
+        DatasetDB datasetDB = checkDataset(datasetId, DatasetOps.DatasetType.qa);
+
+        if(datasetDB.getLatestExportTime().isAfter(datasetDB.getMtime())) {
+            LOGGER.info("using cached export file for dataset_id: {}, latest_export_time: {}, mtime: {}",
+                    datasetId, datasetDB.getLatestExportTime(), datasetDB.getMtime());
+            String cachedFileId = Optional.ofNullable(datasetDB.getLatestExportFileId())
+                    .orElseThrow(() -> new IllegalStateException("latest_export_file_id is null, but latest_export_time is after mtime"));
+            String url = fs.getUrl(cachedFileId, expires);
+            return FileUrl.builder().url(url).build();
+        }
+
+        String filename = datasetId + ".jsonl";
+        File tempFile = null;
+
+        try {
+            tempFile = Files.createTempFile("dataset-export-" + datasetId, ".jsonl").toFile();
+
+            try (FileOutputStream fos = new FileOutputStream(tempFile);
+                    OutputStreamWriter writer = new OutputStreamWriter(fos, StandardCharsets.UTF_8)) {
+
+                ds.streamQaWithReferences(datasetId, qaWithRefs -> writeQaData(writer, qaWithRefs));
+            }
+
+            OpenAIFile uploadedFile = fs.upload(
+                    tempFile,
+                    filename,
+                    "datasets_export",
+                    null,
+                    "text/plain",
+                    "text",
+                    "jsonl",
+                    StandardCharsets.UTF_8.name());
+
+            DatasetOps.DatasetOp op = DatasetOps.DatasetOp.builder()
+                    .datasetId(datasetId)
+                    .latestExportTime(LocalDateTime.now())
+                    .latestExportFileId(uploadedFile.getId())
+                    .build();
+            ds.updateDataset(op);
+
+            String url = fs.getUrl(uploadedFile.getId(), expires);
+            return FileUrl.builder().url(url).build();
+        } catch (IOException e) {
+            LOGGER.error("error creating or uploading export file, e: ", e);
+            throw new IllegalStateException("error creating or uploading export file, e: " + e.getMessage());
+        } finally {
+            if(tempFile != null && tempFile.exists()) {
+                try {
+                    Files.delete(tempFile.toPath());
+                } catch (IOException e) {
+                    LOGGER.warn("failed to delete temp file: " + tempFile.getAbsolutePath(), e);
+                }
+            }
+        }
     }
 
     @PostMapping("/qa/create")
@@ -408,5 +475,43 @@ public class DatasetController {
                 "order_by must be 'ctime' or 'mtime', but got: " + op.getOrderBy());
 
         return ds.listDocument(op);
+    }
+
+    private void writeQaData(OutputStreamWriter writer, DatasetService.DatasetQaWithReferences qaWithRefs) {
+        try {
+            DatasetQaDB qa = qaWithRefs.getQa();
+            List<DatasetQaReferenceDB> references = qaWithRefs.getReferences();
+
+            Map<String, Object> qaData = new LinkedHashMap<>();
+            qaData.put("question", qa.getQuestion());
+            qaData.put("answer", qa.getAnswer());
+
+            if(StringUtils.hasText(qa.getSimilarQ1())) {
+                qaData.put("similar_q1", qa.getSimilarQ1());
+            }
+            if(StringUtils.hasText(qa.getSimilarQ2())) {
+                qaData.put("similar_q2", qa.getSimilarQ2());
+            }
+            if(StringUtils.hasText(qa.getSimilarQ3())) {
+                qaData.put("similar_q3", qa.getSimilarQ3());
+            }
+
+            if(!CollectionUtils.isEmpty(references)) {
+                List<Map<String, Object>> refList = references.stream()
+                        .map(ref -> {
+                            Map<String, Object> refData = new LinkedHashMap<>();
+                            refData.put("file_id", ref.getFileId());
+                            refData.put("path", ref.getPath());
+                            return refData;
+                        })
+                        .collect(Collectors.toList());
+                qaData.put("references", refList);
+            }
+
+            writer.write(JsonUtils.toJson(qaData));
+            writer.write("\n");
+        } catch (IOException e) {
+            throw new IllegalStateException("error writing QA data. e: ", e);
+        }
     }
 }
