@@ -12,11 +12,13 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 import javax.annotation.Resource;
 
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
+import org.jooq.Cursor;
 import org.jooq.DSLContext;
 import org.jooq.InsertOnDuplicateSetMoreStep;
 import org.jooq.Record;
@@ -37,6 +39,7 @@ import com.ke.bella.files.db.tables.records.DatasetQaReferenceRecord;
 import com.ke.bella.files.db.tables.records.DatasetRecord;
 import com.ke.bella.files.db.tables.records.DatasetShardingRecord;
 import com.ke.bella.files.protocol.DatasetOps;
+import com.ke.bella.files.service.DatasetService;
 import com.ke.bella.files.utils.BellaContextHelper;
 import com.ke.bella.files.utils.DigestUtils;
 
@@ -169,7 +172,17 @@ public class DatasetRepo implements BaseRepo {
             rec.set(DATASET.REMARK, op.getRemark());
         }
 
-        fillUpdatorInfo(rec);
+        if(op.getLatestExportTime() != null) {
+            rec.set(DATASET.LATEST_EXPORT_TIME, op.getLatestExportTime());
+        }
+
+        if(op.getLatestExportFileId() != null) {
+            rec.set(DATASET.LATEST_EXPORT_FILE_ID, op.getLatestExportFileId());
+        }
+
+        if(op.getLatestExportTime() == null && op.getLatestExportFileId() == null) {
+            fillUpdatorInfo(rec);
+        }
 
         int execute = db.update(DATASET)
                 .set(rec)
@@ -601,4 +614,66 @@ public class DatasetRepo implements BaseRepo {
                 .fetch().into(DatasetDocumentDB.class);
     }
 
+    /**
+     * 使用游标流式处理QA数据及其关联引用，适用于大数据量导出
+     *
+     * @param datasetId  数据集ID
+     * @param qaConsumer QA数据消费者
+     */
+    public void streamQaWithReferences(String datasetId, Consumer<DatasetService.DatasetQaWithReferences> qaConsumer) {
+        // 1. 获取分片键和数据库上下文
+        String shardingKey = shardingKeyByDatasetId(datasetId);
+        DSLContext dslContext = db(shardingKey);
+
+        // 2. 构建查询游标，使用LEFT JOIN联查QA和references数据
+        try (Cursor<Record> cursor = dslContext
+                .select(DATASET_QA.fields())
+                .select(DATASET_QA_REFERENCE.fields())
+                .from(DATASET_QA)
+                .leftJoin(DATASET_QA_REFERENCE)
+                .on(DATASET_QA.ITEM_ID.eq(DATASET_QA_REFERENCE.ITEM_ID)
+                        .and(DATASET_QA.DATASET_ID.eq(DATASET_QA_REFERENCE.DATASET_ID))
+                        .and(DATASET_QA_REFERENCE.STATUS.eq(0)))
+                .where(DATASET_QA.DATASET_ID.eq(datasetId))
+                .and(DATASET_QA.STATUS.eq(0))
+                .orderBy(DATASET_QA.ID.asc(), DATASET_QA_REFERENCE.ID.asc())
+                .fetchLazy()) {
+
+            // 3. 流式处理：逐个QA收集其所有references，然后输出
+            String currentItemId = null;
+            DatasetQaDB currentQa = null;
+            List<DatasetQaReferenceDB> currentReferences = new ArrayList<>();
+
+            for (Record record : cursor) {
+                DatasetQaDB qa = record.into(DATASET_QA.getRecordType()).into(DatasetQaDB.class);
+                String itemId = qa.getItemId();
+
+                if(!itemId.equals(currentItemId)) {
+                    // 先输出上一个QA（如果存在）
+                    if(currentQa != null) {
+                        DatasetService.DatasetQaWithReferences qaWithRefs = new DatasetService.DatasetQaWithReferences(currentQa,
+                                new ArrayList<>(currentReferences));
+                        qaConsumer.accept(qaWithRefs);
+                    }
+
+                    currentItemId = itemId;
+                    currentQa = qa;
+                    currentReferences.clear();
+                }
+
+                // 收集当前QA的reference（如果存在）
+                if(record.get(DATASET_QA_REFERENCE.ID) != null) {
+                    DatasetQaReferenceDB reference = record.into(DATASET_QA_REFERENCE.getRecordType()).into(DatasetQaReferenceDB.class);
+                    currentReferences.add(reference);
+                }
+            }
+
+            // 输出最后一个QA
+            if(currentQa != null) {
+                DatasetService.DatasetQaWithReferences qaWithRefs = new DatasetService.DatasetQaWithReferences(currentQa,
+                        new ArrayList<>(currentReferences));
+                qaConsumer.accept(qaWithRefs);
+            }
+        }
+    }
 }

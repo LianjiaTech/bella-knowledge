@@ -19,7 +19,7 @@ import org.jooq.Identity;
 import org.jooq.Index;
 import org.jooq.Name;
 import org.jooq.Record;
-import org.jooq.Row14;
+import org.jooq.Row16;
 import org.jooq.Schema;
 import org.jooq.Table;
 import org.jooq.TableField;
@@ -121,6 +121,16 @@ public class Dataset extends TableImpl<DatasetRecord> {
      */
     public final TableField<DatasetRecord, Integer> STATUS = createField(DSL.name("status"), SQLDataType.INTEGER.nullable(false).defaultValue(DSL.inline("0", SQLDataType.INTEGER)), this, "数据集是否被删除，0表示未删除，-1表示已删除");
 
+    /**
+     * The column <code>dataset.latest_export_time</code>. 数据集最新导出时间
+     */
+    public final TableField<DatasetRecord, LocalDateTime> LATEST_EXPORT_TIME = createField(DSL.name("latest_export_time"), SQLDataType.LOCALDATETIME(0).nullable(false).defaultValue(DSL.inline("1970-01-01 00:00:00", SQLDataType.LOCALDATETIME)), this, "数据集最新导出时间");
+
+    /**
+     * The column <code>dataset.latest_export_file_id</code>. 数据集最新导出文件ID
+     */
+    public final TableField<DatasetRecord, String> LATEST_EXPORT_FILE_ID = createField(DSL.name("latest_export_file_id"), SQLDataType.VARCHAR(256).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "数据集最新导出文件ID");
+
     private Dataset(Name alias, Table<DatasetRecord> aliased) {
         this(alias, aliased, null);
     }
@@ -206,11 +216,11 @@ public class Dataset extends TableImpl<DatasetRecord> {
     }
 
     // -------------------------------------------------------------------------
-    // Row14 type methods
+    // Row16 type methods
     // -------------------------------------------------------------------------
 
     @Override
-    public Row14<Long, String, String, String, String, String, Long, Long, String, LocalDateTime, Long, String, LocalDateTime, Integer> fieldsRow() {
-        return (Row14) super.fieldsRow();
+    public Row16<Long, String, String, String, String, String, Long, Long, String, LocalDateTime, Long, String, LocalDateTime, Integer, LocalDateTime, String> fieldsRow() {
+        return (Row16) super.fieldsRow();
     }
 }

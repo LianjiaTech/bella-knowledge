@@ -1,5 +1,6 @@
 package com.ke.bella.files.protocol;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -25,6 +26,8 @@ public class DatasetOps {
         private String name;
         private String type;
         private String remark;
+        private LocalDateTime latestExportTime;
+        private String latestExportFileId;
     }
 
     @Data
