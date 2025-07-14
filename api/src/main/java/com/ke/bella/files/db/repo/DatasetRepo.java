@@ -146,13 +146,17 @@ public class DatasetRepo implements BaseRepo {
     }
 
     public DatasetDB getDataset(DatasetOps.DatasetOp op, Integer status) {
+        return getDataset(op, status, BellaContextHelper.getOperateSpaceCode());
+    }
+
+    public DatasetDB getDataset(DatasetOps.DatasetOp op, Integer status, String spaceCode) {
         return db.selectFrom(DATASET)
                 .where(DATASET.DATASET_ID.eq(op.getDatasetId()))
                 .and(StringUtils.isEmpty(op.getName()) ? DSL.noCondition()
                         : DATASET.NAME.like("%" + DSL.escape(op.getName(), '\\') + "%"))
                 .and(StringUtils.isEmpty(op.getType()) ? DSL.noCondition()
                         : DATASET.TYPE.eq(op.getType()))
-                .and(DATASET.SPACE_CODE.eq(BellaContextHelper.getOperateSpaceCode()))
+                .and(spaceCode == null ? DSL.noCondition() : DATASET.SPACE_CODE.eq(BellaContextHelper.getOperateSpaceCode()))
                 .and(DATASET.STATUS.eq(status))
                 .fetchOneInto(DatasetDB.class);
     }
