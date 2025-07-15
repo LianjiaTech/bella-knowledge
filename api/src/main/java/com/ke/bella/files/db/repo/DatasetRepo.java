@@ -152,7 +152,8 @@ public class DatasetRepo implements BaseRepo {
                         : DATASET.NAME.like("%" + DSL.escape(op.getName(), '\\') + "%"))
                 .and(StringUtils.isEmpty(op.getType()) ? DSL.noCondition()
                         : DATASET.TYPE.eq(op.getType()))
-                .and(DATASET.SPACE_CODE.eq(BellaContextHelper.getOperateSpaceCode()))
+//				fixme: 权限控制
+//                .and(DATASET.SPACE_CODE.eq(BellaContextHelper.getOperateSpaceCode()))
                 .and(DATASET.STATUS.eq(status))
                 .fetchOneInto(DatasetDB.class);
     }
