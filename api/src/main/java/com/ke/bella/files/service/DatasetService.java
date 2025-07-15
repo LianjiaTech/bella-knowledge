@@ -81,10 +81,6 @@ public class DatasetService {
         return repo.getDataset(op);
     }
 
-    public DatasetDB getDatasetWithoutSpaceCode(DatasetOp op) {
-        return repo.getDataset(op, 0, null);
-    }
-
     public Page<DatasetDB> pageDataset(DatasetPage page) {
         return repo.pageDataset(page);
     }
