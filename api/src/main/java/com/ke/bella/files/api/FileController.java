@@ -2,18 +2,28 @@ package com.ke.bella.files.api;
 
 import static com.ke.bella.files.service.FileService.ONE_DAY_STRING;
 
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.Charset;
+import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
 
+import javax.imageio.ImageIO;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.rendering.PDFRenderer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
+import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,6 +38,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.ke.bella.files.annotations.FileAPI;
+import com.ke.bella.files.protocol.FileCropOps;
+import com.ke.bella.files.protocol.FileCropOps.FileCropOp;
 import com.ke.bella.files.protocol.FileException.FileNotFoundException;
 import com.ke.bella.files.protocol.FileException.ProgressNotFoundException;
 import com.ke.bella.files.protocol.FileOps;
@@ -373,5 +385,150 @@ public class FileController {
                 .builder()
                 .url(url)
                 .build();
+    }
+
+    /**
+     * PDF渲染DPI设置
+     * 150 DPI: 性能与质量的最佳平衡点，适合大多数文档处理场景
+     */
+    private static final float PDF_RENDER_DPI = 150f;
+
+    /**
+     * 大裁剪区域阈值 (PDF用户单位)
+     * 超过此阈值的裁剪区域视为大区域，使用较低DPI以节省内存
+     */
+    private static final double LARGE_CROP_AREA_THRESHOLD = 50000.0;
+
+    /**
+     * 大区域使用的低DPI设置
+     */
+    private static final float LOW_DPI_FOR_LARGE_AREAS = 100f;
+
+    /**
+     * PDF标准用户单位转换比例
+     * 根据PDF ISO 32000标准：1用户单位 = 1/72英寸
+     */
+    private static final float PDF_USER_UNITS_PER_INCH = 72f;
+
+    @PostMapping("/crop-image")
+    public FileCropOps.FileCropResponse cropPdf(
+            @RequestBody FileCropOp cropRequest) throws IOException {
+        String fileId = cropRequest.getFileId();
+        OpenAIFile file = fileService.getFile(fileId);
+        if(file == null) {
+            throw new FileNotFoundException(fileId);
+        }
+
+        if(!"application/pdf".equals(file.getMimeType())) {
+            throw new IllegalArgumentException("file is not a PDF: " + fileId);
+        }
+
+        List<Double> bbox = cropRequest.getBbox();
+        Integer pageNumber = cropRequest.getPage();
+
+        if(bbox == null) {
+            throw new IllegalArgumentException("bbox is required");
+        }
+
+        if(bbox.size() != 4) {
+            throw new IllegalArgumentException("bbox must have exactly 4 values: [x1, y1, x2, y2]");
+        }
+
+        double x1 = bbox.get(0);
+        double y1 = bbox.get(1);
+        double x2 = bbox.get(2);
+        double y2 = bbox.get(3);
+
+        FileService.InputStreamWithCharset streamWithCharset = fileService.getFileInputStream(fileId);
+        BufferedImage pageImage = null;
+        BufferedImage croppedImage = null;
+        ByteArrayOutputStream baos = null;
+
+        try (InputStream inputStream = streamWithCharset.getInputStream();
+                PDDocument document = PDDocument.load(inputStream)) {
+
+            Assert.isTrue(pageNumber >= 1 && pageNumber <= document.getNumberOfPages(), String.format("invalid page number: %d, valid range: 1 ~ %d",
+                    pageNumber, document.getNumberOfPages()));
+
+            // 获取PDF页面信息 (转换为0基索引)
+            PDPage page = document.getPage(pageNumber - 1);
+            PDRectangle mediaBox = page.getMediaBox();
+            float pdfPageWidth = mediaBox.getWidth();   // PDF用户单位
+            float pdfPageHeight = mediaBox.getHeight(); // PDF用户单位
+
+            // 智能DPI选择：根据裁剪区域大小优化内存使用
+            double cropArea = (x2 - x1) * (y2 - y1);
+            float selectedDpi = (cropArea > LARGE_CROP_AREA_THRESHOLD) ? LOW_DPI_FOR_LARGE_AREAS : PDF_RENDER_DPI;
+
+            if(cropArea > LARGE_CROP_AREA_THRESHOLD) {
+                LOGGER.warn("large crop area detected ({} units²), using reduced DPI {} for memory efficiency",
+                        cropArea, selectedDpi);
+            }
+
+            // 渲染PDF页面为图片 (使用0基索引)
+            PDFRenderer renderer = new PDFRenderer(document);
+            pageImage = renderer.renderImageWithDPI(pageNumber - 1, selectedDpi);
+
+            // 计算实际缩放比例 (更权威的方法)
+            float actualScaleX = (float) pageImage.getWidth() / pdfPageWidth;
+            float actualScaleY = (float) pageImage.getHeight() / pdfPageHeight;
+
+            // 验证缩放比例一致性 (检测异常情况)
+            float expectedScale = selectedDpi / PDF_USER_UNITS_PER_INCH;
+            if(Math.abs(actualScaleX - expectedScale) > 0.1f || Math.abs(actualScaleY - expectedScale) > 0.1f) {
+                LOGGER.warn("pdf scaling inconsistency detected. Expected: {}, Actual X: {}, Y: {}",
+                        expectedScale, actualScaleX, actualScaleY);
+            }
+
+            // 使用实际缩放比例转换坐标 (避免假设，使用测量值)
+            int x = (int) Math.round(x1 * actualScaleX);
+            int y = (int) Math.round(y1 * actualScaleY);
+            int width = (int) Math.round((x2 - x1) * actualScaleX);
+            int height = (int) Math.round((y2 - y1) * actualScaleY);
+
+            // 额外验证：确保坐标在PDF页面范围内
+            if(x1 < 0 || y1 < 0 || x2 > pdfPageWidth || y2 > pdfPageHeight) {
+                LOGGER.warn("crop coordinates exceed PDF page bounds. Page size: {}x{}, Crop: [{},{},{},{}]",
+                        pdfPageWidth, pdfPageHeight, x1, y1, x2, y2);
+            }
+
+            // 自动修正超出边界的坐标
+            x = Math.max(0, Math.min(x, pageImage.getWidth() - 1));
+            y = Math.max(0, Math.min(y, pageImage.getHeight() - 1));
+            width = Math.min(width, pageImage.getWidth() - x);
+            height = Math.min(height, pageImage.getHeight() - y);
+
+            Assert.isTrue(width > 0 && height > 0,
+                    String.format("crop area outside image bounds. Image size: %dx%d, Final crop: x=%d, y=%d, width=%d, height=%d",
+                            pageImage.getWidth(), pageImage.getHeight(), x, y, width, height));
+
+            // 裁剪图片
+            croppedImage = pageImage.getSubimage(x, y, width, height);
+
+            // 转换为base64
+            baos = new ByteArrayOutputStream();
+            ImageIO.write(croppedImage, "png", baos);
+            String base64Image = Base64.getEncoder().encodeToString(baos.toByteArray());
+
+            // 返回标准Data URI格式
+            String dataUri = "data:image/png;base64," + base64Image;
+            return new FileCropOps.FileCropResponse(dataUri);
+
+        } finally {
+            // 显式释放内存资源
+            if(baos != null) {
+                try {
+                    baos.close();
+                } catch (IOException e) {
+                    LOGGER.warn("failed to close ByteArrayOutputStream", e);
+                }
+            }
+            if(pageImage != null) {
+                pageImage.flush(); // 释放图像内存
+            }
+            if(croppedImage != null) {
+                croppedImage.flush(); // 释放裁剪图像内存
+            }
+        }
     }
 }
