@@ -63,9 +63,20 @@ public class DatasetController {
     FileService fs;
 
     private DatasetDB checkDataset(String datasetId, DatasetOps.DatasetType expectedType) {
-        DatasetDB dataset = ds.getDataset(DatasetOp.builder()
-                .datasetId(datasetId)
-                .build());
+        return checkDataset(datasetId, expectedType, true);
+    }
+
+    private DatasetDB checkDataset(String datasetId, DatasetOps.DatasetType expectedType, Boolean withSpaceCode) {
+        DatasetDB dataset;
+        if(withSpaceCode) {
+            dataset = ds.getDataset(DatasetOp.builder()
+                    .datasetId(datasetId)
+                    .build());
+        } else {
+            dataset = ds.getDatasetWithoutSpaceCode(DatasetOp.builder()
+                    .datasetId(datasetId)
+                    .build());
+        }
 
         Assert.notNull(dataset, "dataset not found for dataset_id: " + datasetId);
         Assert.isTrue(expectedType.name().equals(dataset.getType()),
