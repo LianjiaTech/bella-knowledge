@@ -258,7 +258,7 @@ public class DatasetController {
             @RequestParam(name = "expires", defaultValue = "3600") Long expires) {
         Assert.hasText(datasetId, "dataset_id must not be empty");
 
-        DatasetDB datasetDB = checkDataset(datasetId, DatasetOps.DatasetType.qa, false);
+        DatasetDB datasetDB = checkDataset(datasetId, DatasetOps.DatasetType.qa);
 
         if(datasetDB.getLatestExportTime().isAfter(datasetDB.getMtime())) {
             LOGGER.info("using cached export file for dataset_id: {}, latest_export_time: {}, mtime: {}",
