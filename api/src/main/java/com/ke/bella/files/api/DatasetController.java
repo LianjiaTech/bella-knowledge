@@ -63,20 +63,9 @@ public class DatasetController {
     FileService fs;
 
     private DatasetDB checkDataset(String datasetId, DatasetOps.DatasetType expectedType) {
-        return checkDataset(datasetId, expectedType, true);
-    }
-
-    private DatasetDB checkDataset(String datasetId, DatasetOps.DatasetType expectedType, Boolean withSpaceCode) {
-        DatasetDB dataset;
-        if(withSpaceCode) {
-            dataset = ds.getDataset(DatasetOp.builder()
-                    .datasetId(datasetId)
-                    .build());
-        } else {
-            dataset = ds.getDatasetWithoutSpaceCode(DatasetOp.builder()
-                    .datasetId(datasetId)
-                    .build());
-        }
+        DatasetDB dataset = ds.getDataset(DatasetOp.builder()
+                .datasetId(datasetId)
+                .build());
 
         Assert.notNull(dataset, "dataset not found for dataset_id: " + datasetId);
         Assert.isTrue(expectedType.name().equals(dataset.getType()),
@@ -258,7 +247,7 @@ public class DatasetController {
             @RequestParam(name = "expires", defaultValue = "3600") Long expires) {
         Assert.hasText(datasetId, "dataset_id must not be empty");
 
-        DatasetDB datasetDB = checkDataset(datasetId, DatasetOps.DatasetType.qa, false);
+        DatasetDB datasetDB = checkDataset(datasetId, DatasetOps.DatasetType.qa);
 
         if(datasetDB.getLatestExportTime().isAfter(datasetDB.getMtime())) {
             LOGGER.info("using cached export file for dataset_id: {}, latest_export_time: {}, mtime: {}",
