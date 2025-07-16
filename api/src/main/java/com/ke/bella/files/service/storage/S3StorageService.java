@@ -61,7 +61,8 @@ public class S3StorageService implements StorageService {
             metadata.setContentLength(Files.size(file.toPath()));
 
             String filenameEncoded = UriUtils.encodeFragment(filename, StandardCharsets.UTF_8);
-            metadata.setContentDisposition("attachment; filename=" + filenameEncoded);
+            String disposition = getContentDispositionType(mimeType);
+            metadata.setContentDisposition(disposition + "; filename=" + filenameEncoded);
 
             inputStream = Files.newInputStream(file.toPath());
             PutObjectRequest putObjectRequest = new PutObjectRequest(bucketName, fileKey, inputStream, metadata);
@@ -83,6 +84,27 @@ public class S3StorageService implements StorageService {
             }
         }
         return fileKey;
+    }
+
+    private String getContentDispositionType(String mimeType) {
+        if(StringUtils.isEmpty(mimeType)) {
+            return "attachment";
+        }
+
+        String lowerMimeType = mimeType.toLowerCase();
+
+        // 可以在浏览器中直接显示的文件类型使用 inline
+        if(lowerMimeType.startsWith("image/")           // 图片
+                || lowerMimeType.startsWith("text/")            // 文本文件
+                || lowerMimeType.equals("application/pdf")      // PDF
+                || lowerMimeType.startsWith("video/")           // 视频
+                || lowerMimeType.startsWith("audio/")           // 音频
+                || lowerMimeType.equals("application/json")     // JSON
+                || lowerMimeType.equals("application/xml")) {
+            return "inline";
+        }
+
+        return "attachment";
     }
 
     @Override

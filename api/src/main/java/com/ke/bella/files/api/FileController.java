@@ -304,6 +304,29 @@ public class FileController {
         }
     }
 
+    @PostMapping("/pdf")
+    public OpenAIFile uploadPdf(
+            @RequestParam(value = "file_id") String fileId,
+            @RequestPart(value = "file") MultipartFile file,
+            @RequestParam(value = "metadata", required = false) String metadata,
+            @RequestParam(value = "get_url", required = false, defaultValue = "false") boolean getUrl,
+            @RequestParam(value = "expires", required = false, defaultValue = ONE_DAY_STRING) long expires) throws IOException {
+        if(StringUtils.isEmpty(fileId)) {
+            throw new IllegalArgumentException("file_id is required, but not provided");
+        }
+
+        OpenAIFile uploaded = upload(file, "pdf", metadata, getUrl, expires);
+
+        FileOps bindOp = FileOps.builder()
+                .fileId(fileId)
+                .pdfFileId(uploaded.getId())
+                .build();
+
+        fileService.updateFile(bindOp);
+
+        return uploaded;
+    }
+
     @GetMapping("/{file_id}/content")
     public void retrieveContentRedirect(
             HttpServletResponse response,
@@ -380,7 +403,20 @@ public class FileController {
     public FileUrl getPreviewUrl(
             @PathVariable("file_id") String fileId,
             @RequestParam(value = "expires", required = false, defaultValue = ONE_DAY_STRING) Long expires) {
-        String url = fileService.getPreviewUrl(fileId, expires);
+        OpenAIFile file = fileService.getFile(fileId);
+        if(file == null) {
+            throw new FileNotFoundException(fileId);
+        }
+
+        String url;
+        if(!StringUtils.isEmpty(file.getPdfFileId())) {
+            url = fileService.getUrl(file.getPdfFileId(), expires);
+            // fixme: doc、docx 历史数据不存在转换回流的pdf，需要刷数后才能下掉
+        } else if("doc".equals(file.getExtension()) || "docx".equals(file.getExtension())) {
+            url = fileService.getPreviewUrl(file.getId(), expires);
+        } else {
+            url = fileService.getUrl(fileId, expires);
+        }
         return FileUrl
                 .builder()
                 .url(url)
@@ -413,25 +449,27 @@ public class FileController {
     @PostMapping("/crop-image")
     public FileCropOps.FileCropResponse cropPdf(
             @RequestBody FileCropOp cropRequest) throws IOException {
+        // 校验参数
         String fileId = cropRequest.getFileId();
-        OpenAIFile file = fileService.getFile(fileId);
-        if(file == null) {
-            throw new FileNotFoundException(fileId);
-        }
-
-        if(!"application/pdf".equals(file.getMimeType())) {
-            throw new IllegalArgumentException("file is not a PDF: " + fileId);
-        }
-
         List<Double> bbox = cropRequest.getBbox();
         Integer pageNumber = cropRequest.getPage();
+        Assert.notNull(fileId, "file_id is required");
+        Assert.notNull(cropRequest.getBbox(), "bbox is required");
+        Assert.isTrue(bbox.size() == 4, "bbox must have exactly 4 values: [x1, y1, x2, y2]");
 
-        if(bbox == null) {
-            throw new IllegalArgumentException("bbox is required");
-        }
+        // 校验文件存在
+        OpenAIFile file = fileService.getFile(fileId);;
+        Assert.notNull(file, String.format("file not found. file_id = %s", fileId));
 
-        if(bbox.size() != 4) {
-            throw new IllegalArgumentException("bbox must have exactly 4 values: [x1, y1, x2, y2]");
+        // 确认要处理的pdf文件
+        String pdfFileId = fileId;
+        if(!"pdf".equals(file.getType()) && StringUtils.isEmpty(file.getPdfFileId())) {
+            throw new IllegalArgumentException(
+                    String.format("file is not a PDF or does not have an binding PDF. file_id = %s", fileId));
+        } else if("pdf".equals(file.getType())) {
+            pdfFileId = fileId;
+        } else if(!StringUtils.isEmpty(file.getPdfFileId())) {
+            pdfFileId = file.getPdfFileId();
         }
 
         double x1 = bbox.get(0);
@@ -439,7 +477,7 @@ public class FileController {
         double x2 = bbox.get(2);
         double y2 = bbox.get(3);
 
-        FileService.InputStreamWithCharset streamWithCharset = fileService.getFileInputStream(fileId);
+        FileService.InputStreamWithCharset streamWithCharset = fileService.getFileInputStream(pdfFileId);
         BufferedImage pageImage = null;
         BufferedImage croppedImage = null;
         ByteArrayOutputStream baos = null;

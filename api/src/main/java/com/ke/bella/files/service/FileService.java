@@ -77,6 +77,7 @@ public class FileService {
                 .type(fileDB.getType())
                 .purpose(fileDB.getPurpose())
                 .domTreeFileId(fileDB.getDomTreeFileId())
+                .pdfFileId(fileDB.getPdfFileId())
                 .version(fileDB.getVersion())
                 .build();
     }

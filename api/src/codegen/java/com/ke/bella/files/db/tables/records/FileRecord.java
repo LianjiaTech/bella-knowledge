@@ -343,6 +343,20 @@ public class FileRecord extends UpdatableRecordImpl<FileRecord> implements Opera
         return (String) get(22);
     }
 
+    /**
+     * Setter for <code>file.pdf_file_id</code>. PDF的文件ID
+     */
+    public void setPdfFileId(String value) {
+        set(23, value);
+    }
+
+    /**
+     * Getter for <code>file.pdf_file_id</code>. PDF的文件ID
+     */
+    public String getPdfFileId() {
+        return (String) get(23);
+    }
+
     // -------------------------------------------------------------------------
     // Primary key information
     // -------------------------------------------------------------------------
@@ -366,7 +380,7 @@ public class FileRecord extends UpdatableRecordImpl<FileRecord> implements Opera
     /**
      * Create a detached, initialised FileRecord
      */
-    public FileRecord(Long id, String fileId, Long version, String filename, String extension, String mimeType, String type, String bucket, String path, Long bytes, String spaceCode, String purpose, Long cuid, String cuName, LocalDateTime ctime, Long muid, String muName, LocalDateTime mtime, String metaData, Integer status, String akCode, Long broadcastStatus, String domTreeFileId) {
+    public FileRecord(Long id, String fileId, Long version, String filename, String extension, String mimeType, String type, String bucket, String path, Long bytes, String spaceCode, String purpose, Long cuid, String cuName, LocalDateTime ctime, Long muid, String muName, LocalDateTime mtime, String metaData, Integer status, String akCode, Long broadcastStatus, String domTreeFileId, String pdfFileId) {
         super(File.FILE);
 
         setId(id);
@@ -392,5 +406,6 @@ public class FileRecord extends UpdatableRecordImpl<FileRecord> implements Opera
         setAkCode(akCode);
         setBroadcastStatus(broadcastStatus);
         setDomTreeFileId(domTreeFileId);
+        setPdfFileId(pdfFileId);
     }
 }
