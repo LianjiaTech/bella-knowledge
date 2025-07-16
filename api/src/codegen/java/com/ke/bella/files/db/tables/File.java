@@ -165,6 +165,11 @@ public class File extends TableImpl<FileRecord> {
      */
     public final TableField<FileRecord, String> DOM_TREE_FILE_ID = createField(DSL.name("dom_tree_file_id"), SQLDataType.VARCHAR(256).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "DOM tree的文件ID");
 
+    /**
+     * The column <code>file.pdf_file_id</code>. PDF的文件ID
+     */
+    public final TableField<FileRecord, String> PDF_FILE_ID = createField(DSL.name("pdf_file_id"), SQLDataType.VARCHAR(256).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "PDF的文件ID");
+
     private File(Name alias, Table<FileRecord> aliased) {
         this(alias, aliased, null);
     }

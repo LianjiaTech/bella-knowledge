@@ -115,6 +115,9 @@ public class FileRepo implements BaseRepo {
         if(op.getDomTreeFileId() != null) {
             rec.setDomTreeFileId(op.getDomTreeFileId());
         }
+        if(op.getPdfFileId() != null) {
+            rec.setPdfFileId(op.getPdfFileId());
+        }
         if(op.getFilename() != null) {
             rec.setFilename(op.getFilename());
         }

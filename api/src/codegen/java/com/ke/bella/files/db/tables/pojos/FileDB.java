@@ -41,6 +41,7 @@ public class FileDB implements Operator, Serializable {
     private String        akCode;
     private Long          broadcastStatus;
     private String        domTreeFileId;
+    private String        pdfFileId;
 
     public FileDB() {}
 
@@ -68,6 +69,7 @@ public class FileDB implements Operator, Serializable {
         this.akCode = value.akCode;
         this.broadcastStatus = value.broadcastStatus;
         this.domTreeFileId = value.domTreeFileId;
+        this.pdfFileId = value.pdfFileId;
     }
 
     public FileDB(
@@ -93,7 +95,8 @@ public class FileDB implements Operator, Serializable {
         Integer       status,
         String        akCode,
         Long          broadcastStatus,
-        String        domTreeFileId
+        String        domTreeFileId,
+        String        pdfFileId
     ) {
         this.id = id;
         this.fileId = fileId;
@@ -118,6 +121,7 @@ public class FileDB implements Operator, Serializable {
         this.akCode = akCode;
         this.broadcastStatus = broadcastStatus;
         this.domTreeFileId = domTreeFileId;
+        this.pdfFileId = pdfFileId;
     }
 
     /**
@@ -442,6 +446,20 @@ public class FileDB implements Operator, Serializable {
         this.domTreeFileId = domTreeFileId;
     }
 
+    /**
+     * Getter for <code>file.pdf_file_id</code>. PDF的文件ID
+     */
+    public String getPdfFileId() {
+        return this.pdfFileId;
+    }
+
+    /**
+     * Setter for <code>file.pdf_file_id</code>. PDF的文件ID
+     */
+    public void setPdfFileId(String pdfFileId) {
+        this.pdfFileId = pdfFileId;
+    }
+
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder("FileDB (");
@@ -469,6 +487,7 @@ public class FileDB implements Operator, Serializable {
         sb.append(", ").append(akCode);
         sb.append(", ").append(broadcastStatus);
         sb.append(", ").append(domTreeFileId);
+        sb.append(", ").append(pdfFileId);
 
         sb.append(")");
         return sb.toString();
