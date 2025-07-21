@@ -7,6 +7,9 @@ import static com.ke.bella.files.db.tables.DatasetDocument.DATASET_DOCUMENT;
 import static com.ke.bella.files.db.tables.DatasetQa.DATASET_QA;
 import static com.ke.bella.files.db.tables.DatasetQaReference.DATASET_QA_REFERENCE;
 import static com.ke.bella.files.db.tables.DatasetSharding.DATASET_SHARDING;
+import static com.ke.bella.files.protocol.DatasetOps.DatasetType;
+import static com.ke.bella.files.protocol.DatasetOps.DatasetType.document;
+import static com.ke.bella.files.protocol.DatasetOps.DatasetType.qa;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -62,52 +65,61 @@ public class DatasetRepo implements BaseRepo {
         this.db = db;
     }
 
-    public String shardingKeyByDatasetId(String datasetId) {
-        return queryDatasetShardingByDatasetId(datasetId).getKey();
+    public String shardingKeyByDatasetId(String datasetId, DatasetType type) {
+        return queryDatasetShardingByDatasetId(datasetId, type).getKey();
     }
 
-    public DatasetShardingDB queryDatasetShardingByDatasetId(String datasetId) {
+    public DatasetShardingDB queryDatasetShardingByDatasetId(String datasetId, DatasetType type) {
         LocalDateTime time = timeFromCode(datasetId);
         return db.selectFrom(DATASET_SHARDING)
                 .where(DATASET_SHARDING.KEY_TIME.le(time))
+                .and(DATASET_SHARDING.TYPE.eq(type.name()))
                 .orderBy(DATASET_SHARDING.ID.desc())
                 .limit(1)
                 .fetchOneInto(DatasetShardingDB.class);
     }
 
-    public DatasetShardingDB queryLatestDatasetSharding() {
+    public DatasetShardingDB queryLatestDatasetSharding(String type) {
         return db.selectFrom(DATASET_SHARDING)
+                .where(DATASET_SHARDING.TYPE.eq(type))
                 .orderBy(DATASET_SHARDING.ID.desc())
                 .limit(1)
                 .fetchOneInto(DatasetShardingDB.class);
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public void newShardingTable(String lastKey) {
+    public void newShardingTable(String lastKey, String type) {
         LocalDateTime keyTime = LocalDateTime.now().plusMinutes(10L);
         String key = keyTime.format(DateTimeFormatter.ofPattern("yyMMddHHmmss"));
 
         DatasetShardingRecord rec = db.selectFrom(DATASET_SHARDING)
-                .where(DATASET_SHARDING.LAST_KEY.eq(lastKey)).forUpdate().fetchOne();
+                .where(DATASET_SHARDING.LAST_KEY.eq(lastKey))
+                .and(DATASET_SHARDING.TYPE.eq(type))
+                .forUpdate().fetchOne();
         if(rec != null) {
             return;
         }
 
-        db.execute(createTableLikeSql(DATASET_QA.getName(), key));
-        db.execute(createTableLikeSql(DATASET_QA_REFERENCE.getName(), key));
+        if(qa.name().equals(type)) {
+            db.execute(createTableLikeSql(DATASET_QA.getName(), key));
+            db.execute(createTableLikeSql(DATASET_QA_REFERENCE.getName(), key));
+        } else if(document.name().equals(type)) {
+            db.execute(createTableLikeSql(DATASET_DOCUMENT.getName(), key));
+        }
 
-        addDatasetSharding(keyTime, lastKey, key);
+        addDatasetSharding(keyTime, lastKey, key, type);
     }
 
     private static String createTableLikeSql(String tableName, String key) {
         return String.format("create table `%s_%s` like `%s`", tableName, key, tableName);
     }
 
-    private void addDatasetSharding(LocalDateTime keyTime, String lastKey, String key) {
+    private void addDatasetSharding(LocalDateTime keyTime, String lastKey, String key, String type) {
         DatasetShardingRecord rec = DATASET_SHARDING.newRecord();
         rec.setKey(key);
         rec.setKeyTime(keyTime);
         rec.setLastKey(lastKey);
+        rec.setType(type);
         fillCreatorInfo(rec);
 
         db.insertInto(DATASET_SHARDING)
@@ -240,9 +252,13 @@ public class DatasetRepo implements BaseRepo {
         return queryPage(db, sql, page.getPage(), page.getPageSize(), DatasetDB.class);
     }
 
-    public Long increaseQaCount(String datasetId) {
+    public Long increaseItemCount(String datasetId) {
+        return increaseItemCount(datasetId, 1);
+    }
+
+    public Long increaseItemCount(String datasetId, int count) {
         int execute = db.update(DATASET)
-                .set(DATASET.COUNT, DATASET.COUNT.add(1))
+                .set(DATASET.COUNT, DATASET.COUNT.add(count))
                 .where(DATASET.DATASET_ID.eq(datasetId))
                 .execute();
 
@@ -255,9 +271,13 @@ public class DatasetRepo implements BaseRepo {
                 .fetchOne(DATASET.COUNT);
     }
 
-    public Long decreaseQaCount(String datasetId) {
+    public Long decreaseItemCount(String datasetId) {
+        return decreaseItemCount(datasetId, 1);
+    }
+
+    public Long decreaseItemCount(String datasetId, int count) {
         int execute = db.update(DATASET)
-                .set(DATASET.COUNT, DATASET.COUNT.sub(1))
+                .set(DATASET.COUNT, DATASET.COUNT.sub(count))
                 .where(DATASET.DATASET_ID.eq(datasetId))
                 .execute();
 
@@ -271,7 +291,7 @@ public class DatasetRepo implements BaseRepo {
     }
 
     public DatasetQaDB addQa(DatasetOps.QAOp op) {
-        String shardingKey = shardingKeyByDatasetId(op.getDatasetId());
+        String shardingKey = shardingKeyByDatasetId(op.getDatasetId(), qa);
 
         String itemId = QA_ID_GEN.generate();
 
@@ -296,7 +316,7 @@ public class DatasetRepo implements BaseRepo {
     }
 
     public DatasetQaDB getQa(DatasetOps.QAOp op, Integer status) {
-        String shardingKey = shardingKeyByDatasetId(op.getDatasetId());
+        String shardingKey = shardingKeyByDatasetId(op.getDatasetId(), qa);
         return db(shardingKey).selectFrom(DATASET_QA)
                 .where(DATASET_QA.DATASET_ID.eq(op.getDatasetId()))
                 .and(DATASET_QA.ITEM_ID.eq(op.getItemId()))
@@ -305,7 +325,7 @@ public class DatasetRepo implements BaseRepo {
     }
 
     public void updateQa(DatasetOps.QAOp op) {
-        String shardingKey = shardingKeyByDatasetId(op.getDatasetId());
+        String shardingKey = shardingKeyByDatasetId(op.getDatasetId(), qa);
 
         DatasetQaRecord rec = DATASET_QA.newRecord();
 
@@ -330,7 +350,7 @@ public class DatasetRepo implements BaseRepo {
     }
 
     public void deleteQa(DatasetOps.QAOp op) {
-        String shardingKey = shardingKeyByDatasetId(op.getDatasetId());
+        String shardingKey = shardingKeyByDatasetId(op.getDatasetId(), qa);
         DatasetQaRecord rec = DATASET_QA.newRecord();
         rec.set(DATASET_QA.STATUS, -1);
 
@@ -345,7 +365,7 @@ public class DatasetRepo implements BaseRepo {
     }
 
     public Page<DatasetQaDB> pageQa(DatasetOps.QaPage op) {
-        String shardingKey = shardingKeyByDatasetId(op.getDatasetId());
+        String shardingKey = shardingKeyByDatasetId(op.getDatasetId(), qa);
         DSLContext db0 = db(shardingKey);
 
         SelectConditionStep<DatasetQaRecord> sql = db0.selectFrom(DATASET_QA)
@@ -361,7 +381,7 @@ public class DatasetRepo implements BaseRepo {
     }
 
     public List<DatasetQaDB> listQa(DatasetOps.QaPage op) {
-        String shardingKey = shardingKeyByDatasetId(op.getDatasetId());
+        String shardingKey = shardingKeyByDatasetId(op.getDatasetId(), qa);
         DSLContext db0 = db(shardingKey);
 
         SelectConditionStep<DatasetQaRecord> sql = db0.selectFrom(DATASET_QA)
@@ -377,7 +397,7 @@ public class DatasetRepo implements BaseRepo {
 
     @Transactional(rollbackFor = Exception.class)
     public void addQaReferences(String itemId, String datasetId, List<DatasetOps.QAReferenceOp> referenceOps) {
-        String shardingKey = shardingKeyByDatasetId(datasetId);
+        String shardingKey = shardingKeyByDatasetId(datasetId, qa);
         DSLContext db0 = db(shardingKey);
 
         List<InsertOnDuplicateSetMoreStep<DatasetQaReferenceRecord>> queries = new ArrayList<>(referenceOps.size());
@@ -405,7 +425,7 @@ public class DatasetRepo implements BaseRepo {
     }
 
     public DatasetQaReferenceDB getQaReference(DatasetOps.QAReferenceOp op, Integer status) {
-        String shardingKey = shardingKeyByDatasetId(op.getDatasetId());
+        String shardingKey = shardingKeyByDatasetId(op.getDatasetId(), qa);
         return db(shardingKey).selectFrom(DATASET_QA_REFERENCE)
                 .where(DATASET_QA_REFERENCE.REFERENCE_ID.eq(op.getReferenceId()))
                 .and(DATASET_QA_REFERENCE.STATUS.eq(status))
@@ -413,7 +433,7 @@ public class DatasetRepo implements BaseRepo {
     }
 
     public DatasetQaReferenceDB addQaReference(DatasetOps.QAReferenceOp op) {
-        String shardingKey = shardingKeyByDatasetId(op.getDatasetId());
+        String shardingKey = shardingKeyByDatasetId(op.getDatasetId(), qa);
 
         DatasetQaReferenceRecord rec = DATASET_QA_REFERENCE.newRecord();
 
@@ -443,7 +463,7 @@ public class DatasetRepo implements BaseRepo {
     }
 
     public void updateQaReference(DatasetOps.QAReferenceOp op) {
-        String shardingKey = shardingKeyByDatasetId(op.getDatasetId());
+        String shardingKey = shardingKeyByDatasetId(op.getDatasetId(), qa);
 
         DatasetQaReferenceRecord rec = DATASET_QA_REFERENCE.newRecord();
 
@@ -467,7 +487,7 @@ public class DatasetRepo implements BaseRepo {
     }
 
     public void deleteQaReference(DatasetOps.QAReferenceOp op) {
-        String shardingKey = shardingKeyByDatasetId(op.getDatasetId());
+        String shardingKey = shardingKeyByDatasetId(op.getDatasetId(), qa);
 
         DatasetQaReferenceRecord rec = DATASET_QA_REFERENCE.newRecord();
         rec.set(DATASET_QA_REFERENCE.STATUS, -1);
@@ -482,7 +502,7 @@ public class DatasetRepo implements BaseRepo {
     }
 
     public Page<DatasetQaReferenceDB> pageQaReferences(DatasetOps.QaReferencePage op) {
-        String shardingKey = shardingKeyByDatasetId(op.getDatasetId());
+        String shardingKey = shardingKeyByDatasetId(op.getDatasetId(), qa);
         DSLContext dslContext = db(shardingKey);
 
         SelectConditionStep<DatasetQaReferenceRecord> sql = dslContext.selectFrom(DATASET_QA_REFERENCE)
@@ -498,7 +518,7 @@ public class DatasetRepo implements BaseRepo {
     }
 
     public List<DatasetQaReferenceDB> listQaReferences(DatasetOps.QaReferencePage op) {
-        String shardingKey = shardingKeyByDatasetId(op.getDatasetId());
+        String shardingKey = shardingKeyByDatasetId(op.getDatasetId(), qa);
         DSLContext dslContext = db(shardingKey);
 
         SelectConditionStep<DatasetQaReferenceRecord> sql = dslContext.selectFrom(DATASET_QA_REFERENCE)
@@ -512,22 +532,24 @@ public class DatasetRepo implements BaseRepo {
                 .fetch().into(DatasetQaReferenceDB.class);
     }
 
-    public void increaseShardingCount(String key, long delta) {
+    public void increaseShardingCount(String key, long delta, String type) {
         db.update(DATASET_SHARDING)
                 .set(DATASET_SHARDING.COUNT, DATASET_SHARDING.COUNT.plus(delta))
                 .set(DATASET_SHARDING.MTIME, LocalDateTime.now())
                 .where(DATASET_SHARDING.KEY.eq(key))
+                .and(DATASET_SHARDING.TYPE.eq(type))
                 .execute();
     }
 
     @Transactional(rollbackFor = Exception.class)
     public List<DatasetDocumentDB> addDocuments(DatasetOps.DocumentCreateOp op) {
-        String shardingKey = shardingKeyByDatasetId(op.getDatasetId());
+        String shardingKey = shardingKeyByDatasetId(op.getDatasetId(), document);
+        DSLContext db0 = db(shardingKey);
 
         List<InsertOnDuplicateSetMoreStep<DatasetDocumentRecord>> queries = new ArrayList<>(op.getFileIds().size());
 
         for (String fileId : op.getFileIds()) {
-            InsertOnDuplicateSetMoreStep<DatasetDocumentRecord> sql = db.insertInto(DATASET_DOCUMENT)
+            InsertOnDuplicateSetMoreStep<DatasetDocumentRecord> sql = db0.insertInto(DATASET_DOCUMENT)
                     .set(DATASET_DOCUMENT.DATASET_ID, op.getDatasetId())
                     .set(DATASET_DOCUMENT.FILE_ID, fileId)
                     .set(DATASET_DOCUMENT.DATASET_SHARDING_KEY, shardingKey)
@@ -543,7 +565,7 @@ public class DatasetRepo implements BaseRepo {
             queries.add(sql);
         }
 
-        int[] batchResults = db.batch(queries).execute();
+        int[] batchResults = db0.batch(queries).execute();
 
         for (int i = 0; i < batchResults.length; i++) {
             if(batchResults[i] == 0) {
@@ -552,7 +574,7 @@ public class DatasetRepo implements BaseRepo {
             }
         }
 
-        List<DatasetDocumentDB> results = db.selectFrom(DATASET_DOCUMENT)
+        List<DatasetDocumentDB> results = db0.selectFrom(DATASET_DOCUMENT)
                 .where(DATASET_DOCUMENT.DATASET_ID.eq(op.getDatasetId()))
                 .and(DATASET_DOCUMENT.FILE_ID.in(op.getFileIds()))
                 .and(DATASET_DOCUMENT.STATUS.eq(0))
@@ -567,7 +589,8 @@ public class DatasetRepo implements BaseRepo {
     }
 
     public DatasetDocumentDB getDocument(DatasetOps.DocumentOp op, Integer status) {
-        return db.selectFrom(DATASET_DOCUMENT)
+        String shardingKey = shardingKeyByDatasetId(op.getDatasetId(), document);
+        return db(shardingKey).selectFrom(DATASET_DOCUMENT)
                 .where(DATASET_DOCUMENT.DATASET_ID.eq(op.getDatasetId()))
                 .and(DATASET_DOCUMENT.FILE_ID.eq(op.getFileId()))
                 .and(DATASET_DOCUMENT.STATUS.eq(status))
@@ -575,12 +598,13 @@ public class DatasetRepo implements BaseRepo {
     }
 
     public void deleteDocument(DatasetOps.DocumentOp op) {
+        String shardingKey = shardingKeyByDatasetId(op.getDatasetId(), document);
         DatasetDocumentRecord rec = DATASET_DOCUMENT.newRecord();
         rec.set(DATASET_DOCUMENT.STATUS, -1);
 
         fillUpdatorInfo(rec);
 
-        int execute = db.update(DATASET_DOCUMENT)
+        int execute = db(shardingKey).update(DATASET_DOCUMENT)
                 .set(rec)
                 .where(DATASET_DOCUMENT.DATASET_ID.eq(op.getDatasetId()))
                 .and(DATASET_DOCUMENT.FILE_ID.eq(op.getFileId()))
@@ -591,7 +615,10 @@ public class DatasetRepo implements BaseRepo {
     }
 
     public Page<DatasetDocumentDB> pageDocument(DatasetOps.DocumentPage op) {
-        SelectConditionStep<DatasetDocumentRecord> sql = db.selectFrom(DATASET_DOCUMENT)
+        String shardingKey = shardingKeyByDatasetId(op.getDatasetId(), document);
+        DSLContext db0 = db(shardingKey);
+
+        SelectConditionStep<DatasetDocumentRecord> sql = db0.selectFrom(DATASET_DOCUMENT)
                 .where(DATASET_DOCUMENT.DATASET_ID.eq(op.getDatasetId()))
                 .and(DATASET_DOCUMENT.STATUS.eq(0));
 
@@ -600,11 +627,14 @@ public class DatasetRepo implements BaseRepo {
 
         sql.orderBy(isAsc ? DSL.field(orderBy).asc() : DSL.field(orderBy).desc());
 
-        return queryPage(db, sql, op.getPage(), op.getPageSize(), DatasetDocumentDB.class);
+        return queryPage(db0, sql, op.getPage(), op.getPageSize(), DatasetDocumentDB.class);
     }
 
     public List<DatasetDocumentDB> listDocument(DatasetOps.DocumentPage op) {
-        SelectConditionStep<DatasetDocumentRecord> sql = db.selectFrom(DATASET_DOCUMENT)
+        String shardingKey = shardingKeyByDatasetId(op.getDatasetId(), document);
+        DSLContext db0 = db(shardingKey);
+
+        SelectConditionStep<DatasetDocumentRecord> sql = db0.selectFrom(DATASET_DOCUMENT)
                 .where(DATASET_DOCUMENT.DATASET_ID.eq(op.getDatasetId()))
                 .and(DATASET_DOCUMENT.STATUS.eq(0));
 
@@ -623,7 +653,7 @@ public class DatasetRepo implements BaseRepo {
      */
     public void streamQaWithReferences(String datasetId, Consumer<DatasetService.DatasetQaWithReferences> qaConsumer) {
         // 1. 获取分片键和数据库上下文
-        String shardingKey = shardingKeyByDatasetId(datasetId);
+        String shardingKey = shardingKeyByDatasetId(datasetId, qa);
         DSLContext dslContext = db(shardingKey);
 
         // 2. 构建查询游标，使用LEFT JOIN联查QA和references数据

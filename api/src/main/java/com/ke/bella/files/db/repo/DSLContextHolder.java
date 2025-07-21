@@ -1,5 +1,6 @@
 package com.ke.bella.files.db.repo;
 
+import static com.ke.bella.files.db.Tables.DATASET_DOCUMENT;
 import static com.ke.bella.files.db.Tables.DATASET_QA;
 import static com.ke.bella.files.db.Tables.DATASET_QA_REFERENCE;
 import static com.ke.bella.files.db.Tables.FILE;
@@ -53,7 +54,10 @@ public class DSLContextHolder {
                                                 .withOutput(targetTableName(DATASET_QA.getName(), key)),
                                         new MappedTable()
                                                 .withInput(DATASET_QA_REFERENCE.getName())
-                                                .withOutput(targetTableName(DATASET_QA_REFERENCE.getName(), key)))));
+                                                .withOutput(targetTableName(DATASET_QA_REFERENCE.getName(), key)),
+                                        new MappedTable()
+                                                .withInput(DATASET_DOCUMENT.getName())
+                                                .withOutput(targetTableName(DATASET_DOCUMENT.getName(), key)))));
     }
 
     public static String targetTableName(String orignalName, String key) {

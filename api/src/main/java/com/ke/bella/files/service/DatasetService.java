@@ -1,5 +1,8 @@
 package com.ke.bella.files.service;
 
+import static com.ke.bella.files.protocol.DatasetOps.DatasetType.document;
+import static com.ke.bella.files.protocol.DatasetOps.DatasetType.qa;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -95,10 +98,10 @@ public class DatasetService {
         DatasetQaDB qaDB = repo.addQa(op);
 
         if(qaDB.getId() != null) {
-            TaskExecutor.submit(() -> counter.increase(qaDB.getDatasetShardingKey()));
+            TaskExecutor.submit(() -> counter.increase(qaDB.getDatasetShardingKey(), qa));
         }
 
-        repo.increaseQaCount(qaDB.getDatasetId());
+        repo.increaseItemCount(qaDB.getDatasetId());
 
         if(!CollectionUtils.isEmpty(op.getReferences())) {
             repo.addQaReferences(qaDB.getItemId(), op.getDatasetId(), op.getReferences());
@@ -129,7 +132,7 @@ public class DatasetService {
     @Transactional(rollbackFor = Exception.class)
     public DatasetQaDB deleteQa(QAOp op) {
         repo.deleteQa(op);
-        repo.decreaseQaCount(op.getDatasetId());
+        repo.decreaseItemCount(op.getDatasetId());
         repo.updateDatasetItems(op.getDatasetId());
         return repo.getQa(op, -1);
     }
@@ -571,6 +574,14 @@ public class DatasetService {
     @Transactional(rollbackFor = Exception.class)
     public List<DatasetDocumentDB> createDocuments(DatasetOps.DocumentCreateOp op) {
         List<DatasetDocumentDB> documents = repo.addDocuments(op);
+
+        if(!CollectionUtils.isEmpty(documents)) {
+            String shardingKey = repo.shardingKeyByDatasetId(op.getDatasetId(), document);
+            TaskExecutor.submit(() -> counter.increase(shardingKey, (long) documents.size(), document));
+
+            repo.increaseItemCount(op.getDatasetId(), documents.size());
+        }
+
         repo.updateDatasetItems(op.getDatasetId());
         return documents;
     }
@@ -578,6 +589,7 @@ public class DatasetService {
     @Transactional(rollbackFor = Exception.class)
     public DatasetDocumentDB deleteDocument(DatasetOps.DocumentOp op) {
         repo.deleteDocument(op);
+        repo.decreaseItemCount(op.getDatasetId());
         repo.updateDatasetItems(op.getDatasetId());
         return repo.getDocument(op, -1);
     }

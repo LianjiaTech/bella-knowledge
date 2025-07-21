@@ -5,6 +5,7 @@ import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 
 import com.ke.bella.openapi.BellaContext;
+import com.ke.bella.openapi.Operator;
 import com.ke.bella.openapi.apikey.ApikeyInfo;
 
 public class BellaContextHelper {
@@ -26,7 +27,7 @@ public class BellaContextHelper {
         if(StringUtils.isNotEmpty(operatorId)) {
             return Long.valueOf(operatorId);
         }
-        return BellaContext.getOperator().getUserId();
+        return Optional.ofNullable(BellaContext.getOperatorIgnoreNull()).map(Operator::getUserId).orElse(null);
     }
 
     public static String getOperatorUserName() {
@@ -34,7 +35,7 @@ public class BellaContextHelper {
         if(StringUtils.isNotEmpty(operatorName)) {
             return operatorName;
         }
-        return BellaContext.getOperator().getUserName();
+        return Optional.ofNullable(BellaContext.getOperatorIgnoreNull()).map(Operator::getUserName).orElse(null);
     }
 
     public static String getOperatorAkCode() {
