@@ -19,7 +19,7 @@ import org.jooq.Identity;
 import org.jooq.Index;
 import org.jooq.Name;
 import org.jooq.Record;
-import org.jooq.Row12;
+import org.jooq.Row13;
 import org.jooq.Schema;
 import org.jooq.Table;
 import org.jooq.TableField;
@@ -55,6 +55,11 @@ public class DatasetSharding extends TableImpl<DatasetShardingRecord> {
      * The column <code>dataset_sharding.id</code>.
      */
     public final TableField<DatasetShardingRecord, Long> ID = createField(DSL.name("id"), SQLDataType.BIGINT.nullable(false).identity(true), this, "");
+
+    /**
+     * The column <code>dataset_sharding.type</code>. 分片类型：qa-问答数据，document-文档数据
+     */
+    public final TableField<DatasetShardingRecord, String> TYPE = createField(DSL.name("type"), SQLDataType.VARCHAR(32).nullable(false).defaultValue(DSL.inline("qa", SQLDataType.VARCHAR)), this, "分片类型：qa-问答数据，document-文档数据");
 
     /**
      * The column <code>dataset_sharding.key</code>. 分表的标识，
@@ -153,7 +158,7 @@ public class DatasetSharding extends TableImpl<DatasetShardingRecord> {
 
     @Override
     public List<Index> getIndexes() {
-        return Arrays.<Index>asList(Indexes.DATASET_SHARDING_IDX_LAST_KEY);
+        return Arrays.<Index>asList(Indexes.DATASET_SHARDING_IDX_TYPE_LAST_KEY);
     }
 
     @Override
@@ -168,7 +173,7 @@ public class DatasetSharding extends TableImpl<DatasetShardingRecord> {
 
     @Override
     public List<UniqueKey<DatasetShardingRecord>> getKeys() {
-        return Arrays.<UniqueKey<DatasetShardingRecord>>asList(Keys.KEY_DATASET_SHARDING_PRIMARY, Keys.KEY_DATASET_SHARDING_IDX_KEY);
+        return Arrays.<UniqueKey<DatasetShardingRecord>>asList(Keys.KEY_DATASET_SHARDING_PRIMARY, Keys.KEY_DATASET_SHARDING_IDX_TYPE_KEY);
     }
 
     @Override
@@ -198,11 +203,11 @@ public class DatasetSharding extends TableImpl<DatasetShardingRecord> {
     }
 
     // -------------------------------------------------------------------------
-    // Row12 type methods
+    // Row13 type methods
     // -------------------------------------------------------------------------
 
     @Override
-    public Row12<Long, String, LocalDateTime, String, Long, Long, LocalDateTime, String, Long, LocalDateTime, String, Long> fieldsRow() {
-        return (Row12) super.fieldsRow();
+    public Row13<Long, String, String, LocalDateTime, String, Long, Long, LocalDateTime, String, Long, LocalDateTime, String, Long> fieldsRow() {
+        return (Row13) super.fieldsRow();
     }
 }

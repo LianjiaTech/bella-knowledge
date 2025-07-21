@@ -19,6 +19,7 @@ public class DatasetShardingDB implements Operator, Serializable {
     private static final long serialVersionUID = 1L;
 
     private Long          id;
+    private String        type;
     private String        key;
     private LocalDateTime keyTime;
     private String        lastKey;
@@ -35,6 +36,7 @@ public class DatasetShardingDB implements Operator, Serializable {
 
     public DatasetShardingDB(DatasetShardingDB value) {
         this.id = value.id;
+        this.type = value.type;
         this.key = value.key;
         this.keyTime = value.keyTime;
         this.lastKey = value.lastKey;
@@ -50,6 +52,7 @@ public class DatasetShardingDB implements Operator, Serializable {
 
     public DatasetShardingDB(
         Long          id,
+        String        type,
         String        key,
         LocalDateTime keyTime,
         String        lastKey,
@@ -63,6 +66,7 @@ public class DatasetShardingDB implements Operator, Serializable {
         Long          muid
     ) {
         this.id = id;
+        this.type = type;
         this.key = key;
         this.keyTime = keyTime;
         this.lastKey = lastKey;
@@ -88,6 +92,20 @@ public class DatasetShardingDB implements Operator, Serializable {
      */
     public void setId(Long id) {
         this.id = id;
+    }
+
+    /**
+     * Getter for <code>dataset_sharding.type</code>. 分片类型：qa-问答数据，document-文档数据
+     */
+    public String getType() {
+        return this.type;
+    }
+
+    /**
+     * Setter for <code>dataset_sharding.type</code>. 分片类型：qa-问答数据，document-文档数据
+     */
+    public void setType(String type) {
+        this.type = type;
     }
 
     /**
@@ -253,6 +271,7 @@ public class DatasetShardingDB implements Operator, Serializable {
         StringBuilder sb = new StringBuilder("DatasetShardingDB (");
 
         sb.append(id);
+        sb.append(", ").append(type);
         sb.append(", ").append(key);
         sb.append(", ").append(keyTime);
         sb.append(", ").append(lastKey);
