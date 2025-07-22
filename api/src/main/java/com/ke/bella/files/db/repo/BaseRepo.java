@@ -38,7 +38,11 @@ public interface BaseRepo {
         }
 
         if(!StringUtils.isEmpty(userName)) {
-            db.setMuName(userName);
+            try {
+                db.setMuName(URLDecoder.decode(userName, StandardCharsets.UTF_8.name()));
+            } catch (UnsupportedEncodingException ignored) {
+                // ignore
+            }
         }
         db.setMtime(LocalDateTime.now());
     }
