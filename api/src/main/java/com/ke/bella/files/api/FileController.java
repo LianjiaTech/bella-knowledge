@@ -463,7 +463,7 @@ public class FileController {
 
         // 确认要处理的pdf文件
         String pdfFileId = fileId;
-        if(!"pdf".equals(file.getType()) && StringUtils.isEmpty(file.getPdfFileId())) {
+        if(!("application/pdf".equals(file.getMimeType()) || "pdf".equals(file.getType()) || StringUtils.isNotEmpty(file.getPdfFileId()))) {
             throw new IllegalArgumentException(
                     String.format("file is not a PDF or does not have an binding PDF. file_id = %s", fileId));
         } else if("pdf".equals(file.getType())) {
