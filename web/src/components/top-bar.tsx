@@ -15,7 +15,6 @@ import { Workspace } from "@/lib/types/user";
 import { Button } from "./ui/button";
 import { FileText, User } from "lucide-react";
 import Link from "next/link";
-import { Separator } from "./ui/separator";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
@@ -68,22 +67,20 @@ const TopBarTabs = () => {
   return (
     <div className="flex h-5 items-center  space-x-4 ">
       {LINK.map((link, index) => (
-        <>
+        <div key={index}>
           <Link href={link.link}>
             <Button
               variant="link"
               className={cn(
                 "text-base hover:bg-gray-100",
-                isActive(link.link) && "text-blue-500 font-bold bg-gray-100"
+                isActive(link.link) && "text-blue-500 font-bold bg-gray-100",
               )}
             >
               {link.icon}
               {link.text}
             </Button>
           </Link>
-
-          {index < LINK.length - 1 && <Separator orientation="vertical" />}
-        </>
+        </div>
       ))}
     </div>
   );

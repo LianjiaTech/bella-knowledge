@@ -11,29 +11,30 @@ import {
 } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
-import { Check, Plus } from "lucide-react";
-import { KnowledgeFile } from "@/lib/types/file";
+import { Check, Loader2, Plus } from "lucide-react";
+import { DatasetFile, KnowledgeFile } from "@/lib/types/file";
+import { getFileProgress, postUploadFile } from "@/request/files";
 
 interface UploadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  uploadFile: (file: File) => Promise<string | null>;
-  getUploadProgress: (fileId: string) => Promise<number | null>;
+  loading?: boolean;
   fileList: KnowledgeFile[];
-  referenceFileList: KnowledgeFile[];
+  referenceFileList: KnowledgeFile[] | DatasetFile[];
   onAddReferenceFile: (fileId: string) => void;
   onSelectFile: (fileId: string) => void;
+  onAddUploadFile: (file: KnowledgeFile) => void;
 }
 
 const UploadDialog: React.FC<UploadDialogProps> = ({
   open,
   onOpenChange,
-  uploadFile,
-  getUploadProgress,
+  loading,
   fileList,
   referenceFileList,
   onAddReferenceFile,
   onSelectFile,
+  onAddUploadFile,
 }) => {
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -57,20 +58,33 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
     e.preventDefault();
     setDragActive(false);
   };
-
+  // 实现轮训，直到解析完成
+  const pollingFileProgress = async (fileId: string) => {
+    return new Promise((resolve) => {
+      const poll = async () => {
+        const res = await getFileProgress(fileId);
+        if (res?.status === "document_parse_finish") {
+          resolve(true);
+        } else {
+          setTimeout(() => poll(), 1000);
+        }
+      };
+      poll();
+    });
+  };
   const handleFileUpload = async (file: File) => {
     setUploading(true);
-    const fileId = await uploadFile(file);
+    const fileData = await postUploadFile(file);
 
-    if (fileId) {
+    const fileId = fileData?.id || "";
+    if (fileData && fileId) {
       setUploading(false);
       setParsing(true);
-      await getUploadProgress(fileId);
+      await pollingFileProgress(fileId);
       setParsing(false);
-
+      onAddUploadFile(fileData);
       onAddReferenceFile(fileId);
       onSelectFile(fileId);
-
       toast.success("上传成功，已自动选中");
     } else {
       setUploading(false);
@@ -101,7 +115,11 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
                   key={file.id}
                   className="flex justify-between items-center border border-gray-200 rounded-md p-3 hover:bg-gray-50 transition-colors"
                 >
-                  <span className="flex-1 text-sm">{file.filename}</span>
+                  <span className="flex-1 text-sm">
+                    {"filename" in file
+                      ? file.filename
+                      : fileList.find((f) => f.id === file.file_id)?.filename}
+                  </span>
                 </div>
               ))}
             </div>
@@ -142,35 +160,48 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
               )}
             </div>
             <div className="flex flex-col gap-2 max-h-[400px] overflow-y-auto [&::-webkit-scrollbar]:hidden">
-              {fileList.map((file) => (
-                <div
-                  key={file.id}
-                  className="flex justify-between items-center border border-gray-200 rounded-md p-3 hover:bg-gray-50 transition-colors"
-                >
-                  <span className="flex-1 text-sm line-clamp-1 text-ellipsis max-w-[220px]">
-                    {file.filename}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      if (!referenceFileList.find((f) => f.id === file.id)) {
-                        onAddReferenceFile(file.id);
-                        onSelectFile(file.id);
-                      }
-                    }}
-                  >
-                    {referenceFileList.find((f) => f.id === file.id) ? (
-                      <Check className="w-4 h-4" />
-                    ) : (
-                      <Plus className="w-4 h-4" />
-                    )}
-                    {referenceFileList.find((f) => f.id === file.id)
-                      ? "已选择"
-                      : "选择"}
-                  </Button>
+              {loading ? (
+                <div className="flex items-center justify-center h-full">
+                  <Loader2 className="size-4 animate-spin" />
                 </div>
-              ))}
+              ) : (
+                (fileList || []).map((file) => {
+                  // 判断referenceFileList是否为DatasetFile[]
+                  const isDatasetFile = referenceFileList.every(
+                    (f) => "file_id" in f,
+                  );
+                  const isSelected = isDatasetFile
+                    ? referenceFileList.find((f) => f.file_id === file.id)
+                    : referenceFileList.find((f) => f.id === file.id);
+                  return (
+                    <div
+                      key={file.id}
+                      className="flex justify-between items-center border border-gray-200 rounded-md p-3 hover:bg-gray-50 transition-colors"
+                    >
+                      <span className="flex-1 text-sm line-clamp-1 text-ellipsis max-w-[220px] break-all">
+                        {file.filename}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (!isSelected) {
+                            onAddReferenceFile(file.id);
+                            onSelectFile(file.id);
+                          }
+                        }}
+                      >
+                        {isSelected ? (
+                          <Check className="w-4 h-4" />
+                        ) : (
+                          <Plus className="w-4 h-4" />
+                        )}
+                        {isSelected ? "已选择" : "选择"}
+                      </Button>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
         </div>

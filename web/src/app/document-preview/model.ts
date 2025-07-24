@@ -9,6 +9,8 @@ import { useShallow } from "zustand/react/shallow";
 import { webRequest } from "@/lib/request/web";
 import { toast } from "sonner";
 import { KnowledgeFile } from "@/lib/types/file";
+import { getFileList } from "@/request/files";
+import { requestGetDatasetQuestionList } from "@/request/dataset";
 
 type State = {
   questionInputVal: string;
@@ -18,7 +20,6 @@ type State = {
   qaReferenceList: QaReferenceList;
   fileList: KnowledgeFile[];
   referenceFileList: KnowledgeFile[];
-  uploadProgress: number;
   selectFileId: string;
   lastEditTime: number;
   initLoading: boolean;
@@ -49,8 +50,7 @@ type Action = {
   getFileList: () => void;
   getReferenceFileList: (dataset_id: string) => Promise<void>;
   addReferenceFile: (file: KnowledgeFile) => void;
-  uploadFile: (file: File) => Promise<string | null>;
-  getUploadProgress: (fileId: string) => Promise<number | null>;
+  addUploadFile: (file: KnowledgeFile) => void;
   initPage: (dataset_id: string) => Promise<void>;
   initReferenceFileList: (dataset_id: string) => Promise<void>;
   setSelectFileId: (fileId: string) => void;
@@ -65,18 +65,11 @@ const store = create<State & Action>((set, get) => ({
   selectedQuestion: null,
   fileList: [],
   referenceFileList: [],
-  uploadProgress: 0,
   selectFileId: "",
   lastEditTime: 0,
   initLoading: false,
   getQuestionList: async (dataset_id: string) => {
-    const res = await webRequest<Question[]>({
-      path: "/api/qa/list",
-      method: "GET",
-      query: {
-        dataset_id: dataset_id,
-      },
-    });
+    const res = await requestGetDatasetQuestionList(dataset_id);
     if (res.code === 200) {
       set({ questionList: res.data });
     }
@@ -119,7 +112,7 @@ const store = create<State & Action>((set, get) => ({
       }
       set({
         questionList: questionList.filter(
-          (question) => question.item_id !== item_id
+          (question) => question.item_id !== item_id,
         ),
         lastEditTime: Date.now(),
       });
@@ -129,7 +122,7 @@ const store = create<State & Action>((set, get) => ({
   updateQuestion: async ({ dataset_id, item_id, question, answer }) => {
     const { questionList } = get();
     const currentQuestion = questionList.find(
-      (question) => question.item_id === item_id
+      (question) => question.item_id === item_id,
     );
     if (
       currentQuestion?.question === question &&
@@ -150,7 +143,7 @@ const store = create<State & Action>((set, get) => ({
     if (res.code === 200) {
       set({
         questionList: questionList.map((question) =>
-          question.item_id === item_id ? res.data : question
+          question.item_id === item_id ? res.data : question,
         ),
         selectedQuestion: res.data,
         lastEditTime: Date.now(),
@@ -161,11 +154,11 @@ const store = create<State & Action>((set, get) => ({
   addQuestionReference: async (body) => {
     const { qaReferenceList } = get();
     const qaReference = qaReferenceList.find(
-      (qaReference) => qaReference.item_id === body.item_id
+      (qaReference) => qaReference.item_id === body.item_id,
     );
     if (
       qaReference?.references.find(
-        (r) => r.file_id === body.file_id && r.path.join() === body.path.join()
+        (r) => r.file_id === body.file_id && r.path.join() === body.path.join(),
       )
     ) {
       toast.error("当前文件的该节点已存在标注");
@@ -192,7 +185,7 @@ const store = create<State & Action>((set, get) => ({
                   ...qaReference,
                   references: [...qaReference.references, newReference],
                 }
-              : qaReference
+              : qaReference,
           ),
           lastEditTime: Date.now(),
         });
@@ -227,7 +220,7 @@ const store = create<State & Action>((set, get) => ({
         qaReferenceList: qaReferenceList.map((qaReference) => ({
           ...qaReference,
           references: qaReference.references.filter(
-            (r) => r.reference_id !== body.reference_id
+            (r) => r.reference_id !== body.reference_id,
           ),
         })),
         lastEditTime: Date.now(),
@@ -238,7 +231,7 @@ const store = create<State & Action>((set, get) => ({
   getReferenceList: async (dataset_id: string, item_id: string) => {
     const { qaReferenceList } = get();
     const qaReference = qaReferenceList.find(
-      (qaReference) => qaReference.item_id === item_id
+      (qaReference) => qaReference.item_id === item_id,
     );
     if (qaReference) {
       return;
@@ -269,71 +262,8 @@ const store = create<State & Action>((set, get) => ({
     }
   },
   getFileList: async () => {
-    const res = await webRequest<{ data: KnowledgeFile[] }>({
-      path: "/api/files",
-      method: "GET",
-    });
-    if (res.code === 200) {
-      set({
-        fileList: res.data.data,
-      });
-    }
-  },
-  uploadFile: async (file) => {
-    const formData = new FormData();
-    formData.append("file", file);
-    const currentWorkspace = JSON.parse(
-      localStorage.getItem("current_workspace") || "{}"
-    );
-
-    const response = await fetch("/api/files", {
-      method: "POST",
-      body: formData,
-      headers: {
-        "X-USER-ID": localStorage.getItem("user_id") || "",
-        "X-BELLA-SPACE-CODE": currentWorkspace.spaceCode || "",
-      },
-    });
-    const data = await response.json();
-    if (data.code === 200) {
-      set({
-        fileList: [data.data, ...get().fileList],
-      });
-      return data.data.id;
-    }
-    return null;
-  },
-  getUploadProgress: async (fileId) => {
-    return new Promise((resolve) => {
-      const poll = async () => {
-        const res = await webRequest<{
-          percent: number;
-          code: number;
-          status: "document_parse_finish" | "document_parse_failed";
-        }>({
-          path: "/api/dom-tree/progress",
-          method: "GET",
-          query: {
-            fileId: fileId,
-          },
-        });
-        if (res.data.code === 404) {
-          set({
-            uploadProgress: 0,
-          });
-        } else {
-          set({
-            uploadProgress: res.data.percent,
-          });
-        }
-        if (res.data.status === "document_parse_finish") {
-          resolve(100);
-        } else {
-          setTimeout(poll, 1000);
-        }
-      };
-      poll();
-    });
+    const res = await getFileList();
+    set({ fileList: res });
   },
   addReferenceFile: async (file: KnowledgeFile) => {
     const { referenceFileList } = get();
@@ -341,7 +271,12 @@ const store = create<State & Action>((set, get) => ({
       referenceFileList: [...referenceFileList, file],
     });
   },
-
+  addUploadFile: (file: KnowledgeFile) => {
+    const { fileList } = get();
+    set({
+      fileList: [file, ...fileList],
+    });
+  },
   getReferenceFileList: async (dataset_id: string) => {
     const { questionList, fileList } = get();
     const res = await webRequest<string[]>({
@@ -356,7 +291,7 @@ const store = create<State & Action>((set, get) => ({
     if (res.code === 200) {
       set({
         referenceFileList: fileList.filter((file) =>
-          res.data.includes(file.id)
+          res.data.includes(file.id),
         ),
       });
     }
@@ -368,7 +303,6 @@ const store = create<State & Action>((set, get) => ({
   },
   initReferenceFileList: async (dataset_id: string) => {
     const { questionList } = get();
-    console.log(questionList);
     if (questionList.length > 0) {
       // 修改批处理大小为100
       const batchSize = 100;
@@ -394,14 +328,14 @@ const store = create<State & Action>((set, get) => ({
 
       const executeBatchesWithLimit = async (
         batches: Question[][],
-        limit: number
+        limit: number,
       ) => {
         const results: string[][] = [];
 
         for (let i = 0; i < batches.length; i += limit) {
           const currentBatch = batches.slice(i, i + limit);
           const promises = currentBatch.map((batch) =>
-            singleReq(batch.map((item: Question) => item.item_id.toString()))
+            singleReq(batch.map((item: Question) => item.item_id.toString())),
           );
 
           const batchResults = await Promise.all(promises);
@@ -449,7 +383,6 @@ const store = create<State & Action>((set, get) => ({
       qaReferenceList: [],
       fileList: [],
       referenceFileList: [],
-      uploadProgress: 0,
       selectFileId: "",
       lastEditTime: 0,
     });

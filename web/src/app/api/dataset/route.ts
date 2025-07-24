@@ -18,6 +18,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const data = await req.json();
   const { name, type, remark, file_id, dataset_id } = data;
+  // 追加的场景
   if (file_id) {
     const formData = new FormData();
     formData.append("file_id", file_id);
@@ -46,6 +47,7 @@ export async function POST(req: NextRequest) {
     const resData = await res.json();
     return NextResponse.json(resData);
   } else {
+    // 创建的场景
     const res = await backendRequest(req, {
       url: `${FILE_API_URL}/v1/datasets/create`,
       method: "POST",

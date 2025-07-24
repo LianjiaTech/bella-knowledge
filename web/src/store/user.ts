@@ -1,5 +1,6 @@
 import { webRequest } from "@/lib/request/web";
 import { UserInfo, Workspace } from "@/lib/types/user";
+import { getUserInfo } from "@/request/user";
 import { create } from "zustand";
 import { useShallow } from "zustand/shallow";
 
@@ -19,10 +20,7 @@ const store = create<{
     if (userInfo) {
       return;
     }
-    const res = await webRequest<UserInfo>({
-      path: "/api/user-info",
-      method: "GET",
-    });
+    const res = await getUserInfo();
     if (res.data.userId) {
       localStorage.setItem("user_id", res.data.userId);
       set({ userInfo: res.data });
@@ -55,7 +53,7 @@ const store = create<{
   changeCurrentWorkspace: (spaceCode: string) => {
     const { workspaceList } = get();
     const workspace = workspaceList.find(
-      (space) => space.spaceCode === spaceCode
+      (space) => space.spaceCode === spaceCode,
     );
     if (workspace) {
       localStorage.setItem("current_workspace", JSON.stringify(workspace));

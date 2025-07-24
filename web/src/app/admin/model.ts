@@ -1,11 +1,14 @@
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
-import { Dataset } from "./columns";
-import { webRequest } from "@/lib/request/web";
+import { Dataset } from "@/lib/types/qa";
+import { requestDatasetList } from "@/request/dataset";
 
 type State = {
   loading: boolean;
-  datasetList: Dataset[];
+  datasetList: {
+    qa: Dataset[];
+    document: Dataset[];
+  };
   currentPage: number;
   pageSize: number;
   total: number;
@@ -14,48 +17,54 @@ type State = {
 };
 
 type Action = {
-  getDatasetList: (page?: number, pageSize?: number) => Promise<void>;
+  getDatasetList: (
+    page?: number,
+    pageSize?: number,
+    type?: "qa" | "document",
+  ) => Promise<void>;
   setCurrentPage: (page: number) => void;
   setPageSize: (pageSize: number) => void;
 };
 
 const store = create<State & Action>((set, get) => ({
   loading: false,
-  datasetList: [],
+  datasetList: {
+    qa: [],
+    document: [],
+  },
   currentPage: 1,
   pageSize: 10,
   total: -1,
   hasMore: false,
   page: 1,
-  getDatasetList: async (page?: number, pageSize?: number) => {
+  getDatasetList: async (
+    page?: number,
+    pageSize?: number,
+    type?: "qa" | "document",
+  ) => {
     set({ loading: true });
     const currentPage = page ?? get().currentPage;
     const currentPageSize = pageSize ?? get().pageSize;
 
     try {
-      const res = await webRequest<{
-        data: Dataset[];
-        total?: number;
-        page: number;
-        limit: number;
-        has_more: boolean;
-      }>({
-        path: "/api/dataset/page",
-        method: "GET",
-        query: {
-          page: currentPage.toString(),
-          page_size: currentPageSize.toString(),
-        },
+      const res = await requestDatasetList({
+        page: currentPage,
+        pageSize: currentPageSize,
+        type: type ?? "qa",
       });
 
-      set({
-        datasetList: res.data.data,
-        total: res.data.total || res.data.data.length,
-        currentPage,
-        pageSize: currentPageSize,
-        hasMore: res.data.has_more,
-        page: res.data.page,
-        loading: false,
+      set((state) => {
+        const datasetList = state.datasetList;
+        datasetList[type ?? "qa"] = res.data.data;
+        return {
+          datasetList,
+          total: res.data.total || res.data.data.length,
+          currentPage,
+          pageSize: currentPageSize,
+          hasMore: res.data.has_more,
+          page: res.data.page,
+          loading: false,
+        };
       });
     } catch (error) {
       console.error("Failed to fetch dataset list:", error);

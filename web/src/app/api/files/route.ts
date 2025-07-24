@@ -1,18 +1,15 @@
+import { backendRequest } from "@/lib/request/backend";
 import { FILE_API_URL } from "@/lib/request/const ";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
-  const currentWorkspace = req.headers.get("X-BELLA-SPACE-CODE");
-
-  const res = await fetch(`${FILE_API_URL}/v1/files?purpose=assistants`, {
-    method: "GET",
-    headers: {
-      "X-BELLA-CONSOLE": "true",
-      "X-BELLA-SPACE-CODE": currentWorkspace || "",
-      cookie: req.cookies.toString(),
+  const res = await backendRequest(req, {
+    url: `${FILE_API_URL}/v1/files`,
+    query: {
+      purpose: "assistants",
     },
+    method: "GET",
   });
-
   const data = await res.json();
   return NextResponse.json({
     code: 200,
@@ -31,7 +28,7 @@ export async function POST(req: NextRequest) {
     JSON.stringify({
       post_processors: ["file_indexing"],
       user: uid,
-    })
+    }),
   );
   const purpose = reqFormData.get("purpose");
   formData.append("purpose", purpose || "assistants");

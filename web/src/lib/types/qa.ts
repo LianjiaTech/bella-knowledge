@@ -1,3 +1,19 @@
+export type Dataset = {
+  id: number;
+  dataset_id: string;
+  space_code: string;
+  name: string;
+  type: string;
+  remark: string;
+  cuid: number;
+  cu_name: string;
+  ctime: string;
+  muid: number;
+  mu_name: string;
+  mtime: string;
+  status: number;
+};
+
 export type Question = {
   id: number;
   item_id: string;

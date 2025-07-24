@@ -1,5 +1,5 @@
 # base image
-FROM docker.ipigsy.com/library/node:20.11-alpine3.19 AS base
+FROM swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/node:20.16.0-alpine3.20 AS base
 LABEL maintainer="takatost@gmail.com"
 
 # if you located in China, you can use aliyun mirror to speed up

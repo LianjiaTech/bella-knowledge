@@ -85,13 +85,13 @@ export function TableRenderer({ rows }: TableRendererProps) {
                 isHeader
                   ? "bg-gray-50 font-semibold text-gray-900"
                   : "bg-white text-gray-700 hover:bg-gray-50",
-                "transition-colors duration-150"
+                "transition-colors duration-150",
               )}
             >
               <div className="whitespace-pre-wrap break-words">
                 {cell.text || "-"}
               </div>
-            </td>
+            </td>,
           );
         }
       }
@@ -100,7 +100,7 @@ export function TableRenderer({ rows }: TableRendererProps) {
         tableRows.push(
           <tr key={r} className="divide-x divide-gray-200">
             {tableCells}
-          </tr>
+          </tr>,
         );
       }
     }
