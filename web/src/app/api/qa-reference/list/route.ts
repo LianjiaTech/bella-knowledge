@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
         file_id: item.file_id,
         path: item.path.split(","),
         reference_id: item.reference_id,
-      })
+      }),
     ),
   };
   return NextResponse.json({

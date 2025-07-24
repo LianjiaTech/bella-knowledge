@@ -5,12 +5,12 @@ import { useSearchParams } from "next/navigation";
 import { useDocumentPreviewStore } from "./model";
 import { toast } from "sonner";
 import { DocumentViewerRef } from "@/components/document-viewer";
-import { LeftContentSection } from "./components/left-content-section";
-import { RightDocumentSection } from "./components/right-document-section";
+import { LeftContentSection } from "./_components/left-content-section";
+import { RightDocumentSection } from "./_components/right-document-section";
 import { QaReference } from "@/lib/types/qa";
-import { AppSidebar } from "./app-siderbar";
+import { LeftSidebar } from "./_components/left-siderbar";
 import TopBar from "./top-bar";
-import { Toaster } from "sonner";
+import { KnowledgeFile } from "@/lib/types/file";
 
 function DocumentPreviewPage() {
   const searchParams = useSearchParams();
@@ -41,8 +41,7 @@ function DocumentPreviewPage() {
     addQuestionReference,
     deleteQuestionReference,
 
-    uploadFile,
-    getUploadProgress,
+    addUploadFile,
     addReferenceFile,
     clear,
     initLoading,
@@ -61,7 +60,7 @@ function DocumentPreviewPage() {
     return () => {
       clear();
     };
-  }, [initPage, datasetId, clear]);
+  }, [initPage, datasetId, clear, initReferenceFileList]);
 
   const handleTextAreaBlur = () => {
     if (selectedQuestion) {
@@ -106,14 +105,14 @@ function DocumentPreviewPage() {
     await addQuestionReference(params);
   };
 
-  return (
-    <div className="relative h-screen">
-      {/* TopBar 固定在顶部，占据整个页面宽度 */}
-      <div className="fixed top-0 left-0 right-0 h-16 z-50">
-        <TopBar lastEditTime={lastEditTime} />
-      </div>
+  const handleAddUploadFile = (file: KnowledgeFile) => {
+    addUploadFile(file);
+  };
 
-      <AppSidebar
+  return (
+    <>
+      <TopBar lastEditTime={lastEditTime} />
+      <LeftSidebar
         loading={initLoading}
         questionList={questionList}
         selectedQuestion={selectedQuestion}
@@ -124,7 +123,6 @@ function DocumentPreviewPage() {
         onDeleteQuestion={deleteQuestion}
         onAddQuestion={addQuestion}
       />
-      {/* 主要内容区域 */}
       <main className="pt-16 h-screen flex">
         {/* 左侧内容区域 - 撑满剩余宽度 */}
         <LeftContentSection
@@ -157,14 +155,11 @@ function DocumentPreviewPage() {
             onFileSelect={onFileSelect}
             onAddReferenceFile={handleAddReferenceFile}
             onAddQuestionReference={handleAddQuestionReference}
-            uploadFile={uploadFile}
-            getUploadProgress={getUploadProgress}
+            onAddUploadFile={handleAddUploadFile}
           />
         </div>
       </main>
-
-      <Toaster />
-    </div>
+    </>
   );
 }
 

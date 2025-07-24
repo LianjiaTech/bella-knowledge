@@ -1,4 +1,12 @@
-"use client";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { useAdminStore } from "../model";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -11,14 +19,13 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { webRequest } from "@/lib/request/web";
 import { useState, useRef } from "react";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
 import { Upload, X } from "lucide-react";
 import importDatasetDemo from "@/assets/import-dataset-demo.png";
 import Image from "next/image";
+import { requestCreateDataset } from "@/request/dataset";
 
 const formSchema = z.object({
   name: z
@@ -29,12 +36,22 @@ const formSchema = z.object({
   remark: z.string().max(200, "数据集描述不能超过200个字符"),
 });
 
-export function CreateDatasetForm({ onSuccess }: { onSuccess: () => void }) {
+interface CreateDatasetFormProps {
+  onSuccess: () => void;
+  type: "qa" | "document";
+  showDocumentUpload?: boolean;
+}
+
+export function CreateDatasetForm({
+  onSuccess,
+  type,
+  showDocumentUpload = true,
+}: CreateDatasetFormProps) {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
-      type: "qa",
+      type: type,
       remark: "",
     },
   });
@@ -54,7 +71,7 @@ export function CreateDatasetForm({ onSuccess }: { onSuccess: () => void }) {
     const formData = new FormData();
     formData.append("file", file);
     const currentWorkspace = JSON.parse(
-      localStorage.getItem("current_workspace") || "{}"
+      localStorage.getItem("current_workspace") || "{}",
     );
 
     try {
@@ -94,13 +111,10 @@ export function CreateDatasetForm({ onSuccess }: { onSuccess: () => void }) {
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     try {
       setSubmitting(true);
-      const res = await webRequest({
-        path: "/api/dataset",
-        method: "POST",
-        body: {
-          ...data,
-          file_id: uploadedFiles.length > 0 ? uploadedFiles[0].id : null,
-        },
+      const res = await requestCreateDataset({
+        name: data.name,
+        remark: data.remark,
+        type,
       });
       if (res.code === 200) {
         toast.success("数据集创建成功");
@@ -146,63 +160,67 @@ export function CreateDatasetForm({ onSuccess }: { onSuccess: () => void }) {
         />
 
         {/* File Upload Section */}
-        <div className="space-y-4">
-          <FormLabel>数据集文档 (可选)</FormLabel>
-          <div className="text-xs text-gray-500">示例</div>
-          <Image
-            src={importDatasetDemo}
-            alt="import-dataset-demo"
-            width={1000}
-            height={600}
-          />
-          <div className="border-2 border-dashed border-gray-300 rounded-md p-6">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".xlsx,.xls"
-              className="hidden"
-              onChange={handleFileChange}
-              disabled={uploading}
-            />
+        {showDocumentUpload && (
+          <div className="space-y-4">
+            <FormLabel>数据集文档 (可选)</FormLabel>
+            <>
+              <div className="text-xs text-gray-500">示例</div>
+              <Image
+                src={importDatasetDemo}
+                alt="import-dataset-demo"
+                width={1000}
+                height={600}
+              />
+            </>
+            <div className="border-2 border-dashed border-gray-300 rounded-md p-6">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls"
+                className="hidden"
+                onChange={handleFileChange}
+                disabled={uploading}
+              />
 
-            {uploading ? (
-              <div className="flex flex-col items-center py-4">
-                <Spinner size="md">上传中...</Spinner>
-              </div>
-            ) : (
-              <div
-                className="flex flex-col items-center py-4 cursor-pointer hover:bg-gray-50 transition-colors rounded-md"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <Upload className="h-8 w-8 text-gray-400 mb-2" />
-                <p className="text-sm text-gray-600">点击上传文件</p>
-                <p className="text-xs text-gray-500">
-                  支持 XLSX、XLS 格式，仅支持单个文件
-                </p>
+              {uploading ? (
+                <div className="flex flex-col items-center py-4">
+                  <Spinner size="md">上传中...</Spinner>
+                </div>
+              ) : (
+                <div
+                  className="flex flex-col items-center py-4 cursor-pointer hover:bg-gray-50 transition-colors rounded-md"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload className="h-8 w-8 text-gray-400 mb-2" />
+                  <p className="text-sm text-gray-600">点击上传文件</p>
+                  <p className="text-xs text-gray-500">
+                    支持 XLSX、XLS 格式，仅支持单个文件
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Uploaded File */}
+            {uploadedFiles.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-gray-700">已上传文件:</p>
+                <div className="flex items-center justify-between bg-gray-50 p-2 rounded-md">
+                  <span className="text-sm text-gray-700">
+                    {uploadedFiles[0].filename}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={removeFile}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             )}
           </div>
-
-          {/* Uploaded File */}
-          {uploadedFiles.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-gray-700">已上传文件:</p>
-              <div className="flex items-center justify-between bg-gray-50 p-2 rounded-md">
-                <span className="text-sm text-gray-700">
-                  {uploadedFiles[0].filename}
-                </span>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={removeFile}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
+        )}
 
         <Button type="submit" disabled={uploading || submitting}>
           {uploading ? "上传中..." : submitting ? "提交中..." : "提交"}
@@ -211,3 +229,37 @@ export function CreateDatasetForm({ onSuccess }: { onSuccess: () => void }) {
     </Form>
   );
 }
+
+const CreateDatasetSheet = ({
+  open,
+  onOpenChange,
+  type,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  type: "qa" | "document";
+}) => {
+  const { getDatasetList } = useAdminStore();
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetTrigger asChild>
+        <Button>创建数据集</Button>
+      </SheetTrigger>
+      <SheetContent className="w-[800px] overflow-y-auto pb-4">
+        <SheetHeader>
+          <SheetTitle>创建数据集</SheetTitle>
+        </SheetHeader>
+        <CreateDatasetForm
+          onSuccess={() => {
+            getDatasetList(1, 10, type);
+            onOpenChange(false);
+          }}
+          type={type}
+          showDocumentUpload={type === "qa"}
+        />
+      </SheetContent>
+    </Sheet>
+  );
+};
+
+export default CreateDatasetSheet;

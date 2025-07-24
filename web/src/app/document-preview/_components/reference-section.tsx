@@ -31,7 +31,7 @@ export function ReferenceSection({
 
   const currentReferences =
     qaReferenceList.find(
-      (reference) => reference.item_id === selectedQuestion?.item_id
+      (reference) => reference.item_id === selectedQuestion?.item_id,
     )?.references || [];
 
   return (
@@ -46,13 +46,13 @@ export function ReferenceSection({
               if (reference.file_id === selectFileId) {
                 // 触发DocumentViewer组件高亮和滑动
                 documentViewerRef.current?.scrollToAndHighlightNode(
-                  reference.path.map((item) => Number(item))
+                  reference.path.map((item) => Number(item)),
                 );
                 return;
               } else {
                 await onFileSelect(reference.file_id);
                 documentViewerRef.current?.scrollToAndHighlightNode(
-                  reference.path
+                  reference.path,
                 );
               }
             }}
@@ -61,7 +61,7 @@ export function ReferenceSection({
               <div className="text-sm font-medium">
                 {
                   referenceFileList.find(
-                    (file) => file.id === reference.file_id
+                    (file) => file.id === reference.file_id,
                   )?.filename
                 }
               </div>

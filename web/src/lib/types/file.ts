@@ -10,3 +10,8 @@ export type KnowledgeFile = {
   dom_tree_file_id: string;
   mime_type: string;
 };
+
+export interface DatasetFile {
+  id: string;
+  file_id: string;
+}

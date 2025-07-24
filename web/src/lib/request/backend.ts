@@ -10,7 +10,7 @@ export async function backendRequest(
     method: "GET" | "POST";
     query?: Record<string, string>;
     body?: Record<string, unknown>;
-  }
+  },
 ) {
   try {
     const { url, method, query, body } = params;
@@ -26,7 +26,7 @@ export async function backendRequest(
         },
         method,
         body: JSON.stringify(body),
-      }
+      },
     );
 
     logRequestError(req, { url, method, query, body }, response);
@@ -63,9 +63,37 @@ export async function backendRequest(
   } catch (error) {
     return NextResponse.json({
       code: 500,
-      message: error,
+      message: error instanceof Error ? error.message : "未知错误",
     });
   }
+}
+
+export async function backendRequestFormData(
+  req: NextRequest,
+  params: {
+    method: "GET" | "POST" | "PUT";
+    url: string;
+    data?: Record<string, unknown>;
+  },
+) {
+  const { url, data, method } = params;
+  const formData = new FormData();
+  if (data) {
+    Object.entries(data).forEach(([key, value]) => {
+      formData.append(key, value as string);
+    });
+  }
+  const workspace = req.headers.get("X-BELLA-SPACE-CODE");
+  const response = await fetch(url, {
+    headers: {
+      "X-BELLA-CONSOLE": "true",
+      "X-BELLA-SPACE-CODE": workspace || "",
+      cookie: req.cookies.toString(),
+    },
+    body: formData,
+    method,
+  });
+  return response;
 }
 
 const logRequestError = (
@@ -76,7 +104,7 @@ const logRequestError = (
     query?: Record<string, string>;
     body?: Record<string, unknown>;
   },
-  response: Response
+  response: Response,
 ) => {
   if (isProd) return;
   const { url, method, query, body } = params;

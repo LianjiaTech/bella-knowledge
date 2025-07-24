@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
       } catch (error) {
         console.error(
           `Failed to fetch references for item_id ${item_id}:`,
-          error
+          error,
         );
         return []; // 单个请求失败不影响整体结果
       }

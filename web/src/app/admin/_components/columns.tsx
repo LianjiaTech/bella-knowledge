@@ -6,7 +6,6 @@ import { Edit, Import, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { webRequest } from "@/lib/request/web";
 import { useRouter } from "next/navigation";
 import {
   AlertDialogAction,
@@ -24,6 +23,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { AppendDatasetSheet } from "./append-dataset-sheet";
+import { requestDeleteDataset } from "@/request/dataset";
+import { toast } from "sonner";
 
 export type Dataset = {
   id: number;
@@ -41,30 +42,37 @@ export type Dataset = {
   status: number;
 };
 
-const CreateRowActions = (row: Row<Dataset>, onDelete: () => void) => {
+const CreateRowActions = (
+  row: Row<Dataset>,
+  onDelete: () => void,
+  type: "qa" | "document",
+) => {
   const router = useRouter();
   const [appendSheetOpen, setAppendSheetOpen] = useState(false);
 
   const handleEdit = () => {
-    router.push(
-      `document-preview?dataset_id=${row.original.dataset_id}&dataset_name=${row.original.name}`
-    );
+    if (type === "qa") {
+      router.push(
+        `document-preview?dataset_id=${row.original.dataset_id}&dataset_name=${row.original.name}`,
+      );
+    } else if (type === "document") {
+      router.push(
+        `document-parser?dataset_id=${row.original.dataset_id}&dataset_name=${row.original.name}`,
+      );
+    }
   };
 
   const handleAppend = () => {
     setAppendSheetOpen(true);
   };
 
-  const handleDelete = () => {
-    webRequest({
-      path: `/api/dataset`,
-      body: {
-        dataset_id: row.original.dataset_id,
-      },
-      method: "DELETE",
-    }).then(() => {
+  const handleDelete = async () => {
+    const res = await requestDeleteDataset(row.original.dataset_id);
+    if (res.code === 200) {
       onDelete();
-    });
+    } else {
+      toast.error(res.message);
+    }
   };
 
   return (
@@ -83,19 +91,22 @@ const CreateRowActions = (row: Row<Dataset>, onDelete: () => void) => {
           </TooltipTrigger>
           <TooltipContent>编辑数据集</TooltipContent>
         </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleAppend}
-              className="h-8 px-2"
-            >
-              <Import className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>追加数据集</TooltipContent>
-        </Tooltip>
+        {type === "qa" && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleAppend}
+                className="h-8 px-2"
+              >
+                <Import className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>追加数据集</TooltipContent>
+          </Tooltip>
+        )}
+
         <Tooltip>
           <AlertDialog>
             <AlertDialogTrigger asChild>
@@ -138,7 +149,10 @@ const CreateRowActions = (row: Row<Dataset>, onDelete: () => void) => {
   );
 };
 
-export const getColumns = (onDelete: () => void): ColumnDef<Dataset>[] => [
+export const getColumns = (
+  onDelete: () => void,
+  type: "qa" | "document",
+): ColumnDef<Dataset>[] => [
   {
     accessorKey: "name",
     header: "数据集名称",
@@ -175,7 +189,7 @@ export const getColumns = (onDelete: () => void): ColumnDef<Dataset>[] => [
     id: "actions",
     header: "操作",
     cell: ({ row }) => {
-      return CreateRowActions(row, onDelete);
+      return CreateRowActions(row, onDelete, type);
     },
   },
 ];

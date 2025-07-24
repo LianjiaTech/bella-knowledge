@@ -7,12 +7,12 @@ export default function TopBar({ lastEditTime }: { lastEditTime: number }) {
   const searchParams = useSearchParams();
   const datasetName = searchParams.get("dataset_name");
   return (
-    <div className="w-full h-16 flex justify-between items-center px-6 shadow-md bg-white border-b">
+    <div className="fixed top-0 left-0 right-0 z-50 w-full h-16 flex justify-between items-center px-6 shadow-md bg-white border-b">
       <div className="flex items-center gap-4">
         <ArrowLeft
           className="cursor-pointer"
           onClick={() => {
-            router.back();
+            router.push("/admin?tab=qa");
           }}
         />
         <div className="text-lg font-bold">数据标注</div>

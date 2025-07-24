@@ -37,7 +37,7 @@ interface AppSidebarProps {
   }) => void;
 }
 
-export function AppSidebar({
+export function LeftSidebar({
   loading,
   questionList,
   selectedQuestion,

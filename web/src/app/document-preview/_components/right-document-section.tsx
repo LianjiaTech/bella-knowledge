@@ -24,8 +24,7 @@ interface RightDocumentSectionProps {
     file_id: string;
     path: number[];
   }) => Promise<void>;
-  uploadFile: (file: File) => Promise<string | null>;
-  getUploadProgress: (fileId: string) => Promise<number | null>;
+  onAddUploadFile: (file: KnowledgeFile) => void;
 }
 
 export function RightDocumentSection({
@@ -40,8 +39,7 @@ export function RightDocumentSection({
   onFileSelect,
   onAddReferenceFile,
   onAddQuestionReference,
-  uploadFile,
-  getUploadProgress,
+  onAddUploadFile,
 }: RightDocumentSectionProps) {
   return (
     <div className="h-full bg-white border-l border-gray-200 px-4 py-6 overflow-hidden">
@@ -69,12 +67,11 @@ export function RightDocumentSection({
       <UploadDialog
         open={uploadDialogOpen}
         onOpenChange={setUploadDialogOpen}
-        uploadFile={uploadFile}
-        getUploadProgress={getUploadProgress}
         fileList={fileList}
         referenceFileList={referenceFileList}
         onAddReferenceFile={onAddReferenceFile}
         onSelectFile={onFileSelect}
+        onAddUploadFile={onAddUploadFile}
       />
     </div>
   );

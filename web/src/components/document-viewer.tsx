@@ -23,14 +23,133 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { webRequest } from "@/lib/request/web";
-import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { TableRenderer } from "./table-renderer";
 import { Input } from "./ui/input";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { tomorrow } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { Copy, Check } from "lucide-react";
+import { toast } from "sonner";
+
+interface CodeRendererProps {
+  code: string;
+  className?: string;
+  showLineNumbers?: boolean;
+  showHeader?: boolean;
+  filename?: string;
+}
+
+const CodeRenderer: React.FC<CodeRendererProps> = ({
+  code,
+  className,
+  showLineNumbers = true,
+  showHeader = true,
+  filename,
+}) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      // 优先使用现代的 Clipboard API
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(code);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+        return;
+      }
+
+      // 降级方案：使用传统的 execCommand 方法
+      const textArea = document.createElement("textarea");
+      textArea.value = code;
+      textArea.style.position = "fixed";
+      textArea.style.left = "-999999px";
+      textArea.style.top = "-999999px";
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+
+      const successful = document.execCommand("copy");
+      document.body.removeChild(textArea);
+
+      if (successful) {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } else {
+        throw new Error("execCommand failed");
+      }
+    } catch (error) {
+      console.error("Failed to copy code:", error);
+      toast.error("复制失败，请手动选择复制");
+    }
+  };
+
+  return (
+    <div className={cn("relative group", className)}>
+      {showHeader && (
+        <div className="flex items-center justify-between bg-gray-800 text-gray-200 px-4 py-2 text-sm rounded-t-md">
+          <div className="flex items-center gap-2">
+            <span className="text-gray-400">{filename || "代码"}</span>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleCopy}
+            className="h-6 w-6 p-0 text-gray-400 hover:text-white hover:bg-gray-700"
+          >
+            {copied ? (
+              <Check className="h-3 w-3" />
+            ) : (
+              <Copy className="h-3 w-3" />
+            )}
+          </Button>
+        </div>
+      )}
+      <div className="relative">
+        <SyntaxHighlighter
+          language="text"
+          style={tomorrow}
+          showLineNumbers={showLineNumbers}
+          customStyle={{
+            margin: 0,
+            borderTopLeftRadius: showHeader ? 0 : "6px",
+            borderTopRightRadius: showHeader ? 0 : "6px",
+            borderBottomLeftRadius: "6px",
+            borderBottomRightRadius: "6px",
+            fontSize: "14px",
+            lineHeight: "1.5",
+          }}
+          codeTagProps={{
+            style: {
+              fontSize: "14px",
+              fontFamily:
+                'Monaco, "Cascadia Code", "Segoe UI Mono", "Roboto Mono", Consolas, "Courier New", monospace',
+            },
+          }}
+        >
+          {code}
+        </SyntaxHighlighter>
+        {!showHeader && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleCopy}
+            className="absolute top-2 right-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-800/80 text-gray-200 hover:bg-gray-700 hover:text-white"
+          >
+            {copied ? (
+              <Check className="h-3 w-3" />
+            ) : (
+              <Copy className="h-3 w-3" />
+            )}
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+};
 
 interface NodeComponentProps {
   node: DocumentNode;
   level: number;
-  highlightedPath: number[] | null;
+  highlightedNode: DocumentNode | null;
   onNodeClick: (node: DocumentNode) => void;
   onNodeDoubleClick: (node: DocumentNode) => void;
   nodeRefs: React.RefObject<Map<string, HTMLDivElement>>;
@@ -39,17 +158,18 @@ interface NodeComponentProps {
 const NodeComponent: React.FC<NodeComponentProps> = ({
   node,
   level,
-  highlightedPath,
+  highlightedNode,
   onNodeClick,
   onNodeDoubleClick,
   nodeRefs,
 }) => {
   const nodeKey = node.path ? node.path.join("-") : "";
   const isHighlighted =
-    highlightedPath &&
+    highlightedNode &&
     node.path &&
-    highlightedPath.length === node.path.length &&
-    highlightedPath.every((v, i) => v === node.path[i]);
+    highlightedNode.path &&
+    highlightedNode.path.length === node.path.length &&
+    highlightedNode.path.every((v, i) => v === node.path[i]);
   const nodeRef = useRef<HTMLDivElement>(null);
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -59,6 +179,7 @@ const NodeComponent: React.FC<NodeComponentProps> = ({
     }
     return () => {
       if (node.path) {
+        // eslint-disable-next-line react-hooks/exhaustive-deps
         nodeRefs.current.delete(nodeKey);
       }
     };
@@ -86,7 +207,7 @@ const NodeComponent: React.FC<NodeComponentProps> = ({
   const renderElement = (element: DocumentElement) => {
     const baseClasses = cn(
       "transition-all duration-50 cursor-pointer rounded-md p-2 hover:bg-gray-50",
-      isHighlighted && "bg-blue-100 border-2 border-blue-300 shadow-md"
+      isHighlighted && "bg-blue-100 border-2 border-blue-300 shadow-md",
     );
 
     switch (element.type) {
@@ -132,20 +253,29 @@ const NodeComponent: React.FC<NodeComponentProps> = ({
               <img
                 className="max-w-123"
                 src={element.image.base64}
-                alt="figure"
+                alt={element.name}
               ></img>
             )}
             {element.image?.type === "image_url" && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img className="max-w-123" src={element.image.url} alt="figure" />
+              <img
+                className="max-w-123"
+                src={element.image.url}
+                alt={element.name}
+              />
             )}
           </figure>
         );
       case "Code":
         return (
-          <code className={cn(baseClasses, "mb-2 leading-relaxed")}>
-            {element.text || ""}
-          </code>
+          <div className={cn(baseClasses, "mb-4")}>
+            <CodeRenderer
+              code={element.text || ""}
+              showLineNumbers={true}
+              showHeader={true}
+              className="rounded-md overflow-hidden"
+            />
+          </div>
         );
       case "Formula":
         return (
@@ -165,7 +295,23 @@ const NodeComponent: React.FC<NodeComponentProps> = ({
         );
     }
   };
-
+  if (node.element.type === "Title" && !node.element.text) {
+    return (
+      node.children &&
+      node.children.length > 0 &&
+      node.children.map((childNode, index) => (
+        <NodeComponent
+          key={childNode.path ? childNode.path.join("-") : index}
+          node={childNode}
+          level={level + 1}
+          highlightedNode={highlightedNode}
+          onNodeClick={onNodeClick}
+          onNodeDoubleClick={onNodeDoubleClick}
+          nodeRefs={nodeRefs}
+        />
+      ))
+    );
+  }
   return (
     <div className={cn("mb-1")}>
       <div className="cursor-pointer" ref={nodeRef} onClick={handleClick}>
@@ -178,7 +324,7 @@ const NodeComponent: React.FC<NodeComponentProps> = ({
             key={childNode.path ? childNode.path.join("-") : index}
             node={childNode}
             level={level + 1}
-            highlightedPath={highlightedPath}
+            highlightedNode={highlightedNode}
             onNodeClick={onNodeClick}
             onNodeDoubleClick={onNodeDoubleClick}
             nodeRefs={nodeRefs}
@@ -194,7 +340,7 @@ interface OutlineNodeProps {
   level: number;
   onNodeClick: (node: DocumentNode) => void;
   onNodeDoubleClick: (node: DocumentNode) => void;
-  highlightedPath: number[] | null;
+  highlightedNode: DocumentNode | null;
 }
 
 const OutlineNode: React.FC<OutlineNodeProps> = ({
@@ -202,27 +348,28 @@ const OutlineNode: React.FC<OutlineNodeProps> = ({
   level,
   onNodeClick,
   onNodeDoubleClick,
-  highlightedPath,
+  highlightedNode,
 }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const hasChildren = node.children && node.children.length > 0;
   const nodeKey = node.path ? node.path.join("-") : "";
   const isHighlighted =
-    highlightedPath &&
-    node.path &&
-    node.path.every((v, i) => v === highlightedPath[i]) &&
-    highlightedPath.length - node.path.length <= 1;
-  const shouldShowInOutline = node.element.type === "Title";
+    (highlightedNode?.element.type === "Title" && node === highlightedNode) ||
+    (highlightedNode?.element.type !== "Title" &&
+      node.path.length === (highlightedNode?.path.length || 0) - 1 &&
+      node.path.every((v, i) => v === highlightedNode?.path[i]));
+  const shouldShowInOutline =
+    node.element.type === "Title" && node.element.text;
   if (!shouldShowInOutline && !hasChildren) {
     return null;
   }
   return (
-    <div className="outline-node">
+    <div className="outline-node" data-id={nodeKey}>
       {shouldShowInOutline && (
         <div
           className={cn(
             "flex items-center gap-1 py-1 px-2 rounded cursor-pointer hover:bg-gray-100 transition-colors",
-            isHighlighted && "bg-blue-100 text-blue-800"
+            isHighlighted && "bg-blue-100 text-blue-800",
           )}
           style={{
             paddingLeft: `${level * 12 + 8}px`,
@@ -247,19 +394,12 @@ const OutlineNode: React.FC<OutlineNodeProps> = ({
               )}
             </Button>
           )}
-          <Tooltip>
-            <TooltipTrigger>
-              <span
-                className="text-sm truncate cursor-pointer"
-                title={node.element.text}
-              >
-                {node.element.text || `节点 ${nodeKey}`}
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>
-              {node.element.text || `节点 ${nodeKey}`}
-            </TooltipContent>
-          </Tooltip>
+          <span
+            className="text-sm truncate cursor-pointer"
+            title={node.element.text}
+          >
+            {node.element.text || `节点 ${nodeKey}`}
+          </span>
         </div>
       )}
       {hasChildren && isExpanded && (
@@ -271,7 +411,7 @@ const OutlineNode: React.FC<OutlineNodeProps> = ({
               level={shouldShowInOutline ? level + 1 : level}
               onNodeClick={onNodeClick}
               onNodeDoubleClick={onNodeDoubleClick}
-              highlightedPath={highlightedPath}
+              highlightedNode={highlightedNode}
             />
           ))}
         </div>
@@ -285,14 +425,14 @@ interface OutlinePanelProps {
   data: DocumentData;
   onInternalNodeClick: (node: DocumentNode) => void;
   onInternalNodeDoubleClick: (node: DocumentNode) => void;
-  highlightedPath: number[] | null;
+  highlightedNode: DocumentNode | null;
 }
 
 const OutlinePanel: React.FC<OutlinePanelProps> = ({
   data,
   onInternalNodeClick,
   onInternalNodeDoubleClick,
-  highlightedPath,
+  highlightedNode,
 }) => {
   return (
     <div className="w-64 border-r border-gray-200 bg-gray-50">
@@ -311,7 +451,7 @@ const OutlinePanel: React.FC<OutlinePanelProps> = ({
                   level={0}
                   onNodeClick={onInternalNodeClick}
                   onNodeDoubleClick={onInternalNodeDoubleClick}
-                  highlightedPath={highlightedPath}
+                  highlightedNode={highlightedNode}
                 />
               ))}
           </div>
@@ -324,23 +464,79 @@ const OutlinePanel: React.FC<OutlinePanelProps> = ({
 const KeywordSearch: React.FC<{
   data: DocumentData;
   onScrollToNode: (node: DocumentNode) => void;
-  onClearHighlightedPath: () => void;
-}> = ({ data, onScrollToNode, onClearHighlightedPath }) => {
+  onClearHighlightedNode: () => void;
+}> = ({ data, onScrollToNode, onClearHighlightedNode }) => {
   const [keyword, setKeyword] = useState("");
   const searchNodesRef = useRef<DocumentNode[]>([]);
   const [searchNodesLength, setSearchNodesLength] = useState(0);
   const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
-  const preKeywordRef = useRef("");
+  const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newKeyword = e.target.value;
+    setKeyword(newKeyword);
+    if (newKeyword.length === 0) {
+      searchNodesRef.current = [];
+      setSearchNodesLength(0);
+      setCurrentSearchIndex(0);
+      onClearHighlightedNode();
+      return;
+    }
+    const searchNodes: DocumentNode[] = [];
+    const findNodesByKeyword = (nodes: DocumentNode[]) => {
+      for (const node of nodes) {
+        if (node.element.text && node.element.text.includes(newKeyword)) {
+          searchNodes.push(node);
+        }
+        if (node.children && node.children.length > 0) {
+          findNodesByKeyword(node.children);
+        }
+      }
+    };
+    const findNodeByPath = (nodes: DocumentNode[], path: number[]) => {
+      for (const node of nodes) {
+        if (node.path && path.every((v, i) => v === node.path[i])) {
+          searchNodes.push(node);
+        }
+        if (node.children && node.children.length > 0) {
+          findNodeByPath(node.children, path);
+        }
+      }
+    };
+    if (newKeyword.startsWith("/")) {
+      const path = newKeyword
+        .split("/")
+        .slice(1)
+        .map((v) => Number(v));
+      const isValidPath = path.every((v) => !isNaN(Number(v)));
+      if (!isValidPath) {
+        toast.error("路径搜索格式错误，请使用数字路径");
+        return;
+      }
+      findNodeByPath(data.children || [], path);
+    } else {
+      findNodesByKeyword(data.children || []);
+    }
+    searchNodesRef.current = searchNodes;
+    setSearchNodesLength(searchNodes.length);
+    // 如果搜索到节点，则跳转到第一个
+    if (searchNodes.length > 0) {
+      setCurrentSearchIndex(0);
+      onScrollToNode(searchNodesRef.current[0]);
+    } else {
+      // 如果搜索不到，需要将节点高亮等状态移除
+      setCurrentSearchIndex(0);
+      onClearHighlightedNode();
+    }
+  };
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.nativeEvent.isComposing) {
       return;
     }
     if (e.key === "Enter") {
+      if (keyword.length === 0) {
+        return;
+      }
       // 如果关键词相同，则跳转到下一个
-      if (
-        preKeywordRef.current === keyword &&
-        searchNodesRef.current.length > 0
-      ) {
+      if (searchNodesRef.current.length > 0) {
         if (e.shiftKey) {
           const preIndex =
             currentSearchIndex - 1 >= 0
@@ -358,31 +554,6 @@ const KeywordSearch: React.FC<{
         onScrollToNode(searchNodesRef.current[nextIndex]);
         return;
       }
-      // 如果关键词不同，则重新搜索
-      preKeywordRef.current = keyword;
-      const searchNodes: DocumentNode[] = [];
-      const findNodes = (nodes: DocumentNode[]) => {
-        for (const node of nodes) {
-          if (node.element.text && node.element.text.includes(keyword)) {
-            searchNodes.push(node);
-          }
-          if (node.children && node.children.length > 0) {
-            findNodes(node.children);
-          }
-        }
-      };
-      findNodes(data.children || []);
-      searchNodesRef.current = searchNodes;
-      setSearchNodesLength(searchNodes.length);
-      // 如果搜索到节点，则跳转到第一个
-      if (searchNodes.length > 0) {
-        setCurrentSearchIndex(0);
-        onScrollToNode(searchNodesRef.current[0]);
-      } else {
-        // 如果搜索不到，需要将节点高亮等状态移除
-        setCurrentSearchIndex(0);
-        onClearHighlightedPath();
-      }
     }
   };
 
@@ -393,15 +564,15 @@ const KeywordSearch: React.FC<{
           className="w-70 pr-8"
           placeholder="请输入关键词，按下回车后搜索"
           value={keyword}
-          onChange={(e) => setKeyword(e.target.value)}
+          onChange={onChange}
           onKeyDown={onKeyDown}
         />
         <div className="absolute right-2 text-sm text-gray-500">
           {searchNodesLength > 0
             ? `${currentSearchIndex + 1}/${searchNodesLength}`
             : keyword.length > 0
-            ? "0/0"
-            : ""}
+              ? "0/0"
+              : ""}
         </div>
       </div>
 
@@ -459,19 +630,34 @@ interface DocumentViewerProps {
 const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
   function DocumentViewer(
     { fileId, onClickNode, onDoubleClickNode, showOutline = true },
-    ref
+    ref,
   ) {
-    const [highlightedPath, setHighlightedPath] = useState<number[] | null>(
-      null
+    const [highlightedNode, setHighlightedNode] = useState<DocumentNode | null>(
+      null,
     );
     const [showOutlinePanel, setShowOutlinePanel] = useState(showOutline);
     const [data, setData] = useState<DocumentData | null>(null);
     const [message, setMessage] = useState("");
     const fileDomData = useRef<{ fileId: string; data: DocumentData }[]>([]);
+    const altKeyRef = useRef(false);
+
+    useEffect(() => {
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.altKey) {
+          altKeyRef.current = true;
+        } else {
+          altKeyRef.current = false;
+        }
+      };
+      document.addEventListener("keydown", handleKeyDown);
+      return () => {
+        document.removeEventListener("keydown", handleKeyDown);
+      };
+    }, []);
     useEffect(() => {
       if (fileDomData.current.find((item) => item.fileId === fileId)) {
         setData(
-          fileDomData.current.find((item) => item.fileId === fileId)!.data
+          fileDomData.current.find((item) => item.fileId === fileId)!.data,
         );
       } else if (fileId) {
         webRequest<{ url: string }>({
@@ -499,7 +685,7 @@ const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
     const nodeRefs = useRef<Map<string, HTMLDivElement>>(new Map());
     const findNodeByPath = (
       nodes: DocumentNode[],
-      path: number[]
+      path: number[],
     ): DocumentNode | null => {
       for (const node of nodes) {
         if (
@@ -518,20 +704,41 @@ const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
     };
 
     const handleNodeClick = (node: DocumentNode) => {
-      setHighlightedPath(node.path || null);
+      setHighlightedNode(node);
+      if (onClickNode) {
+        onClickNode(node);
+      }
+      if (altKeyRef.current) {
+        onDoubleClickNode?.(node);
+      }
+      // 滚动到左侧目录的对应节点
+      if (node.path && showOutlinePanel) {
+        const path = node.path.slice();
+        while (path.length > 0) {
+          const element = document.querySelector(
+            `.outline-node [data-id="${path.join("-")}"]`,
+          );
+          if (element) {
+            element.scrollIntoView({
+              behavior: "smooth",
+              block: "start",
+            });
+            break;
+          }
+          path.pop();
+        }
+      }
     };
 
     const handleNodeDoubleClick = (node: DocumentNode) => {
-      setHighlightedPath(node.path || null);
+      setHighlightedNode(node);
       if (onDoubleClickNode) {
         onDoubleClickNode(node);
-      } else {
-        onClickNode(node);
       }
     };
 
     const handleOutlineNodeClick = (node: DocumentNode) => {
-      setHighlightedPath(node.path || null);
+      setHighlightedNode(node);
       if (node.path) {
         setTimeout(() => {
           const element = nodeRefs.current.get(node.path.join("-"));
@@ -546,14 +753,14 @@ const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
     };
 
     const handleOutlineNodeDoubleClick = (node: DocumentNode) => {
-      setHighlightedPath(node.path || null);
+      setHighlightedNode(node);
       if (onDoubleClickNode) {
         onDoubleClickNode(node);
       }
     };
 
     const handleScrollToNode = (node: DocumentNode) => {
-      setHighlightedPath(node.path || null);
+      setHighlightedNode(node);
       const element = nodeRefs.current.get(node.path?.join("-") || "");
       if (element) {
         element.scrollIntoView({
@@ -577,7 +784,7 @@ const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
         if (data) {
           const node = findNodeByPath(data.children || [], path);
           if (node) {
-            setHighlightedPath(node.path || null);
+            setHighlightedNode(node);
           }
         }
       },
@@ -585,7 +792,7 @@ const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
         if (data) {
           const node = findNodeByPath(data.children || [], path);
           if (node) {
-            setHighlightedPath(node.path || null);
+            setHighlightedNode(node);
             setTimeout(() => {
               const element = nodeRefs.current.get(path.join("-"));
               if (element) {
@@ -621,7 +828,7 @@ const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
             data={data}
             onInternalNodeClick={handleOutlineNodeClick}
             onInternalNodeDoubleClick={handleOutlineNodeDoubleClick}
-            highlightedPath={highlightedPath}
+            highlightedNode={highlightedNode}
           />
         )}
         {/* 主内容区域 */}
@@ -639,7 +846,7 @@ const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
             <KeywordSearch
               data={data}
               onScrollToNode={handleScrollToNode}
-              onClearHighlightedPath={() => setHighlightedPath(null)}
+              onClearHighlightedNode={() => setHighlightedNode(null)}
             />
           </div>
           {/* 文档内容区域 */}
@@ -654,7 +861,7 @@ const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
                     key={node.path ? node.path.join("-") : undefined}
                     node={node}
                     level={0}
-                    highlightedPath={highlightedPath}
+                    highlightedNode={highlightedNode}
                     onNodeClick={handleNodeClick}
                     onNodeDoubleClick={handleNodeDoubleClick}
                     nodeRefs={nodeRefs}
@@ -665,7 +872,7 @@ const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
         </div>
       </div>
     );
-  }
+  },
 );
 
 export default DocumentViewer;

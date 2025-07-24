@@ -11,11 +11,11 @@ interface WebRequestParams {
   headers?: Record<string, string>;
 }
 export async function webRequest<T>(
-  params: WebRequestParams
+  params: WebRequestParams,
 ): Promise<WebResponse<T>> {
   const { path, method, query, body, headers } = params;
   const currentWorkspace = JSON.parse(
-    localStorage.getItem("current_workspace") || "{}"
+    localStorage.getItem("current_workspace") || "{}",
   );
   const response = await fetch(
     path + (query ? "?" + new URLSearchParams(query).toString() : ""),
@@ -29,7 +29,7 @@ export async function webRequest<T>(
         "X-BELLA-SPACE-CODE": currentWorkspace.spaceCode || "",
         ...headers,
       },
-    }
+    },
   );
 
   const data = await response.json();
@@ -38,4 +38,30 @@ export async function webRequest<T>(
       data.data.redirectUrl + encodeURIComponent(window.location.href);
   }
   return data as WebResponse<T>;
+}
+
+export async function webRequestFormData<T>(params: {
+  path: string;
+  data: Record<string, unknown>;
+}): Promise<WebResponse<T>> {
+  const { path, data } = params;
+  const formData = new FormData();
+  Object.entries(data).forEach(([key, value]) => {
+    formData.append(key, value as string);
+  });
+  const response = await fetch(path, {
+    credentials: "same-origin",
+    method: "POST",
+    body: formData,
+  });
+  return response.json() as unknown as WebResponse<T>;
+}
+
+export async function webRequestFetch(url: string) {
+  try {
+    const response = await fetch(url);
+    return response.json();
+  } catch {
+    return null;
+  }
 }

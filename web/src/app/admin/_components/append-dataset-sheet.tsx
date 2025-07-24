@@ -59,7 +59,7 @@ export function AppendDatasetSheet({
       setIsDragOver(false);
       handleFileSelect(e.dataTransfer.files);
     },
-    [handleFileSelect]
+    [handleFileSelect],
   );
 
   // 移除文件
@@ -78,7 +78,7 @@ export function AppendDatasetSheet({
       formData.append("file", selectedFile);
       formData.append("purpose", "datasets_import");
       const currentWorkspace = JSON.parse(
-        localStorage.getItem("current_workspace") || "{}"
+        localStorage.getItem("current_workspace") || "{}",
       );
 
       const response = await fetch("/api/files", {
@@ -148,7 +148,7 @@ export function AppendDatasetSheet({
                 "border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer",
                 isDragOver
                   ? "border-blue-400 bg-blue-50"
-                  : "border-gray-300 hover:border-gray-400"
+                  : "border-gray-300 hover:border-gray-400",
               )}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
