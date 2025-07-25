@@ -411,12 +411,16 @@ public class DatasetRepo implements BaseRepo {
             insertRec.setFileId(referenceOp.getFileId());
             insertRec.setReferenceId(referenceId);
             insertRec.setPath(referenceOp.getPath());
-            insertRec.setSnippet(referenceOp.getSnippet());
+            if(referenceOp.getSnippet() != null) {
+                insertRec.setSnippet(referenceOp.getSnippet());
+            }
             fillCreatorInfo(insertRec);
 
             DatasetQaReferenceRecord updateRec = DATASET_QA_REFERENCE.newRecord();
             updateRec.setStatus(0);
-            updateRec.setSnippet(referenceOp.getSnippet());
+            if(referenceOp.getSnippet() != null) {
+                updateRec.setSnippet(referenceOp.getSnippet());
+            }
             fillCreatorInfo(updateRec);
 
             InsertOnDuplicateSetMoreStep<DatasetQaReferenceRecord> sql = db0.insertInto(DATASET_QA_REFERENCE)
@@ -444,33 +448,38 @@ public class DatasetRepo implements BaseRepo {
 
     public DatasetQaReferenceDB addQaReference(DatasetOps.QAReferenceOp op) {
         String shardingKey = shardingKeyByDatasetId(op.getDatasetId(), qa);
+        String referenceId = genReferenceId(op.getItemId(), op.getFileId(), op.getPath());
 
         DatasetQaReferenceRecord rec = DATASET_QA_REFERENCE.newRecord();
 
         rec.setItemId(op.getItemId());
         rec.setDatasetId(op.getDatasetId());
         rec.setFileId(op.getFileId());
-        rec.setReferenceId(genReferenceId(op.getItemId(), op.getFileId(), op.getPath()));
+        rec.setReferenceId(referenceId);
         rec.setPath(op.getPath());
-        rec.setSnippet(op.getSnippet());
+        if(op.getSnippet() != null) {
+            rec.setSnippet(op.getSnippet());
+        }
 
         fillCreatorInfo(rec);
 
         DatasetQaReferenceRecord updateRec = DATASET_QA_REFERENCE.newRecord();
         updateRec.setStatus(0);
-        updateRec.setSnippet(op.getSnippet());
+        if(op.getSnippet() != null) {
+            updateRec.setSnippet(op.getSnippet());
+        }
         fillCreatorInfo(updateRec);
 
-        Record result = db(shardingKey).insertInto(DATASET_QA_REFERENCE)
+        db(shardingKey).insertInto(DATASET_QA_REFERENCE)
                 .set(rec)
                 .onDuplicateKeyUpdate()
                 .set(updateRec)
-                .returningResult()
-                .fetchOne();
+                .execute();
 
-        Assert.notNull(result, "qa reference is already exists");
-
-        return result.into(DatasetQaReferenceDB.class);
+        return db(shardingKey).selectFrom(DATASET_QA_REFERENCE)
+                .where(DATASET_QA_REFERENCE.REFERENCE_ID.eq(referenceId))
+                .and(DATASET_QA_REFERENCE.STATUS.eq(0))
+                .fetchOneInto(DatasetQaReferenceDB.class);
     }
 
     @NotNull
