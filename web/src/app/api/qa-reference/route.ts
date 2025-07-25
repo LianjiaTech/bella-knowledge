@@ -16,11 +16,17 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { dataset_id, item_id, file_id, path } = body;
+  const { dataset_id, item_id, file_id, path, snippet } = body;
   const res = await backendRequest(req, {
     url: `${FILE_API_URL}/v1/datasets/qa/reference/create`,
     method: "POST",
-    body: { dataset_id, item_id, file_id, path: path.toString() },
+    body: {
+      dataset_id,
+      item_id,
+      file_id,
+      path: path.toString(),
+      snippet: snippet || "",
+    },
   });
   return res;
 }

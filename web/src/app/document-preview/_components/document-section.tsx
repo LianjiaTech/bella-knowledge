@@ -5,6 +5,7 @@ import DocumentViewer, {
 } from "@/components/document-viewer";
 import { DocumentNode } from "@/lib/types/documents";
 import { Question } from "@/lib/types/qa";
+import { useSearchParams } from "next/navigation";
 import { useRef } from "react";
 
 interface DocumentSectionProps {
@@ -16,8 +17,8 @@ interface DocumentSectionProps {
     item_id: string;
     file_id: string;
     path: number[];
+    snippet: string;
   }) => Promise<void>;
-  datasetId: string;
 }
 
 export function DocumentSection({
@@ -25,8 +26,8 @@ export function DocumentSection({
   selectedQuestion,
   documentViewerRef,
   onAddQuestionReference,
-  datasetId,
 }: DocumentSectionProps) {
+  const searchParams = useSearchParams();
   const onClickNode = () => {
     // console.log(node);
   };
@@ -37,11 +38,16 @@ export function DocumentSection({
         return;
       }
       loadingRef.current = true;
+      const datasetId = searchParams.get("dataset_id") || "";
       await onAddQuestionReference({
         dataset_id: datasetId,
         item_id: selectedQuestion?.item_id.toString() || "",
         file_id: selectFileId || "",
         path: node.path,
+        snippet:
+          node.element.type !== "Figure"
+            ? (node.element.text || "").slice(0, 30)
+            : "",
       });
       loadingRef.current = false;
     }

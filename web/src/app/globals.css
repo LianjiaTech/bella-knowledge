@@ -155,6 +155,9 @@
   }
 }
 
+.bn-block-content[data-content-type="codeBlock"] pre code {
+  font-size: 14px !important;
+}
 .bn-editor {
   padding-right: 27px !important;
 }

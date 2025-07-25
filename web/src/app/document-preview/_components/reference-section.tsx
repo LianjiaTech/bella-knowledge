@@ -57,18 +57,27 @@ export function ReferenceSection({
               }
             }}
           >
-            <div className="flex-1">
-              <div className="text-sm font-medium">
-                {
-                  referenceFileList.find(
-                    (file) => file.id === reference.file_id,
-                  )?.filename
-                }
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center flex-1 gap-2">
+                <div className="text-sm font-medium">
+                  {
+                    referenceFileList.find(
+                      (file) => file.id === reference.file_id,
+                    )?.filename
+                  }
+                </div>
+                <div className="text-xs text-gray-500">
+                  节点: /{reference.path.join("/")}
+                </div>
               </div>
-              <div className="text-xs text-gray-500">
-                节点: {reference.path.join("-")}
-              </div>
+              {reference.snippet && (
+                <div className="text-xs text-gray-500">
+                  {reference.snippet +
+                    (reference.snippet.length === 30 ? "..." : "")}
+                </div>
+              )}
             </div>
+
             <Button
               variant="outline"
               size="icon"

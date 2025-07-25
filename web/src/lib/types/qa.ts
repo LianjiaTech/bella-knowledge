@@ -38,6 +38,7 @@ export type QaReference = {
     file_id: string;
     path: number[];
     reference_id: number;
+    snippet: string;
   }[];
 };
 

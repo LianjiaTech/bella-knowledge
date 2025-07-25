@@ -14,7 +14,6 @@ import { KnowledgeFile } from "@/lib/types/file";
 
 function DocumentPreviewPage() {
   const searchParams = useSearchParams();
-  const datasetId = searchParams.get("dataset_id") || "";
 
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -51,6 +50,8 @@ function DocumentPreviewPage() {
   const documentViewerRef = useRef<DocumentViewerRef>(null);
 
   useEffect(() => {
+    const datasetId = searchParams.get("dataset_id") || "";
+
     const init = async () => {
       await initPage(datasetId);
       setSidebarOpen(true);
@@ -60,7 +61,7 @@ function DocumentPreviewPage() {
     return () => {
       clear();
     };
-  }, [initPage, datasetId, clear, initReferenceFileList]);
+  }, [initPage, searchParams, clear, initReferenceFileList]);
 
   const handleTextAreaBlur = () => {
     if (selectedQuestion) {
@@ -90,6 +91,7 @@ function DocumentPreviewPage() {
   };
 
   const handleDeleteReference = (reference: QaReference["references"][0]) => {
+    const datasetId = searchParams.get("dataset_id") || "";
     deleteQuestionReference({
       dataset_id: datasetId,
       reference_id: reference.reference_id,
@@ -101,6 +103,7 @@ function DocumentPreviewPage() {
     item_id: string;
     file_id: string;
     path: number[];
+    snippet: string;
   }) => {
     await addQuestionReference(params);
   };
@@ -116,7 +119,6 @@ function DocumentPreviewPage() {
         loading={initLoading}
         questionList={questionList}
         selectedQuestion={selectedQuestion}
-        datasetId={datasetId}
         open={sidebarOpen}
         onOpenChange={setSidebarOpen}
         onChangeSelectedQuestion={onChangeSelectedQuestion}
@@ -151,7 +153,6 @@ function DocumentPreviewPage() {
             uploadDialogOpen={uploadDialogOpen}
             setUploadDialogOpen={setUploadDialogOpen}
             fileList={fileList}
-            datasetId={datasetId}
             onFileSelect={onFileSelect}
             onAddReferenceFile={handleAddReferenceFile}
             onAddQuestionReference={handleAddQuestionReference}
