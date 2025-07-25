@@ -561,8 +561,8 @@ const KeywordSearch: React.FC<{
     <div className="flex items-center gap-2">
       <div className="relative flex items-center gap-2">
         <Input
-          className="w-70 pr-8"
-          placeholder="请输入关键词，按下回车后搜索"
+          className="w-78 pr-8"
+          placeholder="请输入关键词或节点路径，按下回车后搜索"
           value={keyword}
           onChange={onChange}
           onKeyDown={onKeyDown}

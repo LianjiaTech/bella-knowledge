@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { KnowledgeFile } from "@/lib/types/file";
 import { getFileList } from "@/request/files";
 import { requestGetDatasetQuestionList } from "@/request/dataset";
+import { requestCreateQaReference } from "@/request/qa-reference";
 
 type State = {
   questionInputVal: string;
@@ -41,6 +42,7 @@ type Action = {
     item_id: string;
     file_id: string;
     path: number[];
+    snippet: string;
   }) => Promise<void>;
   deleteQuestionReference: (body: {
     dataset_id: string;
@@ -48,7 +50,6 @@ type Action = {
   }) => void;
   getReferenceList: (dataset_id: string, item_id: string) => void;
   getFileList: () => void;
-  getReferenceFileList: (dataset_id: string) => Promise<void>;
   addReferenceFile: (file: KnowledgeFile) => void;
   addUploadFile: (file: KnowledgeFile) => void;
   initPage: (dataset_id: string) => Promise<void>;
@@ -151,36 +152,37 @@ const store = create<State & Action>((set, get) => ({
       toast.success("更新成功");
     }
   },
-  addQuestionReference: async (body) => {
+  addQuestionReference: async (data) => {
     const { qaReferenceList } = get();
     const qaReference = qaReferenceList.find(
-      (qaReference) => qaReference.item_id === body.item_id,
+      (qaReference) => qaReference.item_id === data.item_id,
     );
     if (
       qaReference?.references.find(
-        (r) => r.file_id === body.file_id && r.path.join() === body.path.join(),
+        (r) => r.file_id === data.file_id && r.path.join() === data.path.join(),
       )
     ) {
       toast.error("当前文件的该节点已存在标注");
       return;
     }
-    const res = await webRequest<{ reference_id: number }>({
-      path: "/api/qa-reference",
-      method: "POST",
-      body,
-    });
+    const {
+      result,
+      data: resData,
+      message,
+    } = await requestCreateQaReference(data);
 
-    if (res.code === 200) {
+    if (result) {
       const newReference = {
-        file_id: body.file_id,
-        path: body.path,
-        reference_id: res.data.reference_id,
+        file_id: data.file_id,
+        path: data.path,
+        reference_id: resData!.reference_id,
+        snippet: data.snippet,
       };
 
       if (qaReference) {
         set({
           qaReferenceList: qaReferenceList.map((qaReference) =>
-            qaReference.item_id === body.item_id
+            qaReference.item_id === data.item_id
               ? {
                   ...qaReference,
                   references: [...qaReference.references, newReference],
@@ -194,7 +196,7 @@ const store = create<State & Action>((set, get) => ({
           qaReferenceList: [
             ...qaReferenceList,
             {
-              item_id: body.item_id,
+              item_id: data.item_id,
               references: [newReference],
             },
           ],
@@ -202,7 +204,7 @@ const store = create<State & Action>((set, get) => ({
         });
       }
     } else {
-      toast.error(res.message);
+      toast.error(message);
     }
   },
   deleteQuestionReference: async (body: {
@@ -276,25 +278,6 @@ const store = create<State & Action>((set, get) => ({
     set({
       fileList: [file, ...fileList],
     });
-  },
-  getReferenceFileList: async (dataset_id: string) => {
-    const { questionList, fileList } = get();
-    const res = await webRequest<string[]>({
-      path: "/api/reference-files",
-      method: "POST",
-      body: {
-        dataset_id,
-        item_ids: questionList.map((item) => item.item_id),
-      },
-    });
-
-    if (res.code === 200) {
-      set({
-        referenceFileList: fileList.filter((file) =>
-          res.data.includes(file.id),
-        ),
-      });
-    }
   },
   initPage: async (dataset_id: string) => {
     set({ initLoading: true });

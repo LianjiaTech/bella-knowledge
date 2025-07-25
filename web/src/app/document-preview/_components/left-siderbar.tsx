@@ -20,12 +20,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { useSearchParams } from "next/navigation";
 
 interface AppSidebarProps {
   loading: boolean;
   questionList: QuestionList;
   selectedQuestion: Question | null;
-  datasetId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onChangeSelectedQuestion: (question: Question) => void;
@@ -41,7 +41,6 @@ export function LeftSidebar({
   loading,
   questionList,
   selectedQuestion,
-  datasetId,
   open,
   onOpenChange,
   onChangeSelectedQuestion,
@@ -49,7 +48,7 @@ export function LeftSidebar({
   onAddQuestion,
 }: AppSidebarProps) {
   const [newQuestionText, setNewQuestionText] = useState("");
-
+  const datasetId = useSearchParams().get("dataset_id") || "";
   const handleAddQuestion = () => {
     if (newQuestionText.trim()) {
       onAddQuestion({

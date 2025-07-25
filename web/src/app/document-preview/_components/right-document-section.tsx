@@ -15,7 +15,6 @@ interface RightDocumentSectionProps {
   uploadDialogOpen: boolean;
   setUploadDialogOpen: (open: boolean) => void;
   fileList: KnowledgeFile[];
-  datasetId: string;
   onFileSelect: (fileId: string) => Promise<void>;
   onAddReferenceFile: (fileId: string) => void;
   onAddQuestionReference: (params: {
@@ -23,6 +22,7 @@ interface RightDocumentSectionProps {
     item_id: string;
     file_id: string;
     path: number[];
+    snippet: string;
   }) => Promise<void>;
   onAddUploadFile: (file: KnowledgeFile) => void;
 }
@@ -35,7 +35,6 @@ export function RightDocumentSection({
   uploadDialogOpen,
   setUploadDialogOpen,
   fileList,
-  datasetId,
   onFileSelect,
   onAddReferenceFile,
   onAddQuestionReference,
@@ -59,7 +58,6 @@ export function RightDocumentSection({
             selectedQuestion={selectedQuestion}
             documentViewerRef={documentViewerRef}
             onAddQuestionReference={onAddQuestionReference}
-            datasetId={datasetId}
           />
         </div>
       </div>
