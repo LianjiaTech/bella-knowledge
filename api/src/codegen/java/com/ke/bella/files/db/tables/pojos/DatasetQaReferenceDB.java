@@ -24,6 +24,7 @@ public class DatasetQaReferenceDB implements Operator, Serializable {
     private String        datasetId;
     private String        fileId;
     private String        path;
+    private String        snippet;
     private Long          cuid;
     private String        cuName;
     private LocalDateTime ctime;
@@ -41,6 +42,7 @@ public class DatasetQaReferenceDB implements Operator, Serializable {
         this.datasetId = value.datasetId;
         this.fileId = value.fileId;
         this.path = value.path;
+        this.snippet = value.snippet;
         this.cuid = value.cuid;
         this.cuName = value.cuName;
         this.ctime = value.ctime;
@@ -57,6 +59,7 @@ public class DatasetQaReferenceDB implements Operator, Serializable {
         String        datasetId,
         String        fileId,
         String        path,
+        String        snippet,
         Long          cuid,
         String        cuName,
         LocalDateTime ctime,
@@ -71,6 +74,7 @@ public class DatasetQaReferenceDB implements Operator, Serializable {
         this.datasetId = datasetId;
         this.fileId = fileId;
         this.path = path;
+        this.snippet = snippet;
         this.cuid = cuid;
         this.cuName = cuName;
         this.ctime = ctime;
@@ -162,6 +166,20 @@ public class DatasetQaReferenceDB implements Operator, Serializable {
      */
     public void setPath(String path) {
         this.path = path;
+    }
+
+    /**
+     * Getter for <code>dataset_qa_reference.snippet</code>. snippet for dataset qa reference
+     */
+    public String getSnippet() {
+        return this.snippet;
+    }
+
+    /**
+     * Setter for <code>dataset_qa_reference.snippet</code>. snippet for dataset qa reference
+     */
+    public void setSnippet(String snippet) {
+        this.snippet = snippet;
     }
 
     /**
@@ -272,6 +290,7 @@ public class DatasetQaReferenceDB implements Operator, Serializable {
         sb.append(", ").append(datasetId);
         sb.append(", ").append(fileId);
         sb.append(", ").append(path);
+        sb.append(", ").append(snippet);
         sb.append(", ").append(cuid);
         sb.append(", ").append(cuName);
         sb.append(", ").append(ctime);
