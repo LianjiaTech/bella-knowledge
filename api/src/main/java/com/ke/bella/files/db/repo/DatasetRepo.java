@@ -405,15 +405,24 @@ public class DatasetRepo implements BaseRepo {
         for (DatasetOps.QAReferenceOp referenceOp : referenceOps) {
             String referenceId = genReferenceId(itemId, referenceOp.getFileId(), referenceOp.getPath());
 
+            DatasetQaReferenceRecord insertRec = DATASET_QA_REFERENCE.newRecord();
+            insertRec.setItemId(itemId);
+            insertRec.setDatasetId(datasetId);
+            insertRec.setFileId(referenceOp.getFileId());
+            insertRec.setReferenceId(referenceId);
+            insertRec.setPath(referenceOp.getPath());
+            insertRec.setSnippet(referenceOp.getSnippet());
+            fillCreatorInfo(insertRec);
+
+            DatasetQaReferenceRecord updateRec = DATASET_QA_REFERENCE.newRecord();
+            updateRec.setStatus(0);
+            updateRec.setSnippet(referenceOp.getSnippet());
+            fillCreatorInfo(updateRec);
+
             InsertOnDuplicateSetMoreStep<DatasetQaReferenceRecord> sql = db0.insertInto(DATASET_QA_REFERENCE)
-                    .set(DATASET_QA_REFERENCE.ITEM_ID, itemId)
-                    .set(DATASET_QA_REFERENCE.DATASET_ID, datasetId)
-                    .set(DATASET_QA_REFERENCE.FILE_ID, referenceOp.getFileId())
-                    .set(DATASET_QA_REFERENCE.REFERENCE_ID, referenceId)
-                    .set(DATASET_QA_REFERENCE.PATH, referenceOp.getPath())
-                    .set(DATASET_QA_REFERENCE.SNIPPET, referenceOp.getSnippet())
+                    .set(insertRec)
                     .onDuplicateKeyUpdate()
-                    .set(DATASET_QA_REFERENCE.STATUS, 0);
+                    .set(updateRec);
 
             queries.add(sql);
         }
@@ -447,10 +456,15 @@ public class DatasetRepo implements BaseRepo {
 
         fillCreatorInfo(rec);
 
+        DatasetQaReferenceRecord updateRec = DATASET_QA_REFERENCE.newRecord();
+        updateRec.setStatus(0);
+        updateRec.setSnippet(op.getSnippet());
+        fillCreatorInfo(updateRec);
+
         Record result = db(shardingKey).insertInto(DATASET_QA_REFERENCE)
                 .set(rec)
                 .onDuplicateKeyUpdate()
-                .set(DATASET_QA_REFERENCE.STATUS, 0)
+                .set(updateRec)
                 .returningResult()
                 .fetchOne();
 
@@ -555,18 +569,20 @@ public class DatasetRepo implements BaseRepo {
         List<InsertOnDuplicateSetMoreStep<DatasetDocumentRecord>> queries = new ArrayList<>(op.getFileIds().size());
 
         for (String fileId : op.getFileIds()) {
+            DatasetDocumentRecord insertRec = DATASET_DOCUMENT.newRecord();
+            insertRec.setDatasetId(op.getDatasetId());
+            insertRec.setFileId(fileId);
+            insertRec.setDatasetShardingKey(shardingKey);
+            fillCreatorInfo(insertRec);
+
+            DatasetDocumentRecord updateRec = DATASET_DOCUMENT.newRecord();
+            updateRec.setStatus(0);
+            fillCreatorInfo(updateRec);
+
             InsertOnDuplicateSetMoreStep<DatasetDocumentRecord> sql = db0.insertInto(DATASET_DOCUMENT)
-                    .set(DATASET_DOCUMENT.DATASET_ID, op.getDatasetId())
-                    .set(DATASET_DOCUMENT.FILE_ID, fileId)
-                    .set(DATASET_DOCUMENT.DATASET_SHARDING_KEY, shardingKey)
-                    .set(DATASET_DOCUMENT.CUID, BellaContextHelper.getOperatorUserId())
-                    .set(DATASET_DOCUMENT.CU_NAME, BellaContextHelper.getOperatorUserName())
-                    .set(DATASET_DOCUMENT.CTIME, LocalDateTime.now())
-                    .set(DATASET_DOCUMENT.MUID, BellaContextHelper.getOperatorUserId())
-                    .set(DATASET_DOCUMENT.MU_NAME, BellaContextHelper.getOperatorUserName())
-                    .set(DATASET_DOCUMENT.MTIME, LocalDateTime.now())
+                    .set(insertRec)
                     .onDuplicateKeyUpdate()
-                    .set(DATASET_DOCUMENT.STATUS, 0);
+                    .set(updateRec);
 
             queries.add(sql);
         }
