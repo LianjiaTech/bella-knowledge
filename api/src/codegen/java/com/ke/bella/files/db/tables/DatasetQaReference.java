@@ -19,7 +19,7 @@ import org.jooq.Identity;
 import org.jooq.Index;
 import org.jooq.Name;
 import org.jooq.Record;
-import org.jooq.Row13;
+import org.jooq.Row14;
 import org.jooq.Schema;
 import org.jooq.Table;
 import org.jooq.TableField;
@@ -80,6 +80,11 @@ public class DatasetQaReference extends TableImpl<DatasetQaReferenceRecord> {
      * The column <code>dataset_qa_reference.path</code>. 位置信息
      */
     public final TableField<DatasetQaReferenceRecord, String> PATH = createField(DSL.name("path"), SQLDataType.VARCHAR(512).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "位置信息");
+
+    /**
+     * The column <code>dataset_qa_reference.snippet</code>. snippet for dataset qa reference
+     */
+    public final TableField<DatasetQaReferenceRecord, String> SNIPPET = createField(DSL.name("snippet"), SQLDataType.VARCHAR(64).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "snippet for dataset qa reference");
 
     /**
      * The column <code>dataset_qa_reference.cuid</code>.
@@ -201,11 +206,11 @@ public class DatasetQaReference extends TableImpl<DatasetQaReferenceRecord> {
     }
 
     // -------------------------------------------------------------------------
-    // Row13 type methods
+    // Row14 type methods
     // -------------------------------------------------------------------------
 
     @Override
-    public Row13<Long, String, String, String, String, String, Long, String, LocalDateTime, Long, String, LocalDateTime, Integer> fieldsRow() {
-        return (Row13) super.fieldsRow();
+    public Row14<Long, String, String, String, String, String, String, Long, String, LocalDateTime, Long, String, LocalDateTime, Integer> fieldsRow() {
+        return (Row14) super.fieldsRow();
     }
 }

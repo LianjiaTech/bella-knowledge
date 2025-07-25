@@ -89,6 +89,8 @@ public class DatasetOps {
         private String path;
         @JsonProperty("dataset_id")
         private String datasetId;
+        @JsonProperty("snippet")
+        private String snippet;
     }
 
     @Data

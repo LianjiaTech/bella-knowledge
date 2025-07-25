@@ -411,6 +411,7 @@ public class DatasetRepo implements BaseRepo {
                     .set(DATASET_QA_REFERENCE.FILE_ID, referenceOp.getFileId())
                     .set(DATASET_QA_REFERENCE.REFERENCE_ID, referenceId)
                     .set(DATASET_QA_REFERENCE.PATH, referenceOp.getPath())
+                    .set(DATASET_QA_REFERENCE.SNIPPET, referenceOp.getSnippet())
                     .onDuplicateKeyUpdate()
                     .set(DATASET_QA_REFERENCE.STATUS, 0);
 
@@ -442,6 +443,7 @@ public class DatasetRepo implements BaseRepo {
         rec.setFileId(op.getFileId());
         rec.setReferenceId(genReferenceId(op.getItemId(), op.getFileId(), op.getPath()));
         rec.setPath(op.getPath());
+        rec.setSnippet(op.getSnippet());
 
         fillCreatorInfo(rec);
 
@@ -473,6 +475,10 @@ public class DatasetRepo implements BaseRepo {
 
         if(op.getFileId() != null) {
             rec.set(DATASET_QA_REFERENCE.FILE_ID, op.getFileId());
+        }
+
+        if(op.getSnippet() != null) {
+            rec.set(DATASET_QA_REFERENCE.SNIPPET, op.getSnippet());
         }
 
         fillUpdatorInfo(rec);
