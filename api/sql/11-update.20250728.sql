@@ -1,0 +1,17 @@
+alter table file add index `idx_space_purpose`(`space_code`,`purpose`,`status`) USING BTREE;
+alter table file_0 add index `idx_space_purpose`(`space_code`,`purpose`,`status`) USING BTREE;
+alter table file_1 add index `idx_space_purpose`(`space_code`,`purpose`,`status`) USING BTREE;
+alter table file_2 add index `idx_space_purpose`(`space_code`,`purpose`,`status`) USING BTREE;
+alter table file_3 add index `idx_space_purpose`(`space_code`,`purpose`,`status`) USING BTREE;
+alter table file_4 add index `idx_space_purpose`(`space_code`,`purpose`,`status`) USING BTREE;
+alter table file_5 add index `idx_space_purpose`(`space_code`,`purpose`,`status`) USING BTREE;
+alter table file_6 add index `idx_space_purpose`(`space_code`,`purpose`,`status`) USING BTREE;
+alter table file_7 add index `idx_space_purpose`(`space_code`,`purpose`,`status`) USING BTREE;
+alter table file_8 add index `idx_space_purpose`(`space_code`,`purpose`,`status`) USING BTREE;
+alter table file_9 add index `idx_space_purpose`(`space_code`,`purpose`,`status`) USING BTREE;
+alter table file_10 add index `idx_space_purpose`(`space_code`,`purpose`,`status`) USING BTREE;
+alter table file_11 add index `idx_space_purpose`(`space_code`,`purpose`,`status`) USING BTREE;
+alter table file_12 add index `idx_space_purpose`(`space_code`,`purpose`,`status`) USING BTREE;
+alter table file_13 add index `idx_space_purpose`(`space_code`,`purpose`,`status`) USING BTREE;
+alter table file_14 add index `idx_space_purpose`(`space_code`,`purpose`,`status`) USING BTREE;
+alter table file_15 add index `idx_space_purpose`(`space_code`,`purpose`,`status`) USING BTREE;
