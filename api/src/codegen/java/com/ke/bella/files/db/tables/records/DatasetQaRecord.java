@@ -11,8 +11,8 @@ import java.time.LocalDateTime;
 
 import org.jooq.Field;
 import org.jooq.Record1;
-import org.jooq.Record16;
-import org.jooq.Row16;
+import org.jooq.Record18;
+import org.jooq.Row18;
 import org.jooq.impl.UpdatableRecordImpl;
 
 
@@ -20,7 +20,7 @@ import org.jooq.impl.UpdatableRecordImpl;
  * 问答数据集表
  */
 @SuppressWarnings({ "all", "unchecked", "rawtypes" })
-public class DatasetQaRecord extends UpdatableRecordImpl<DatasetQaRecord> implements Operator, Record16<Long, String, String, String, String, String, String, String, String, Long, String, LocalDateTime, Long, String, LocalDateTime, Integer> {
+public class DatasetQaRecord extends UpdatableRecordImpl<DatasetQaRecord> implements Operator, Record18<Long, String, String, String, String, String, String, String, String, String, String, Long, String, LocalDateTime, Long, String, LocalDateTime, Integer> {
 
     private static final long serialVersionUID = 1L;
 
@@ -151,101 +151,129 @@ public class DatasetQaRecord extends UpdatableRecordImpl<DatasetQaRecord> implem
     }
 
     /**
+     * Setter for <code>dataset_qa.reasoning</code>. 推理过程/解题思路
+     */
+    public void setReasoning(String value) {
+        set(9, value);
+    }
+
+    /**
+     * Getter for <code>dataset_qa.reasoning</code>. 推理过程/解题思路
+     */
+    public String getReasoning() {
+        return (String) get(9);
+    }
+
+    /**
+     * Setter for <code>dataset_qa.tags</code>. 标签信息冗余存储，格式：[{"tag_id":"","name":""}]
+     */
+    public void setTags(String value) {
+        set(10, value);
+    }
+
+    /**
+     * Getter for <code>dataset_qa.tags</code>. 标签信息冗余存储，格式：[{"tag_id":"","name":""}]
+     */
+    public String getTags() {
+        return (String) get(10);
+    }
+
+    /**
      * Setter for <code>dataset_qa.cuid</code>.
      */
     public void setCuid(Long value) {
-        set(9, value);
+        set(11, value);
     }
 
     /**
      * Getter for <code>dataset_qa.cuid</code>.
      */
     public Long getCuid() {
-        return (Long) get(9);
+        return (Long) get(11);
     }
 
     /**
      * Setter for <code>dataset_qa.cu_name</code>.
      */
     public void setCuName(String value) {
-        set(10, value);
+        set(12, value);
     }
 
     /**
      * Getter for <code>dataset_qa.cu_name</code>.
      */
     public String getCuName() {
-        return (String) get(10);
+        return (String) get(12);
     }
 
     /**
      * Setter for <code>dataset_qa.ctime</code>.
      */
     public void setCtime(LocalDateTime value) {
-        set(11, value);
+        set(13, value);
     }
 
     /**
      * Getter for <code>dataset_qa.ctime</code>.
      */
     public LocalDateTime getCtime() {
-        return (LocalDateTime) get(11);
+        return (LocalDateTime) get(13);
     }
 
     /**
      * Setter for <code>dataset_qa.muid</code>.
      */
     public void setMuid(Long value) {
-        set(12, value);
+        set(14, value);
     }
 
     /**
      * Getter for <code>dataset_qa.muid</code>.
      */
     public Long getMuid() {
-        return (Long) get(12);
+        return (Long) get(14);
     }
 
     /**
      * Setter for <code>dataset_qa.mu_name</code>.
      */
     public void setMuName(String value) {
-        set(13, value);
+        set(15, value);
     }
 
     /**
      * Getter for <code>dataset_qa.mu_name</code>.
      */
     public String getMuName() {
-        return (String) get(13);
+        return (String) get(15);
     }
 
     /**
      * Setter for <code>dataset_qa.mtime</code>.
      */
     public void setMtime(LocalDateTime value) {
-        set(14, value);
+        set(16, value);
     }
 
     /**
      * Getter for <code>dataset_qa.mtime</code>.
      */
     public LocalDateTime getMtime() {
-        return (LocalDateTime) get(14);
+        return (LocalDateTime) get(16);
     }
 
     /**
      * Setter for <code>dataset_qa.status</code>. 数据集是否被删除，0表示未删除，-1表示已删除
      */
     public void setStatus(Integer value) {
-        set(15, value);
+        set(17, value);
     }
 
     /**
      * Getter for <code>dataset_qa.status</code>. 数据集是否被删除，0表示未删除，-1表示已删除
      */
     public Integer getStatus() {
-        return (Integer) get(15);
+        return (Integer) get(17);
     }
 
     // -------------------------------------------------------------------------
@@ -258,17 +286,17 @@ public class DatasetQaRecord extends UpdatableRecordImpl<DatasetQaRecord> implem
     }
 
     // -------------------------------------------------------------------------
-    // Record16 type implementation
+    // Record18 type implementation
     // -------------------------------------------------------------------------
 
     @Override
-    public Row16<Long, String, String, String, String, String, String, String, String, Long, String, LocalDateTime, Long, String, LocalDateTime, Integer> fieldsRow() {
-        return (Row16) super.fieldsRow();
+    public Row18<Long, String, String, String, String, String, String, String, String, String, String, Long, String, LocalDateTime, Long, String, LocalDateTime, Integer> fieldsRow() {
+        return (Row18) super.fieldsRow();
     }
 
     @Override
-    public Row16<Long, String, String, String, String, String, String, String, String, Long, String, LocalDateTime, Long, String, LocalDateTime, Integer> valuesRow() {
-        return (Row16) super.valuesRow();
+    public Row18<Long, String, String, String, String, String, String, String, String, String, String, Long, String, LocalDateTime, Long, String, LocalDateTime, Integer> valuesRow() {
+        return (Row18) super.valuesRow();
     }
 
     @Override
@@ -317,37 +345,47 @@ public class DatasetQaRecord extends UpdatableRecordImpl<DatasetQaRecord> implem
     }
 
     @Override
-    public Field<Long> field10() {
-        return DatasetQa.DATASET_QA.CUID;
+    public Field<String> field10() {
+        return DatasetQa.DATASET_QA.REASONING;
     }
 
     @Override
     public Field<String> field11() {
+        return DatasetQa.DATASET_QA.TAGS;
+    }
+
+    @Override
+    public Field<Long> field12() {
+        return DatasetQa.DATASET_QA.CUID;
+    }
+
+    @Override
+    public Field<String> field13() {
         return DatasetQa.DATASET_QA.CU_NAME;
     }
 
     @Override
-    public Field<LocalDateTime> field12() {
+    public Field<LocalDateTime> field14() {
         return DatasetQa.DATASET_QA.CTIME;
     }
 
     @Override
-    public Field<Long> field13() {
+    public Field<Long> field15() {
         return DatasetQa.DATASET_QA.MUID;
     }
 
     @Override
-    public Field<String> field14() {
+    public Field<String> field16() {
         return DatasetQa.DATASET_QA.MU_NAME;
     }
 
     @Override
-    public Field<LocalDateTime> field15() {
+    public Field<LocalDateTime> field17() {
         return DatasetQa.DATASET_QA.MTIME;
     }
 
     @Override
-    public Field<Integer> field16() {
+    public Field<Integer> field18() {
         return DatasetQa.DATASET_QA.STATUS;
     }
 
@@ -397,37 +435,47 @@ public class DatasetQaRecord extends UpdatableRecordImpl<DatasetQaRecord> implem
     }
 
     @Override
-    public Long component10() {
-        return getCuid();
+    public String component10() {
+        return getReasoning();
     }
 
     @Override
     public String component11() {
+        return getTags();
+    }
+
+    @Override
+    public Long component12() {
+        return getCuid();
+    }
+
+    @Override
+    public String component13() {
         return getCuName();
     }
 
     @Override
-    public LocalDateTime component12() {
+    public LocalDateTime component14() {
         return getCtime();
     }
 
     @Override
-    public Long component13() {
+    public Long component15() {
         return getMuid();
     }
 
     @Override
-    public String component14() {
+    public String component16() {
         return getMuName();
     }
 
     @Override
-    public LocalDateTime component15() {
+    public LocalDateTime component17() {
         return getMtime();
     }
 
     @Override
-    public Integer component16() {
+    public Integer component18() {
         return getStatus();
     }
 
@@ -477,37 +525,47 @@ public class DatasetQaRecord extends UpdatableRecordImpl<DatasetQaRecord> implem
     }
 
     @Override
-    public Long value10() {
-        return getCuid();
+    public String value10() {
+        return getReasoning();
     }
 
     @Override
     public String value11() {
+        return getTags();
+    }
+
+    @Override
+    public Long value12() {
+        return getCuid();
+    }
+
+    @Override
+    public String value13() {
         return getCuName();
     }
 
     @Override
-    public LocalDateTime value12() {
+    public LocalDateTime value14() {
         return getCtime();
     }
 
     @Override
-    public Long value13() {
+    public Long value15() {
         return getMuid();
     }
 
     @Override
-    public String value14() {
+    public String value16() {
         return getMuName();
     }
 
     @Override
-    public LocalDateTime value15() {
+    public LocalDateTime value17() {
         return getMtime();
     }
 
     @Override
-    public Integer value16() {
+    public Integer value18() {
         return getStatus();
     }
 
@@ -566,49 +624,61 @@ public class DatasetQaRecord extends UpdatableRecordImpl<DatasetQaRecord> implem
     }
 
     @Override
-    public DatasetQaRecord value10(Long value) {
-        setCuid(value);
+    public DatasetQaRecord value10(String value) {
+        setReasoning(value);
         return this;
     }
 
     @Override
     public DatasetQaRecord value11(String value) {
+        setTags(value);
+        return this;
+    }
+
+    @Override
+    public DatasetQaRecord value12(Long value) {
+        setCuid(value);
+        return this;
+    }
+
+    @Override
+    public DatasetQaRecord value13(String value) {
         setCuName(value);
         return this;
     }
 
     @Override
-    public DatasetQaRecord value12(LocalDateTime value) {
+    public DatasetQaRecord value14(LocalDateTime value) {
         setCtime(value);
         return this;
     }
 
     @Override
-    public DatasetQaRecord value13(Long value) {
+    public DatasetQaRecord value15(Long value) {
         setMuid(value);
         return this;
     }
 
     @Override
-    public DatasetQaRecord value14(String value) {
+    public DatasetQaRecord value16(String value) {
         setMuName(value);
         return this;
     }
 
     @Override
-    public DatasetQaRecord value15(LocalDateTime value) {
+    public DatasetQaRecord value17(LocalDateTime value) {
         setMtime(value);
         return this;
     }
 
     @Override
-    public DatasetQaRecord value16(Integer value) {
+    public DatasetQaRecord value18(Integer value) {
         setStatus(value);
         return this;
     }
 
     @Override
-    public DatasetQaRecord values(Long value1, String value2, String value3, String value4, String value5, String value6, String value7, String value8, String value9, Long value10, String value11, LocalDateTime value12, Long value13, String value14, LocalDateTime value15, Integer value16) {
+    public DatasetQaRecord values(Long value1, String value2, String value3, String value4, String value5, String value6, String value7, String value8, String value9, String value10, String value11, Long value12, String value13, LocalDateTime value14, Long value15, String value16, LocalDateTime value17, Integer value18) {
         value1(value1);
         value2(value2);
         value3(value3);
@@ -625,6 +695,8 @@ public class DatasetQaRecord extends UpdatableRecordImpl<DatasetQaRecord> implem
         value14(value14);
         value15(value15);
         value16(value16);
+        value17(value17);
+        value18(value18);
         return this;
     }
 
@@ -642,7 +714,7 @@ public class DatasetQaRecord extends UpdatableRecordImpl<DatasetQaRecord> implem
     /**
      * Create a detached, initialised DatasetQaRecord
      */
-    public DatasetQaRecord(Long id, String itemId, String datasetShardingKey, String datasetId, String question, String similarQ1, String similarQ2, String similarQ3, String answer, Long cuid, String cuName, LocalDateTime ctime, Long muid, String muName, LocalDateTime mtime, Integer status) {
+    public DatasetQaRecord(Long id, String itemId, String datasetShardingKey, String datasetId, String question, String similarQ1, String similarQ2, String similarQ3, String answer, String reasoning, String tags, Long cuid, String cuName, LocalDateTime ctime, Long muid, String muName, LocalDateTime mtime, Integer status) {
         super(DatasetQa.DATASET_QA);
 
         setId(id);
@@ -654,6 +726,8 @@ public class DatasetQaRecord extends UpdatableRecordImpl<DatasetQaRecord> implem
         setSimilarQ2(similarQ2);
         setSimilarQ3(similarQ3);
         setAnswer(answer);
+        setReasoning(reasoning);
+        setTags(tags);
         setCuid(cuid);
         setCuName(cuName);
         setCtime(ctime);

@@ -13,6 +13,7 @@ import com.ke.bella.files.db.tables.File;
 import com.ke.bella.files.db.tables.FileMapping;
 import com.ke.bella.files.db.tables.FileProgress;
 import com.ke.bella.files.db.tables.Instance;
+import com.ke.bella.files.db.tables.Tag;
 
 import java.util.Arrays;
 import java.util.List;
@@ -81,6 +82,11 @@ public class DefaultSchema extends SchemaImpl {
     public final Instance INSTANCE = Instance.INSTANCE;
 
     /**
+     * 标签定义表
+     */
+    public final Tag TAG = Tag.TAG;
+
+    /**
      * No further instances allowed
      */
     private DefaultSchema() {
@@ -104,6 +110,7 @@ public class DefaultSchema extends SchemaImpl {
             File.FILE,
             FileMapping.FILE_MAPPING,
             FileProgress.FILE_PROGRESS,
-            Instance.INSTANCE);
+            Instance.INSTANCE,
+            Tag.TAG);
     }
 }

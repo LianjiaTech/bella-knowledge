@@ -19,13 +19,14 @@ import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
 
 import com.ke.bella.files.api.DatasetController;
+import com.ke.bella.files.api.TagController;
 import com.ke.bella.files.utils.JsonUtils;
 import com.ke.bella.openapi.BellaContext;
 import com.ke.bella.openapi.BellaResponse;
 
 import lombok.extern.slf4j.Slf4j;
 
-@RestControllerAdvice(assignableTypes = { BellaApiResponseAdvice.class, DatasetController.class })
+@RestControllerAdvice(assignableTypes = { BellaApiResponseAdvice.class, DatasetController.class, TagController.class })
 @Slf4j
 public class BellaApiResponseAdvice implements ResponseBodyAdvice<Object> {
     @Override

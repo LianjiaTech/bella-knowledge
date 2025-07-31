@@ -13,6 +13,7 @@ import com.ke.bella.files.db.tables.File;
 import com.ke.bella.files.db.tables.FileMapping;
 import com.ke.bella.files.db.tables.FileProgress;
 import com.ke.bella.files.db.tables.Instance;
+import com.ke.bella.files.db.tables.Tag;
 import com.ke.bella.files.db.tables.records.DatasetDocumentRecord;
 import com.ke.bella.files.db.tables.records.DatasetQaRecord;
 import com.ke.bella.files.db.tables.records.DatasetQaReferenceRecord;
@@ -22,6 +23,7 @@ import com.ke.bella.files.db.tables.records.FileMappingRecord;
 import com.ke.bella.files.db.tables.records.FileProgressRecord;
 import com.ke.bella.files.db.tables.records.FileRecord;
 import com.ke.bella.files.db.tables.records.InstanceRecord;
+import com.ke.bella.files.db.tables.records.TagRecord;
 
 import org.jooq.TableField;
 import org.jooq.UniqueKey;
@@ -57,4 +59,6 @@ public class Keys {
     public static final UniqueKey<FileProgressRecord> KEY_FILE_PROGRESS_IDX_FILE_ID_NAME = Internal.createUniqueKey(FileProgress.FILE_PROGRESS, DSL.name("KEY_file_progress_idx_file_id_name"), new TableField[] { FileProgress.FILE_PROGRESS.FILE_ID, FileProgress.FILE_PROGRESS.NAME }, true);
     public static final UniqueKey<FileProgressRecord> KEY_FILE_PROGRESS_PRIMARY = Internal.createUniqueKey(FileProgress.FILE_PROGRESS, DSL.name("KEY_file_progress_PRIMARY"), new TableField[] { FileProgress.FILE_PROGRESS.ID }, true);
     public static final UniqueKey<InstanceRecord> KEY_INSTANCE_PRIMARY = Internal.createUniqueKey(Instance.INSTANCE, DSL.name("KEY_instance_PRIMARY"), new TableField[] { Instance.INSTANCE.ID }, true);
+    public static final UniqueKey<TagRecord> KEY_TAG_IDX_SPACE_NAME = Internal.createUniqueKey(Tag.TAG, DSL.name("KEY_tag_idx_space_name"), new TableField[] { Tag.TAG.SPACE_CODE, Tag.TAG.NAME }, true);
+    public static final UniqueKey<TagRecord> KEY_TAG_PRIMARY = Internal.createUniqueKey(Tag.TAG, DSL.name("KEY_tag_PRIMARY"), new TableField[] { Tag.TAG.ID }, true);
 }

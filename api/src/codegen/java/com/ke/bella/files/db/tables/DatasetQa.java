@@ -19,7 +19,7 @@ import org.jooq.Identity;
 import org.jooq.Index;
 import org.jooq.Name;
 import org.jooq.Record;
-import org.jooq.Row16;
+import org.jooq.Row18;
 import org.jooq.Schema;
 import org.jooq.Table;
 import org.jooq.TableField;
@@ -95,6 +95,16 @@ public class DatasetQa extends TableImpl<DatasetQaRecord> {
      * The column <code>dataset_qa.answer</code>. 答案
      */
     public final TableField<DatasetQaRecord, String> ANSWER = createField(DSL.name("answer"), SQLDataType.CLOB, this, "答案");
+
+    /**
+     * The column <code>dataset_qa.reasoning</code>. 推理过程/解题思路
+     */
+    public final TableField<DatasetQaRecord, String> REASONING = createField(DSL.name("reasoning"), SQLDataType.VARCHAR(4096).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "推理过程/解题思路");
+
+    /**
+     * The column <code>dataset_qa.tags</code>. 标签信息冗余存储，格式：[{"tag_id":"","name":""}]
+     */
+    public final TableField<DatasetQaRecord, String> TAGS = createField(DSL.name("tags"), SQLDataType.VARCHAR(8192), this, "标签信息冗余存储，格式：[{\"tag_id\":\"\",\"name\":\"\"}]");
 
     /**
      * The column <code>dataset_qa.cuid</code>.
@@ -216,11 +226,11 @@ public class DatasetQa extends TableImpl<DatasetQaRecord> {
     }
 
     // -------------------------------------------------------------------------
-    // Row16 type methods
+    // Row18 type methods
     // -------------------------------------------------------------------------
 
     @Override
-    public Row16<Long, String, String, String, String, String, String, String, String, Long, String, LocalDateTime, Long, String, LocalDateTime, Integer> fieldsRow() {
-        return (Row16) super.fieldsRow();
+    public Row18<Long, String, String, String, String, String, String, String, String, String, String, Long, String, LocalDateTime, Long, String, LocalDateTime, Integer> fieldsRow() {
+        return (Row18) super.fieldsRow();
     }
 }
