@@ -28,6 +28,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.ke.bella.files.TaskExecutor;
 import com.ke.bella.files.configuration.Configs;
 import com.ke.bella.files.db.repo.Page;
@@ -35,6 +36,7 @@ import com.ke.bella.files.db.tables.pojos.DatasetDB;
 import com.ke.bella.files.db.tables.pojos.DatasetDocumentDB;
 import com.ke.bella.files.db.tables.pojos.DatasetQaDB;
 import com.ke.bella.files.db.tables.pojos.DatasetQaReferenceDB;
+import com.ke.bella.files.db.tables.pojos.TagDB;
 import com.ke.bella.files.protocol.DatasetOps;
 import com.ke.bella.files.protocol.DatasetOps.DatasetImportingProgress;
 import com.ke.bella.files.protocol.DatasetOps.DatasetOp;
@@ -43,11 +45,16 @@ import com.ke.bella.files.protocol.DatasetOps.QAOp;
 import com.ke.bella.files.protocol.FileUrl;
 import com.ke.bella.files.protocol.ListFileOps;
 import com.ke.bella.files.protocol.OpenAIFile;
+import com.ke.bella.files.protocol.TagOps;
 import com.ke.bella.files.protocol.UpdateProgressRequestData;
 import com.ke.bella.files.service.DatasetService;
 import com.ke.bella.files.service.FileService;
+import com.ke.bella.files.service.TagService;
 import com.ke.bella.files.utils.JsonUtils;
 
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 @RestController
@@ -61,6 +68,8 @@ public class DatasetController {
     DatasetService ds;
     @Resource
     FileService fs;
+    @Resource
+    TagService ts;
 
     private DatasetDB checkDataset(String datasetId, DatasetOps.DatasetType expectedType) {
         DatasetDB dataset = ds.getDataset(DatasetOp.builder()
@@ -101,6 +110,25 @@ public class DatasetController {
         }
 
         return existingFiles;
+    }
+
+    private void validateTags(List<String> tagNames) {
+        if(CollectionUtils.isEmpty(tagNames)) {
+            return;
+        }
+
+        // 使用 list 方法获取所有存在的标签
+        List<TagDB> existingTags = ts.listTag(TagOps.TagPage.builder().build());
+        Set<String> existingTagNames = existingTags.stream()
+                .map(TagDB::getName)
+                .collect(Collectors.toSet());
+
+        // 找出不存在的标签
+        List<String> missingTagNames = tagNames.stream()
+                .filter(tagName -> !existingTagNames.contains(tagName))
+                .collect(Collectors.toList());
+
+        Assert.isTrue(CollectionUtils.isEmpty(missingTagNames), "tags not found: " + String.join(", ", missingTagNames));
     }
 
     @PostMapping("/create")
@@ -304,62 +332,75 @@ public class DatasetController {
     }
 
     @PostMapping("/qa/create")
-    public DatasetQaDB create(@RequestBody QAOp op) {
+    public DatasetQaResponse create(@RequestBody QAOp op) {
         Assert.hasText(op.getDatasetId(), "dataset_id must not be empty");
         Assert.hasText(op.getQuestion(), "question must not be empty");
 
         checkDataset(op.getDatasetId(), DatasetOps.DatasetType.qa);
+        validateTags(op.getTags());
 
-        return ds.createQa(op);
+        return DatasetQaResponse.from(ds.createQa(op));
     }
 
     @PostMapping("/qa/update")
-    public DatasetQaDB update(@RequestBody QAOp op) {
+    public DatasetQaResponse update(@RequestBody QAOp op) {
         Assert.hasText(op.getDatasetId(), "dataset_id must not be empty");
         Assert.hasText(op.getItemId(), "item_id must not be empty");
 
-        return ds.updateQa(op);
+        validateTags(op.getTags());
+
+        return DatasetQaResponse.from(ds.updateQa(op));
     }
 
     @PostMapping("/qa/delete")
-    public DatasetQaDB delete(@RequestBody QAOp op) {
+    public DatasetQaResponse delete(@RequestBody QAOp op) {
         Assert.hasText(op.getDatasetId(), "dataset_id must not be empty");
         Assert.hasText(op.getItemId(), "item_id must not be empty");
 
-        return ds.deleteQa(op);
+        return DatasetQaResponse.from(ds.deleteQa(op));
     }
 
     @PostMapping("/qa/get")
-    public DatasetQaDB get(@RequestBody QAOp op) {
+    public DatasetQaResponse get(@RequestBody QAOp op) {
         Assert.hasText(op.getDatasetId(), "dataset_id must not be empty");
         Assert.hasText(op.getItemId(), "item_id must not be empty");
 
         DatasetQaDB qa = ds.getQa(op);
         Assert.notNull(qa, "qa not found for dataset_id: " + op.getDatasetId() + ", item_id: " + op.getItemId());
 
-        return qa;
+        return DatasetQaResponse.from(qa);
     }
 
     @PostMapping("/qa/page")
-    public Page<DatasetQaDB> page(@RequestBody DatasetOps.QaPage op) {
+    public Page<DatasetQaResponse> page(@RequestBody DatasetOps.QaPage op) {
         Assert.hasText(op.getDatasetId(), "dataset_id must not be empty");
         Assert.isTrue(op.getOrder().equals("desc") || op.getOrder().equals("asc"),
                 "order must be 'desc' or 'asc', but got: " + op.getOrder());
         Assert.isTrue(op.getOrderBy().equals("ctime") || op.getOrderBy().equals("mtime"),
                 "order_by must be 'ctime' or 'mtime', but got: " + op.getOrderBy());
 
-        return ds.pageQa(op);
+        Page<DatasetQaDB> qaPage = ds.pageQa(op);
+
+        List<DatasetQaResponse> qaResponseList = qaPage.getData().stream()
+                .map(DatasetQaResponse::from)
+                .collect(Collectors.toList());
+
+        return new Page<DatasetQaResponse>()
+                .page(qaPage.getPage())
+                .pageSize(qaPage.getPageSize())
+                .total(qaPage.getTotal())
+                .list(qaResponseList);
     }
 
     @PostMapping("/qa/list")
-    public List<DatasetQaDB> list(@RequestBody DatasetOps.QaPage op) {
+    public List<DatasetQaResponse> list(@RequestBody DatasetOps.QaPage op) {
         Assert.hasText(op.getDatasetId(), "dataset_id must not be empty");
         Assert.isTrue(op.getOrder().equals("desc") || op.getOrder().equals("asc"),
                 "order must be 'desc' or 'asc', but got: " + op.getOrder());
         Assert.isTrue(op.getOrderBy().equals("ctime") || op.getOrderBy().equals("mtime"),
                 "order_by must be 'ctime' or 'mtime', but got: " + op.getOrderBy());
 
-        return ds.listQa(op);
+        return ds.listQa(op).stream().map(DatasetQaResponse::from).collect(Collectors.toList());
     }
 
     @PostMapping("/qa/reference/create")
@@ -477,6 +518,59 @@ public class DatasetController {
         return ds.listDocument(op);
     }
 
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class DatasetQaResponse {
+        private Long id;
+        private String itemId;
+        private String datasetShardingKey;
+        private String datasetId;
+        private String question;
+        private String similarQ1;
+        private String similarQ2;
+        private String similarQ3;
+        private String answer;
+        private String reasoning;
+        private List<String> tags;
+        private Long cuid;
+        private String cuName;
+        private LocalDateTime ctime;
+        private Long muid;
+        private String muName;
+        private LocalDateTime mtime;
+        private Integer status;
+
+        public static DatasetQaResponse from(DatasetQaDB qa) {
+            DatasetQaResponse result = new DatasetQaResponse();
+            result.setId(qa.getId());
+            result.setItemId(qa.getItemId());
+            result.setDatasetShardingKey(qa.getDatasetShardingKey());
+            result.setDatasetId(qa.getDatasetId());
+            result.setQuestion(qa.getQuestion());
+            result.setSimilarQ1(qa.getSimilarQ1());
+            result.setSimilarQ2(qa.getSimilarQ2());
+            result.setSimilarQ3(qa.getSimilarQ3());
+            result.setAnswer(qa.getAnswer());
+            result.setReasoning(qa.getReasoning());
+            result.setCuid(qa.getCuid());
+            result.setCuName(qa.getCuName());
+            result.setCtime(qa.getCtime());
+            result.setMuid(qa.getMuid());
+            result.setMuName(qa.getMuName());
+            result.setMtime(qa.getMtime());
+            result.setStatus(qa.getStatus());
+
+            if(!StringUtils.isEmpty(qa.getTags())) {
+                result.setTags(JsonUtils.fromJson(qa.getTags(),
+                        new TypeReference<List<String>>() {
+                        }));
+            }
+
+            return result;
+        }
+    }
+
     private void writeQaData(OutputStreamWriter writer, DatasetService.DatasetQaWithReferences qaWithRefs) {
         try {
             DatasetQaDB qa = qaWithRefs.getQa();
@@ -494,6 +588,10 @@ public class DatasetController {
             }
             if(StringUtils.hasText(qa.getSimilarQ3())) {
                 qaData.put("similar_q3", qa.getSimilarQ3());
+            }
+
+            if(StringUtils.hasText(qa.getReasoning())) {
+                qaData.put("reasoning", qa.getReasoning());
             }
 
             if(!CollectionUtils.isEmpty(references)) {

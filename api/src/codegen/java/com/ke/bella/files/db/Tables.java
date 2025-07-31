@@ -13,6 +13,7 @@ import com.ke.bella.files.db.tables.File;
 import com.ke.bella.files.db.tables.FileMapping;
 import com.ke.bella.files.db.tables.FileProgress;
 import com.ke.bella.files.db.tables.Instance;
+import com.ke.bella.files.db.tables.Tag;
 
 
 /**
@@ -65,4 +66,9 @@ public class Tables {
      * The table <code>instance</code>.
      */
     public static final Instance INSTANCE = Instance.INSTANCE;
+
+    /**
+     * 标签定义表
+     */
+    public static final Tag TAG = Tag.TAG;
 }

@@ -11,6 +11,7 @@ import com.ke.bella.files.db.tables.DatasetQaReference;
 import com.ke.bella.files.db.tables.DatasetSharding;
 import com.ke.bella.files.db.tables.File;
 import com.ke.bella.files.db.tables.Instance;
+import com.ke.bella.files.db.tables.Tag;
 
 import org.jooq.Index;
 import org.jooq.OrderField;
@@ -33,6 +34,7 @@ public class Indexes {
     public static final Index DATASET_QA_IDX_CTIME = Internal.createIndex(DSL.name("idx_ctime"), DatasetQa.DATASET_QA, new OrderField[] { DatasetQa.DATASET_QA.CTIME }, false);
     public static final Index DATASET_QA_REFERENCE_IDX_CTIME = Internal.createIndex(DSL.name("idx_ctime"), DatasetQaReference.DATASET_QA_REFERENCE, new OrderField[] { DatasetQaReference.DATASET_QA_REFERENCE.CTIME }, false);
     public static final Index FILE_IDX_CTIME = Internal.createIndex(DSL.name("idx_ctime"), File.FILE, new OrderField[] { File.FILE.CTIME }, false);
+    public static final Index TAG_IDX_CTIME = Internal.createIndex(DSL.name("idx_ctime"), Tag.TAG, new OrderField[] { Tag.TAG.CTIME }, false);
     public static final Index DATASET_DOCUMENT_IDX_DATASET_ID = Internal.createIndex(DSL.name("idx_dataset_id"), DatasetDocument.DATASET_DOCUMENT, new OrderField[] { DatasetDocument.DATASET_DOCUMENT.DATASET_ID }, false);
     public static final Index DATASET_QA_REFERENCE_IDX_DATASET_ID = Internal.createIndex(DSL.name("idx_dataset_id"), DatasetQaReference.DATASET_QA_REFERENCE, new OrderField[] { DatasetQaReference.DATASET_QA_REFERENCE.DATASET_ID }, false);
     public static final Index DATASET_QA_IDX_DATASET_ITEM = Internal.createIndex(DSL.name("idx_dataset_item"), DatasetQa.DATASET_QA, new OrderField[] { DatasetQa.DATASET_QA.DATASET_ID, DatasetQa.DATASET_QA.ITEM_ID }, false);
@@ -43,5 +45,6 @@ public class Indexes {
     public static final Index DATASET_QA_IDX_MTIME = Internal.createIndex(DSL.name("idx_mtime"), DatasetQa.DATASET_QA, new OrderField[] { DatasetQa.DATASET_QA.MTIME }, false);
     public static final Index DATASET_QA_REFERENCE_IDX_MTIME = Internal.createIndex(DSL.name("idx_mtime"), DatasetQaReference.DATASET_QA_REFERENCE, new OrderField[] { DatasetQaReference.DATASET_QA_REFERENCE.MTIME }, false);
     public static final Index DATASET_IDX_SPACE_CODE = Internal.createIndex(DSL.name("idx_space_code"), Dataset.DATASET, new OrderField[] { Dataset.DATASET.SPACE_CODE }, false);
+    public static final Index FILE_IDX_SPACE_PURPOSE = Internal.createIndex(DSL.name("idx_space_purpose"), File.FILE, new OrderField[] { File.FILE.SPACE_CODE, File.FILE.PURPOSE, File.FILE.STATUS }, false);
     public static final Index DATASET_SHARDING_IDX_TYPE_LAST_KEY = Internal.createIndex(DSL.name("idx_type_last_key"), DatasetSharding.DATASET_SHARDING, new OrderField[] { DatasetSharding.DATASET_SHARDING.TYPE, DatasetSharding.DATASET_SHARDING.LAST_KEY }, false);
 }

@@ -45,6 +45,7 @@ import com.ke.bella.files.protocol.DatasetOps;
 import com.ke.bella.files.service.DatasetService;
 import com.ke.bella.files.utils.BellaContextHelper;
 import com.ke.bella.files.utils.DigestUtils;
+import com.ke.bella.files.utils.JsonUtils;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -303,9 +304,18 @@ public class DatasetRepo implements BaseRepo {
         rec.setSimilarQ2(op.getSimilarQ2());
         rec.setSimilarQ3(op.getSimilarQ3());
         rec.setAnswer(op.getAnswer());
+        if(op.getReasoning() != null) {
+            rec.setReasoning(op.getReasoning());
+        }
+
+        // 直接使用 QAOp 中的 tags，转换为 JSON 字符串
+        if(op.getTags() != null) {
+            rec.setTags(JsonUtils.toJson(op.getTags()));
+        } else {
+            rec.setTags("[]");
+        }
         rec.setDatasetShardingKey(shardingKey);
 
-        // todo similar_questions
         fillCreatorInfo(rec);
 
         return db(shardingKey).insertInto(DATASET_QA).set(rec).returningResult().fetchOne().into(DatasetQaDB.class);
@@ -335,6 +345,18 @@ public class DatasetRepo implements BaseRepo {
 
         if(op.getAnswer() != null) {
             rec.set(DATASET_QA.ANSWER, op.getAnswer());
+        }
+
+        if(op.getReasoning() != null) {
+            rec.set(DATASET_QA.REASONING, op.getReasoning());
+        }
+
+        if(op.getTags() != null) {
+            if(!op.getTags().isEmpty()) {
+                rec.set(DATASET_QA.TAGS, JsonUtils.toJson(op.getTags()));
+            } else {
+                rec.set(DATASET_QA.TAGS, "[]");
+            }
         }
 
         fillUpdatorInfo(rec);

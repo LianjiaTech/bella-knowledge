@@ -27,6 +27,8 @@ public class DatasetQaDB implements Operator, Serializable {
     private String        similarQ2;
     private String        similarQ3;
     private String        answer;
+    private String        reasoning;
+    private String        tags;
     private Long          cuid;
     private String        cuName;
     private LocalDateTime ctime;
@@ -47,6 +49,8 @@ public class DatasetQaDB implements Operator, Serializable {
         this.similarQ2 = value.similarQ2;
         this.similarQ3 = value.similarQ3;
         this.answer = value.answer;
+        this.reasoning = value.reasoning;
+        this.tags = value.tags;
         this.cuid = value.cuid;
         this.cuName = value.cuName;
         this.ctime = value.ctime;
@@ -66,6 +70,8 @@ public class DatasetQaDB implements Operator, Serializable {
         String        similarQ2,
         String        similarQ3,
         String        answer,
+        String        reasoning,
+        String        tags,
         Long          cuid,
         String        cuName,
         LocalDateTime ctime,
@@ -83,6 +89,8 @@ public class DatasetQaDB implements Operator, Serializable {
         this.similarQ2 = similarQ2;
         this.similarQ3 = similarQ3;
         this.answer = answer;
+        this.reasoning = reasoning;
+        this.tags = tags;
         this.cuid = cuid;
         this.cuName = cuName;
         this.ctime = ctime;
@@ -219,6 +227,34 @@ public class DatasetQaDB implements Operator, Serializable {
     }
 
     /**
+     * Getter for <code>dataset_qa.reasoning</code>. 推理过程/解题思路
+     */
+    public String getReasoning() {
+        return this.reasoning;
+    }
+
+    /**
+     * Setter for <code>dataset_qa.reasoning</code>. 推理过程/解题思路
+     */
+    public void setReasoning(String reasoning) {
+        this.reasoning = reasoning;
+    }
+
+    /**
+     * Getter for <code>dataset_qa.tags</code>. 标签信息冗余存储，格式：[{"tag_id":"","name":""}]
+     */
+    public String getTags() {
+        return this.tags;
+    }
+
+    /**
+     * Setter for <code>dataset_qa.tags</code>. 标签信息冗余存储，格式：[{"tag_id":"","name":""}]
+     */
+    public void setTags(String tags) {
+        this.tags = tags;
+    }
+
+    /**
      * Getter for <code>dataset_qa.cuid</code>.
      */
     public Long getCuid() {
@@ -329,6 +365,8 @@ public class DatasetQaDB implements Operator, Serializable {
         sb.append(", ").append(similarQ2);
         sb.append(", ").append(similarQ3);
         sb.append(", ").append(answer);
+        sb.append(", ").append(reasoning);
+        sb.append(", ").append(tags);
         sb.append(", ").append(cuid);
         sb.append(", ").append(cuName);
         sb.append(", ").append(ctime);

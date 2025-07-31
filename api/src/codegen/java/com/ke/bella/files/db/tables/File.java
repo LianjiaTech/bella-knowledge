@@ -210,7 +210,7 @@ public class File extends TableImpl<FileRecord> {
 
     @Override
     public List<Index> getIndexes() {
-        return Arrays.<Index>asList(Indexes.FILE_IDX_CTIME);
+        return Arrays.<Index>asList(Indexes.FILE_IDX_CTIME, Indexes.FILE_IDX_SPACE_PURPOSE);
     }
 
     @Override
