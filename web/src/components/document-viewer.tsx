@@ -13,7 +13,7 @@ import {
   DocumentNode,
   DocumentElement,
 } from "@/lib/types/documents";
-import { ScrollArea } from "./ui/scroll-area";
+import { ScrollArea, ScrollBar } from "./ui/scroll-area";
 import { Button } from "./ui/button";
 import {
   ChevronRight,
@@ -29,6 +29,8 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { tomorrow } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { Copy, Check } from "lucide-react";
 import { toast } from "sonner";
+import DragWidthBar from "./drag-width-bar";
+import { useLocalState } from "@/hooks/use-local-state";
 
 interface CodeRendererProps {
   code: string;
@@ -171,7 +173,6 @@ const NodeComponent: React.FC<NodeComponentProps> = ({
     highlightedNode.path.length === node.path.length &&
     highlightedNode.path.every((v, i) => v === node.path[i]);
   const nodeRef = useRef<HTMLDivElement>(null);
-  const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (nodeRef.current && node.path) {
@@ -188,20 +189,12 @@ const NodeComponent: React.FC<NodeComponentProps> = ({
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    onNodeClick(node);
+  };
 
-    // 如果已经有点击等待，说明这是双击
-    if (clickTimeoutRef.current) {
-      clearTimeout(clickTimeoutRef.current);
-      clickTimeoutRef.current = null;
-      onNodeDoubleClick(node);
-      return;
-    }
-
-    // 设置单击延迟，等待可能的双击
-    clickTimeoutRef.current = setTimeout(() => {
-      clickTimeoutRef.current = null;
-      onNodeClick(node);
-    }, 250); // 250ms 延迟来区分单击和双击
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onNodeDoubleClick(node);
   };
 
   const renderElement = (element: DocumentElement) => {
@@ -251,7 +244,7 @@ const NodeComponent: React.FC<NodeComponentProps> = ({
             {element.image?.type === "image_base64" && (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                className="max-w-123"
+                className="w-full"
                 src={element.image.base64}
                 alt={element.name}
               ></img>
@@ -259,7 +252,7 @@ const NodeComponent: React.FC<NodeComponentProps> = ({
             {element.image?.type === "image_url" && (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                className="max-w-123"
+                className="w-full"
                 src={element.image.url}
                 alt={element.name}
               />
@@ -314,7 +307,12 @@ const NodeComponent: React.FC<NodeComponentProps> = ({
   }
   return (
     <div className={cn("mb-1")}>
-      <div className="cursor-pointer" ref={nodeRef} onClick={handleClick}>
+      <div
+        className="cursor-pointer"
+        ref={nodeRef}
+        onClick={handleClick}
+        onDoubleClick={handleDoubleClick}
+      >
         {renderElement(node.element)}
       </div>
       {node.children &&
@@ -426,6 +424,7 @@ interface OutlinePanelProps {
   onInternalNodeClick: (node: DocumentNode) => void;
   onInternalNodeDoubleClick: (node: DocumentNode) => void;
   highlightedNode: DocumentNode | null;
+  outlinePanelWidth: number;
 }
 
 const OutlinePanel: React.FC<OutlinePanelProps> = ({
@@ -433,9 +432,13 @@ const OutlinePanel: React.FC<OutlinePanelProps> = ({
   onInternalNodeClick,
   onInternalNodeDoubleClick,
   highlightedNode,
+  outlinePanelWidth,
 }) => {
   return (
-    <div className="w-64 border-r border-gray-200 bg-gray-50">
+    <div
+      className="border-r border-gray-200 bg-gray-50"
+      style={{ width: outlinePanelWidth + "%" }}
+    >
       <div className="p-4">
         <div className="flex items-center gap-2 mb-3">
           <List className="h-4 w-4" />
@@ -455,6 +458,8 @@ const OutlinePanel: React.FC<OutlinePanelProps> = ({
                 />
               ))}
           </div>
+          <ScrollBar orientation="horizontal" />
+          <ScrollBar orientation="vertical" />
         </ScrollArea>
       </div>
     </div>
@@ -636,11 +641,15 @@ const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
       null,
     );
     const [showOutlinePanel, setShowOutlinePanel] = useState(showOutline);
+    const [outlinePanelWidth, setOutlinePanelWidth] = useLocalState(
+      "outlinePanelWidth",
+      30,
+    );
     const [data, setData] = useState<DocumentData | null>(null);
     const [message, setMessage] = useState("");
     const fileDomData = useRef<{ fileId: string; data: DocumentData }[]>([]);
     const altKeyRef = useRef(false);
-
+    const containerRef = useRef<HTMLDivElement | null>(null);
     useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
         if (e.altKey) {
@@ -681,7 +690,7 @@ const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
         });
       }
     }, [fileId]);
-    const containerRef = useRef<HTMLDivElement>(null);
+    const scrollAreaRef = useRef<HTMLDivElement>(null);
     const nodeRefs = useRef<Map<string, HTMLDivElement>>(new Map());
     const findNodeByPath = (
       nodes: DocumentNode[],
@@ -716,7 +725,7 @@ const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
         const path = node.path.slice();
         while (path.length > 0) {
           const element = document.querySelector(
-            `.outline-node [data-id="${path.join("-")}"]`,
+            `.outline-node[data-id="${path.join("-")}"]`,
           );
           if (element) {
             element.scrollIntoView({
@@ -821,7 +830,10 @@ const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
       );
     }
     return (
-      <div className="flex h-full bg-gray-50 overflow-hidden">
+      <div
+        className="flex h-full bg-gray-50 overflow-hidden"
+        ref={containerRef}
+      >
         {/* 大纲面板 */}
         {showOutlinePanel && (
           <OutlinePanel
@@ -829,10 +841,24 @@ const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
             onInternalNodeClick={handleOutlineNodeClick}
             onInternalNodeDoubleClick={handleOutlineNodeDoubleClick}
             highlightedNode={highlightedNode}
+            outlinePanelWidth={outlinePanelWidth}
           />
         )}
+        <DragWidthBar
+          containerRef={containerRef}
+          minWidthPercentage={20}
+          maxWidthPercentage={50}
+          localStorageKey="outlinePanelWidth"
+          width={outlinePanelWidth}
+          setWidth={setOutlinePanelWidth}
+        />
         {/* 主内容区域 */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div
+          className="flex flex-col overflow-hidden"
+          style={{
+            width: `${100 - outlinePanelWidth}%`,
+          }}
+        >
           {/* 工具栏 */}
           <div className="flex items-center justify-between p-2 border-b border-gray-200 bg-white">
             <Button
@@ -851,10 +877,10 @@ const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
           </div>
           {/* 文档内容区域 */}
           <ScrollArea
-            ref={containerRef}
+            ref={scrollAreaRef}
             className="flex-1 overflow-y-auto p-6 space-y-2 scrollbar-hide"
           >
-            <div className="max-w-140 mx-auto bg-white rounded-lg shadow-sm p-6">
+            <div className="bg-white rounded-lg shadow-sm p-6">
               {data.children &&
                 data.children.map((node) => (
                   <NodeComponent

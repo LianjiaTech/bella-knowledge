@@ -54,7 +54,7 @@ type Action = {
   addUploadFile: (file: KnowledgeFile) => void;
   initPage: (dataset_id: string) => Promise<void>;
   initReferenceFileList: (dataset_id: string) => Promise<void>;
-  setSelectFileId: (fileId: string) => void;
+  onFileSelect: (fileId: string) => void;
   clear: () => void;
 };
 
@@ -280,6 +280,10 @@ const store = create<State & Action>((set, get) => ({
     });
   },
   initPage: async (dataset_id: string) => {
+    const { initLoading } = get();
+    if (initLoading) {
+      return;
+    }
     set({ initLoading: true });
     await Promise.all([get().getQuestionList(dataset_id), get().getFileList()]);
     set({ initLoading: false });
@@ -354,7 +358,7 @@ const store = create<State & Action>((set, get) => ({
   onChangeAnswerInputVal: (val: string) => {
     set({ answerInputVal: val });
   },
-  setSelectFileId: (fileId: string) => {
+  onFileSelect: (fileId: string) => {
     set({ selectFileId: fileId });
   },
   clear: () => {

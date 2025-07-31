@@ -65,6 +65,7 @@ import { toast } from "sonner";
 import { SideMenuIcon } from "./side-menu-icon";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
+import { useLocalState } from "@/hooks/use-local-state";
 
 // 自定义块类型定义
 const CatalogBlock = createReactBlockSpec(
@@ -879,23 +880,10 @@ const Parser: React.FC<ParserProps> = ({ width }) => {
   const { domData, documentContent, editor } = useDocumentParserStore();
 
   // 从localStorage读取初始宽度，如果不存在则使用默认值60%
-  const [domPanelWidth, setDomPanelWidth] = useState(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("domPanelWidth");
-      return saved ? parseFloat(saved) : 60;
-    }
-    return 60;
-  });
+  const [domPanelWidth, setDomPanelWidth] = useLocalState("domPanelWidth", 60);
 
   // 当前高亮的节点路径
   const [highlightedPath, setHighlightedPath] = useState<number[] | null>(null);
-
-  // 保存宽度到localStorage
-  const saveWidthToStorage = (width: number) => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("domPanelWidth", width.toString());
-    }
-  };
 
   const handleNavigateToNode = (node: DocumentNode) => {
     if (!domData || !editor) {
@@ -962,7 +950,6 @@ const Parser: React.FC<ParserProps> = ({ width }) => {
       const deltaPercentage = (deltaX / containerWidth) * 100;
       const newWidth = Math.max(30, Math.min(80, startWidth + deltaPercentage)); // 限制在30%-80%之间
       setDomPanelWidth(newWidth);
-      saveWidthToStorage(newWidth); // 实时保存到localStorage
     };
 
     const handleMouseUp = () => {

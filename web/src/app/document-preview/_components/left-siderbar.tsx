@@ -7,7 +7,6 @@ import {
 } from "@/components/ui/sheet";
 import { useState } from "react";
 import { X, CornerDownLeft, Loader2 } from "lucide-react";
-import { Question, QuestionList } from "@/lib/types/qa";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -21,37 +20,27 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useSearchParams } from "next/navigation";
+import { useDocumentPreviewStore } from "../model";
 
 interface AppSidebarProps {
-  loading: boolean;
-  questionList: QuestionList;
-  selectedQuestion: Question | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onChangeSelectedQuestion: (question: Question) => void;
-  onDeleteQuestion: (question: Question) => void;
-  onAddQuestion: (params: {
-    question: string;
-    answer: string;
-    dataset_id: string;
-  }) => void;
 }
 
-export function LeftSidebar({
-  loading,
-  questionList,
-  selectedQuestion,
-  open,
-  onOpenChange,
-  onChangeSelectedQuestion,
-  onDeleteQuestion,
-  onAddQuestion,
-}: AppSidebarProps) {
+export function LeftSidebar({ open, onOpenChange }: AppSidebarProps) {
   const [newQuestionText, setNewQuestionText] = useState("");
   const datasetId = useSearchParams().get("dataset_id") || "";
+  const {
+    questionList,
+    selectedQuestion,
+    initLoading,
+    deleteQuestion,
+    addQuestion,
+    onChangeSelectedQuestion,
+  } = useDocumentPreviewStore();
   const handleAddQuestion = () => {
     if (newQuestionText.trim()) {
-      onAddQuestion({
+      addQuestion({
         question: newQuestionText.trim(),
         answer: "",
         dataset_id: datasetId,
@@ -104,7 +93,7 @@ export function LeftSidebar({
 
           <ScrollArea className="h-full">
             <div className="h-full overflow-hidden">
-              {loading ? (
+              {initLoading ? (
                 <div className="flex items-center justify-center h-full">
                   <Loader2 className="size-4 animate-spin" />
                 </div>
@@ -141,7 +130,7 @@ export function LeftSidebar({
                             <AlertDialogFooter>
                               <AlertDialogCancel>取消</AlertDialogCancel>
                               <AlertDialogAction
-                                onClick={() => onDeleteQuestion(question)}
+                                onClick={() => deleteQuestion(question)}
                               >
                                 确定
                               </AlertDialogAction>

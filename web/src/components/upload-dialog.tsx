@@ -22,7 +22,7 @@ interface UploadDialogProps {
   fileList: KnowledgeFile[];
   referenceFileList: KnowledgeFile[] | DatasetFile[];
   onAddReferenceFile: (fileId: string) => void;
-  onSelectFile: (fileId: string) => void;
+  onFileSelect: (fileId: string) => void;
   onAddUploadFile: (file: KnowledgeFile) => void;
 }
 
@@ -33,7 +33,7 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
   fileList,
   referenceFileList,
   onAddReferenceFile,
-  onSelectFile,
+  onFileSelect,
   onAddUploadFile,
 }) => {
   const [dragActive, setDragActive] = useState(false);
@@ -84,7 +84,7 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
       setParsing(false);
       onAddUploadFile(fileData);
       onAddReferenceFile(fileId);
-      onSelectFile(fileId);
+      onFileSelect(fileId);
       toast.success("上传成功，已自动选中");
     } else {
       setUploading(false);
@@ -187,7 +187,7 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
                         onClick={() => {
                           if (!isSelected) {
                             onAddReferenceFile(file.id);
-                            onSelectFile(file.id);
+                            onFileSelect(file.id);
                           }
                         }}
                       >

@@ -182,7 +182,7 @@ const LeftSidebar = () => {
         onAddReferenceFile={(fileId) => {
           addDatasetFile(datasetId, [fileId]);
         }}
-        onSelectFile={() => {}}
+        onFileSelect={() => {}}
       />
     </div>
   );

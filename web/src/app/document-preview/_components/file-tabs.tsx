@@ -9,7 +9,7 @@ import { Plus } from "lucide-react";
 interface FileTabsProps {
   referenceFileList: KnowledgeFile[];
   selectFileId: string;
-  onFileSelect: (fileId: string) => Promise<void>;
+  onFileSelect: (fileId: string) => void;
   onUploadClick: () => void;
 }
 
