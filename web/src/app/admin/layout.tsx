@@ -7,7 +7,7 @@ const layout = ({ children }: { children: React.ReactNode }) => {
     <Suspense>
       <div className="h-screen w-screen">
         <TopBar></TopBar>
-        <div className="py-4 px-6 flex flex-col items-start w-screen h-[calc(100vh-4rem)] overflow-y-auto scrollbar-scroll">
+        <div className="py-4 px-6 flex flex-col items-start w-screen overflow-y-auto scrollbar-scroll">
           {children}
         </div>
       </div>

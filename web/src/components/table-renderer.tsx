@@ -2,6 +2,7 @@
 
 import React from "react";
 import { cn } from "@/lib/utils";
+import { HighlightedText } from "./hightlighted-text";
 
 interface TableCell {
   text: string;
@@ -14,9 +15,10 @@ interface TableRow {
 
 interface TableRendererProps {
   rows: TableRow[];
+  keyword: string;
 }
 
-export function TableRenderer({ rows }: TableRendererProps) {
+export function TableRenderer({ rows, keyword }: TableRendererProps) {
   if (!rows || rows.length === 0) {
     return <div className="p-8 text-center text-gray-500">暂无表格数据</div>;
   }
@@ -88,9 +90,11 @@ export function TableRenderer({ rows }: TableRendererProps) {
                 "transition-colors duration-150",
               )}
             >
-              <div className="whitespace-pre-wrap break-words">
-                {cell.text || "-"}
-              </div>
+              <HighlightedText
+                className="whitespace-pre-wrap break-words"
+                text={cell.text || "-"}
+                keyword={keyword}
+              ></HighlightedText>
             </td>,
           );
         }

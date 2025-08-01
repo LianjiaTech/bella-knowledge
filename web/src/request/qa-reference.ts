@@ -20,3 +20,16 @@ export async function requestCreateQaReference(data: {
     message: res.message,
   };
 }
+
+export async function requestUpdateQaReference(data: {
+  dataset_id: string;
+  reference_id: number;
+  path: number[];
+}) {
+  const res = await webRequest({
+    path: "/api/qa-reference",
+    method: "PUT",
+    body: data,
+  });
+  return res;
+}

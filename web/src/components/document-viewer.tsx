@@ -31,13 +31,13 @@ import { Copy, Check } from "lucide-react";
 import { toast } from "sonner";
 import DragWidthBar from "./drag-width-bar";
 import { useLocalState } from "@/hooks/use-local-state";
+import { HighlightedText } from "./hightlighted-text";
 
 interface CodeRendererProps {
   code: string;
   className?: string;
   showLineNumbers?: boolean;
   showHeader?: boolean;
-  filename?: string;
 }
 
 const CodeRenderer: React.FC<CodeRendererProps> = ({
@@ -45,17 +45,20 @@ const CodeRenderer: React.FC<CodeRendererProps> = ({
   className,
   showLineNumbers = true,
   showHeader = true,
-  filename,
 }) => {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
     try {
-      // 优先使用现代的 Clipboard API
+      // HTTPS 协议下，navigator.clipboard 才存在
       if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(code);
         setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+        toast.success("复制成功", {
+          onAutoClose: () => {
+            setCopied(false);
+          },
+        });
         return;
       }
 
@@ -74,12 +77,15 @@ const CodeRenderer: React.FC<CodeRendererProps> = ({
 
       if (successful) {
         setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+        toast.success("复制成功", {
+          onAutoClose: () => {
+            setCopied(false);
+          },
+        });
       } else {
         throw new Error("execCommand failed");
       }
-    } catch (error) {
-      console.error("Failed to copy code:", error);
+    } catch {
       toast.error("复制失败，请手动选择复制");
     }
   };
@@ -89,7 +95,7 @@ const CodeRenderer: React.FC<CodeRendererProps> = ({
       {showHeader && (
         <div className="flex items-center justify-between bg-gray-800 text-gray-200 px-4 py-2 text-sm rounded-t-md">
           <div className="flex items-center gap-2">
-            <span className="text-gray-400">{filename || "代码"}</span>
+            <span className="text-gray-400">代码</span>
           </div>
           <Button
             variant="ghost"
@@ -152,6 +158,7 @@ interface NodeComponentProps {
   node: DocumentNode;
   level: number;
   highlightedNode: DocumentNode | null;
+  keyword: string;
   onNodeClick: (node: DocumentNode) => void;
   onNodeDoubleClick: (node: DocumentNode) => void;
   nodeRefs: React.RefObject<Map<string, HTMLDivElement>>;
@@ -161,6 +168,7 @@ const NodeComponent: React.FC<NodeComponentProps> = ({
   node,
   level,
   highlightedNode,
+  keyword,
   onNodeClick,
   onNodeDoubleClick,
   nodeRefs,
@@ -206,16 +214,16 @@ const NodeComponent: React.FC<NodeComponentProps> = ({
     switch (element.type) {
       case "Title":
         return (
-          <div
+          <HighlightedText
             className={cn(baseClasses, "font-bold text-lg mb-2", {
               "text-2xl": level === 0,
               "text-xl": level === 1,
               "text-lg": level === 2,
               "text-base": level > 2,
             })}
-          >
-            {element.text || ""}
-          </div>
+            text={element.text || ""}
+            keyword={keyword}
+          ></HighlightedText>
         );
 
       case "List":
@@ -223,18 +231,19 @@ const NodeComponent: React.FC<NodeComponentProps> = ({
           <div
             className={cn(baseClasses, "mb-2 pl-4 border-l-2 border-gray-200")}
           >
-            <span className="text-gray-700">{element.text || ""}</span>
+            <HighlightedText
+              className="text-gray-700"
+              text={element.text || ""}
+              keyword={keyword}
+            ></HighlightedText>
           </div>
         );
 
       case "Table":
         return (
           <div className={cn(baseClasses, "mb-4")}>
-            {element.text && (
-              <div className="mb-2 font-medium">{element.text}</div>
-            )}
             <div className="overflow-x-auto">
-              <TableRenderer rows={element.rows || []} />
+              <TableRenderer rows={element.rows || []} keyword={keyword} />
             </div>
           </div>
         );
@@ -272,18 +281,22 @@ const NodeComponent: React.FC<NodeComponentProps> = ({
         );
       case "Formula":
         return (
-          <div className={cn(baseClasses, "mb-2 leading-relaxed")}>
-            {element.text || ""}
-          </div>
+          <HighlightedText
+            className={cn(baseClasses, "mb-2 leading-relaxed")}
+            text={element.text || ""}
+            keyword={keyword}
+          ></HighlightedText>
         );
       case "Text":
 
       default:
         return (
           <div className={cn(baseClasses, "mb-2 leading-relaxed")}>
-            <span className="text-gray-800 whitespace-pre-wrap">
-              {element.text || ""}
-            </span>
+            <HighlightedText
+              className="text-gray-800 whitespace-pre-wrap"
+              text={element.text || ""}
+              keyword={keyword}
+            ></HighlightedText>
           </div>
         );
     }
@@ -301,6 +314,7 @@ const NodeComponent: React.FC<NodeComponentProps> = ({
           onNodeClick={onNodeClick}
           onNodeDoubleClick={onNodeDoubleClick}
           nodeRefs={nodeRefs}
+          keyword={keyword}
         />
       ))
     );
@@ -323,6 +337,7 @@ const NodeComponent: React.FC<NodeComponentProps> = ({
             node={childNode}
             level={level + 1}
             highlightedNode={highlightedNode}
+            keyword={keyword}
             onNodeClick={onNodeClick}
             onNodeDoubleClick={onNodeDoubleClick}
             nodeRefs={nodeRefs}
@@ -436,48 +451,49 @@ const OutlinePanel: React.FC<OutlinePanelProps> = ({
 }) => {
   return (
     <div
-      className="border-r border-gray-200 bg-gray-50"
+      className="flex flex-col border-r border-gray-200 bg-gray-50 p-2"
       style={{ width: outlinePanelWidth + "%" }}
     >
-      <div className="p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <List className="h-4 w-4" />
-          <h3 className="font-medium text-sm">文档大纲</h3>
+      <ScrollArea className="flex flex-1 overflow-hidden">
+        <div className="space-y-1">
+          {data.children &&
+            data.children.map((node, index) => (
+              <OutlineNode
+                key={node.path ? node.path.join("-") : index}
+                node={node}
+                level={0}
+                onNodeClick={onInternalNodeClick}
+                onNodeDoubleClick={onInternalNodeDoubleClick}
+                highlightedNode={highlightedNode}
+              />
+            ))}
         </div>
-        <ScrollArea className="h-[calc(100vh-280px)]">
-          <div className="space-y-1">
-            {data.children &&
-              data.children.map((node, index) => (
-                <OutlineNode
-                  key={node.path ? node.path.join("-") : index}
-                  node={node}
-                  level={0}
-                  onNodeClick={onInternalNodeClick}
-                  onNodeDoubleClick={onInternalNodeDoubleClick}
-                  highlightedNode={highlightedNode}
-                />
-              ))}
-          </div>
-          <ScrollBar orientation="horizontal" />
-          <ScrollBar orientation="vertical" />
-        </ScrollArea>
-      </div>
+        <ScrollBar orientation="horizontal" />
+        <ScrollBar orientation="vertical" />
+      </ScrollArea>
     </div>
   );
 };
 
 const KeywordSearch: React.FC<{
   data: DocumentData;
+  keyword: string;
+  onKeywordChange: (keyword: string) => void;
   onScrollToNode: (node: DocumentNode) => void;
   onClearHighlightedNode: () => void;
-}> = ({ data, onScrollToNode, onClearHighlightedNode }) => {
-  const [keyword, setKeyword] = useState("");
+}> = ({
+  data,
+  onScrollToNode,
+  onClearHighlightedNode,
+  keyword,
+  onKeywordChange,
+}) => {
   const searchNodesRef = useRef<DocumentNode[]>([]);
   const [searchNodesLength, setSearchNodesLength] = useState(0);
   const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
   const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newKeyword = e.target.value;
-    setKeyword(newKeyword);
+    onKeywordChange(newKeyword);
     if (newKeyword.length === 0) {
       searchNodesRef.current = [];
       setSearchNodesLength(0);
@@ -486,27 +502,18 @@ const KeywordSearch: React.FC<{
       return;
     }
     const searchNodes: DocumentNode[] = [];
-    const findNodesByKeyword = (nodes: DocumentNode[]) => {
-      for (const node of nodes) {
-        if (node.element.text && node.element.text.includes(newKeyword)) {
-          searchNodes.push(node);
-        }
-        if (node.children && node.children.length > 0) {
-          findNodesByKeyword(node.children);
-        }
-      }
-    };
-    const findNodeByPath = (nodes: DocumentNode[], path: number[]) => {
-      for (const node of nodes) {
-        if (node.path && path.every((v, i) => v === node.path[i])) {
-          searchNodes.push(node);
-        }
-        if (node.children && node.children.length > 0) {
-          findNodeByPath(node.children, path);
-        }
-      }
-    };
+    // 搜索节点
     if (newKeyword.startsWith("/")) {
+      const findNodeByPath = (nodes: DocumentNode[], path: number[]) => {
+        for (const node of nodes) {
+          if (node.path && path.every((v, i) => v === node.path[i])) {
+            searchNodes.push(node);
+          }
+          if (node.children && node.children.length > 0) {
+            findNodeByPath(node.children, path);
+          }
+        }
+      };
       const path = newKeyword
         .split("/")
         .slice(1)
@@ -518,11 +525,31 @@ const KeywordSearch: React.FC<{
       }
       findNodeByPath(data.children || [], path);
     } else {
+      const findNodesByKeyword = (nodes: DocumentNode[]) => {
+        for (const node of nodes) {
+          if (node.element.text && node.element.text.includes(newKeyword)) {
+            searchNodes.push(node);
+          }
+          if (node.element.type === "Table") {
+            const rows = node.element.rows || [];
+            const found = rows.find((row) =>
+              row.cells.find((cell) => cell.text?.includes(newKeyword)),
+            );
+            if (found) {
+              searchNodes.push(node);
+            }
+          }
+          if (node.children && node.children.length > 0) {
+            findNodesByKeyword(node.children);
+          }
+        }
+      };
       findNodesByKeyword(data.children || []);
     }
+    // 获取到了搜索的节点，更新状态
     searchNodesRef.current = searchNodes;
     setSearchNodesLength(searchNodes.length);
-    // 如果搜索到节点，则跳转到第一个
+    // 如果搜索到节点，则跳转到第一个节点
     if (searchNodes.length > 0) {
       setCurrentSearchIndex(0);
       onScrollToNode(searchNodesRef.current[0]);
@@ -650,6 +677,7 @@ const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
     const fileDomData = useRef<{ fileId: string; data: DocumentData }[]>([]);
     const altKeyRef = useRef(false);
     const containerRef = useRef<HTMLDivElement | null>(null);
+    const [searchKeyword, setSearchKeyword] = useState("");
     useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
         if (e.altKey) {
@@ -844,19 +872,21 @@ const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
             outlinePanelWidth={outlinePanelWidth}
           />
         )}
-        <DragWidthBar
-          containerRef={containerRef}
-          minWidthPercentage={20}
-          maxWidthPercentage={50}
-          localStorageKey="outlinePanelWidth"
-          width={outlinePanelWidth}
-          setWidth={setOutlinePanelWidth}
-        />
+        {showOutlinePanel && (
+          <DragWidthBar
+            containerRef={containerRef}
+            minWidthPercentage={20}
+            maxWidthPercentage={80}
+            localStorageKey="outlinePanelWidth"
+            width={showOutlinePanel ? outlinePanelWidth : 0}
+            setWidth={setOutlinePanelWidth}
+          />
+        )}
         {/* 主内容区域 */}
         <div
           className="flex flex-col overflow-hidden"
           style={{
-            width: `${100 - outlinePanelWidth}%`,
+            width: `${100 - (showOutlinePanel ? outlinePanelWidth : 0)}%`,
           }}
         >
           {/* 工具栏 */}
@@ -871,6 +901,8 @@ const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
             </Button>
             <KeywordSearch
               data={data}
+              keyword={searchKeyword}
+              onKeywordChange={setSearchKeyword}
               onScrollToNode={handleScrollToNode}
               onClearHighlightedNode={() => setHighlightedNode(null)}
             />
@@ -887,6 +919,7 @@ const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
                     key={node.path ? node.path.join("-") : undefined}
                     node={node}
                     level={0}
+                    keyword={searchKeyword}
                     highlightedNode={highlightedNode}
                     onNodeClick={handleNodeClick}
                     onNodeDoubleClick={handleNodeDoubleClick}

@@ -1,7 +1,5 @@
 "use client";
 
-import { Menu } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { QuestionAnswerSection } from "./question-answer-section";
 import { ReferenceSection } from "./reference-section";
 import { EmptyState } from "./empty-state";
@@ -13,14 +11,12 @@ interface LeftContentSectionProps {
   documentViewerRef: React.RefObject<DocumentViewerRef | null>;
   referenceSectionRef: React.RefObject<ReferenceSectionRef | null>;
   width: number;
-  onOpenSidebar: () => void;
 }
 
 export function LeftContentSection({
   documentViewerRef,
   referenceSectionRef,
   width,
-  onOpenSidebar,
 }: LeftContentSectionProps) {
   const { selectedQuestion } = useDocumentPreviewStore();
   return (
@@ -30,17 +26,7 @@ export function LeftContentSection({
         width: `${width}%`,
       }}
     >
-      <div className="absolute top-4 left-4 z-10">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={onOpenSidebar}
-          className="h-8 w-8"
-        >
-          <Menu size={16} />
-        </Button>
-      </div>
-      <div className="flex flex-col gap-4 p-6 pt-16 overflow-auto scrollbar-hide">
+      <div className="flex flex-col gap-4 p-6 pt-4 overflow-auto scrollbar-hide">
         {selectedQuestion ? (
           <>
             <QuestionAnswerSection />

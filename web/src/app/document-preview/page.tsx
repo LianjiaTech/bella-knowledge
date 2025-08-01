@@ -33,7 +33,7 @@ function DocumentPreviewPage() {
 
     const init = async () => {
       await initPage(datasetId);
-      setSidebarOpen(true);
+      // 移除自动打开边栏，现在通过鼠标悬停打开
       initReferenceFileList(datasetId);
     };
     init();
@@ -51,7 +51,6 @@ function DocumentPreviewPage() {
         <LeftContentSection
           documentViewerRef={documentViewerRef}
           referenceSectionRef={referenceSectionRef}
-          onOpenSidebar={() => setSidebarOpen(true)}
           width={leftSectionWidth}
         />
         <DragWidthBar
@@ -64,7 +63,6 @@ function DocumentPreviewPage() {
         />
         {/* 右侧文档区域 - 固定在右侧 */}
         <div
-          className="h-[calc(100vh-4rem)]"
           style={{
             width: `${100 - leftSectionWidth}%`,
           }}

@@ -31,6 +31,15 @@ export async function POST(req: NextRequest) {
   return res;
 }
 
+export async function PUT(req: NextRequest) {
+  const body = await req.json();
+  const res = await backendRequest(req, {
+    url: `${FILE_API_URL}/v1/datasets/qa/reference/update`,
+    method: "POST",
+    body,
+  });
+  return res;
+}
 export async function DELETE(req: NextRequest) {
   const body = await req.json();
   const { dataset_id, reference_id } = body;

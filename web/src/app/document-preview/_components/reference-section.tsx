@@ -54,6 +54,9 @@ const ReferenceSection = forwardRef<ReferenceSectionRef, ReferenceSectionProps>(
         <div className="flex flex-col gap-2">
           {currentReferences
             .toSorted((a, b) => {
+              if (a.file_id !== b.file_id) {
+                return a.file_id.localeCompare(b.file_id);
+              }
               const minPathLen = Math.min(a.path.length, b.path.length);
               if (a.path.length === b.path.length) {
                 for (let i = 0; i < minPathLen; i++) {

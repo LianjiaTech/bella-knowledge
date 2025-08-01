@@ -45,7 +45,7 @@ export function RightDocumentSection({
     }
   };
   return (
-    <div className="h-full bg-white border-l border-gray-200 px-4 py-6 overflow-hidden">
+    <div className="h-full bg-white border-l border-gray-200 overflow-hidden">
       <div className="flex flex-col h-full">
         <FileTabs
           selectFileId={selectFileId}
@@ -53,16 +53,13 @@ export function RightDocumentSection({
           referenceFileList={referenceFileList}
           onUploadClick={() => setUploadDialogOpen(true)}
         />
-
-        <div className="flex-1 overflow-hidden">
-          <DocumentSection
-            selectFileId={selectFileId}
-            selectedQuestion={selectedQuestion}
-            documentViewerRef={documentViewerRef}
-            referenceSectionRef={referenceSectionRef}
-            onAddQuestionReference={addQuestionReference}
-          />
-        </div>
+        <DocumentSection
+          selectFileId={selectFileId}
+          selectedQuestion={selectedQuestion}
+          documentViewerRef={documentViewerRef}
+          referenceSectionRef={referenceSectionRef}
+          onAddQuestionReference={addQuestionReference}
+        />
       </div>
 
       <UploadDialog

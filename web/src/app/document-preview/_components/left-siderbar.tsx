@@ -5,7 +5,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { X, CornerDownLeft, Loader2 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -29,6 +29,7 @@ interface AppSidebarProps {
 
 export function LeftSidebar({ open, onOpenChange }: AppSidebarProps) {
   const [newQuestionText, setNewQuestionText] = useState("");
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const datasetId = useSearchParams().get("dataset_id") || "";
   const {
     questionList,
@@ -38,6 +39,51 @@ export function LeftSidebar({ open, onOpenChange }: AppSidebarProps) {
     addQuestion,
     onChangeSelectedQuestion,
   } = useDocumentPreviewStore();
+
+  // 鼠标悬停检测
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      const threshold = 5;
+
+      if (e.clientX <= threshold && !open) {
+        // 鼠标进入左侧区域，打开边栏
+        if (hoverTimeoutRef.current) {
+          clearTimeout(hoverTimeoutRef.current);
+        }
+        onOpenChange(true);
+      } else if (e.clientX > threshold && open) {
+        // 鼠标离开左侧区域，延迟关闭边栏
+        if (hoverTimeoutRef.current) {
+          clearTimeout(hoverTimeoutRef.current);
+        }
+        hoverTimeoutRef.current = setTimeout(() => {
+          onOpenChange(false);
+        }, 300); // 300ms延迟，避免意外关闭
+      }
+    };
+
+    // 鼠标离开整个窗口时关闭边栏
+    const handleMouseLeave = () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+      if (open) {
+        onOpenChange(false);
+      }
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseleave", handleMouseLeave);
+
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseleave", handleMouseLeave);
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+    };
+  }, [open, onOpenChange]);
+
   const handleAddQuestion = () => {
     if (newQuestionText.trim()) {
       addQuestion({
@@ -61,7 +107,24 @@ export function LeftSidebar({ open, onOpenChange }: AppSidebarProps) {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="left" className="flex flex-col w-100 p-0">
+      <SheetContent
+        side="left"
+        className="flex flex-col w-100 p-0"
+        onMouseEnter={() => {
+          // 鼠标进入边栏时，清除关闭定时器
+          if (hoverTimeoutRef.current) {
+            clearTimeout(hoverTimeoutRef.current);
+          }
+        }}
+        onMouseLeave={() => {
+          // 鼠标离开边栏时，延迟关闭
+          if (open) {
+            hoverTimeoutRef.current = setTimeout(() => {
+              onOpenChange(false);
+            }, 300);
+          }
+        }}
+      >
         <SheetHeader className="p-4 border-b">
           <SheetTitle>
             问题列表

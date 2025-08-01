@@ -64,13 +64,11 @@ export function DocumentSection({
   };
 
   return (
-    <div className="overflow-hidden h-[calc(100vh-200px)]">
-      <DocumentViewer
-        fileId={selectFileId}
-        onClickNode={onClickNode}
-        onDoubleClickNode={onDoubleClickNode}
-        ref={documentViewerRef}
-      />
-    </div>
+    <DocumentViewer
+      fileId={selectFileId}
+      onClickNode={onClickNode}
+      onDoubleClickNode={onDoubleClickNode}
+      ref={documentViewerRef}
+    />
   );
 }
