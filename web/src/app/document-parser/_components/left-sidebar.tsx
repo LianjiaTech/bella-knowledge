@@ -19,7 +19,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { useDocumentParserStore } from "../model";
+import { store, useDocumentParserStore } from "../model";
 import { Button } from "@/components/ui/button";
 import UploadDialog from "@/components/upload-dialog";
 import { useSearchParams } from "next/navigation";
@@ -38,7 +38,7 @@ const LeftSidebar = () => {
     deleteDatasetFile,
   } = useDocumentParserStore();
   const [selectFileDialogOpen, setSelectFileDialogOpen] = useState(false);
-  const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(true);
   const [sheetLoading, setSheetLoading] = useState(false);
   const [getFileLoading, setGetFileLoading] = useState(false);
 
@@ -48,7 +48,12 @@ const LeftSidebar = () => {
     const init = async () => {
       setSheetLoading(true);
       await getFileList();
-      await getDatasetFileList(datasetId);
+      await getDatasetFileList(datasetId).then(() => {
+        const state = store.getState();
+        if (state.datasetFileList.length > 0) {
+          state.selectDatasetFile(state.datasetFileList[0]);
+        }
+      });
       setSheetLoading(false);
     };
     init();

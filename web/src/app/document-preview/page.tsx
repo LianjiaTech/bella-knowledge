@@ -16,7 +16,7 @@ function DocumentPreviewPage() {
   const searchParams = useSearchParams();
 
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [leftSectionWidth, setLeftSectionWidth] = useLocalState(
     "leftSectionWidth",
     50,
