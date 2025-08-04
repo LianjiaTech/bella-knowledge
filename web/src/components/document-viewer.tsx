@@ -21,6 +21,7 @@ import {
   List,
   ArrowLeft,
   ArrowRight,
+  RefreshCcw,
 } from "lucide-react";
 import { webRequest } from "@/lib/request/web";
 import { TableRenderer } from "./table-renderer";
@@ -351,17 +352,19 @@ const NodeComponent: React.FC<NodeComponentProps> = ({
 interface OutlineNodeProps {
   node: DocumentNode;
   level: number;
+  highlightedNode: DocumentNode | null;
+  searchKeyword: string;
   onNodeClick: (node: DocumentNode) => void;
   onNodeDoubleClick: (node: DocumentNode) => void;
-  highlightedNode: DocumentNode | null;
 }
 
 const OutlineNode: React.FC<OutlineNodeProps> = ({
   node,
   level,
+  highlightedNode,
+  searchKeyword,
   onNodeClick,
   onNodeDoubleClick,
-  highlightedNode,
 }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const hasChildren = node.children && node.children.length > 0;
@@ -407,12 +410,11 @@ const OutlineNode: React.FC<OutlineNodeProps> = ({
               )}
             </Button>
           )}
-          <span
+          <HighlightedText
             className="text-sm truncate cursor-pointer"
-            title={node.element.text}
-          >
-            {node.element.text || `节点 ${nodeKey}`}
-          </span>
+            text={node.element.text || `节点 ${nodeKey}`}
+            keyword={searchKeyword}
+          ></HighlightedText>
         </div>
       )}
       {hasChildren && isExpanded && (
@@ -422,9 +424,10 @@ const OutlineNode: React.FC<OutlineNodeProps> = ({
               key={childNode.path ? childNode.path.join("-") : index}
               node={childNode}
               level={shouldShowInOutline ? level + 1 : level}
+              searchKeyword={searchKeyword}
+              highlightedNode={highlightedNode}
               onNodeClick={onNodeClick}
               onNodeDoubleClick={onNodeDoubleClick}
-              highlightedNode={highlightedNode}
             />
           ))}
         </div>
@@ -436,18 +439,20 @@ const OutlineNode: React.FC<OutlineNodeProps> = ({
 // 大纲面板组件
 interface OutlinePanelProps {
   data: DocumentData;
-  onInternalNodeClick: (node: DocumentNode) => void;
-  onInternalNodeDoubleClick: (node: DocumentNode) => void;
   highlightedNode: DocumentNode | null;
   outlinePanelWidth: number;
+  searchKeyword: string;
+  onInternalNodeClick: (node: DocumentNode) => void;
+  onInternalNodeDoubleClick: (node: DocumentNode) => void;
 }
 
 const OutlinePanel: React.FC<OutlinePanelProps> = ({
   data,
-  onInternalNodeClick,
-  onInternalNodeDoubleClick,
   highlightedNode,
   outlinePanelWidth,
+  searchKeyword,
+  onInternalNodeClick,
+  onInternalNodeDoubleClick,
 }) => {
   return (
     <div
@@ -462,9 +467,10 @@ const OutlinePanel: React.FC<OutlinePanelProps> = ({
                 key={node.path ? node.path.join("-") : index}
                 node={node}
                 level={0}
+                searchKeyword={searchKeyword}
+                highlightedNode={highlightedNode}
                 onNodeClick={onInternalNodeClick}
                 onNodeDoubleClick={onInternalNodeDoubleClick}
-                highlightedNode={highlightedNode}
               />
             ))}
         </div>
@@ -674,6 +680,8 @@ const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
     );
     const [data, setData] = useState<DocumentData | null>(null);
     const [message, setMessage] = useState("");
+    const [error, setError] = useState(false);
+    const fileUrlRef = useRef<string | null>(null);
     const fileDomData = useRef<{ fileId: string; data: DocumentData }[]>([]);
     const altKeyRef = useRef(false);
     const containerRef = useRef<HTMLDivElement | null>(null);
@@ -705,18 +713,15 @@ const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
           if (res.data.url) {
             setMessage("正在获取文档内容，请稍后...");
             const url = res.data.url;
-            fetch(url).then((res) => {
-              res.json().then((data) => {
-                setData(data);
-                fileDomData.current.push({ fileId, data });
-              });
-            });
+            fileUrlRef.current = url;
+            fetchDocument();
           } else {
             setMessage("当前文档不支持解析");
             setData(null);
           }
         });
       }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [fileId]);
     const scrollAreaRef = useRef<HTMLDivElement>(null);
     const nodeRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -805,6 +810,28 @@ const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
           block: "center",
         });
       }
+      const outlineElement = document.querySelector(
+        `.outline-node[data-id="${node.path?.join("-")}"]`,
+      );
+      if (outlineElement) {
+        outlineElement.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      }
+    };
+    const fetchDocument = async () => {
+      try {
+        const res = await fetch(fileUrlRef.current!);
+        const data = await res.json();
+        setData(data);
+        setError(false);
+        fileDomData.current.push({ fileId, data });
+      } catch {
+        setMessage("获取文档内容失败");
+        setError(true);
+        setData(null);
+      }
     };
 
     useImperativeHandle(ref, () => ({
@@ -852,8 +879,13 @@ const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
     }
     if (!data) {
       return (
-        <div className="flex items-center justify-center h-64 text-gray-500">
+        <div className="flex flex-col items-center justify-center h-64 text-gray-500 gap-2">
           {message}
+          {error && (
+            <Button onClick={fetchDocument} variant="ghost">
+              点击重试 <RefreshCcw className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       );
     }
@@ -866,10 +898,11 @@ const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
         {showOutlinePanel && (
           <OutlinePanel
             data={data}
-            onInternalNodeClick={handleOutlineNodeClick}
-            onInternalNodeDoubleClick={handleOutlineNodeDoubleClick}
             highlightedNode={highlightedNode}
             outlinePanelWidth={outlinePanelWidth}
+            searchKeyword={searchKeyword}
+            onInternalNodeClick={handleOutlineNodeClick}
+            onInternalNodeDoubleClick={handleOutlineNodeDoubleClick}
           />
         )}
         {showOutlinePanel && (

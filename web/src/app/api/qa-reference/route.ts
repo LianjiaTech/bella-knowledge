@@ -16,7 +16,17 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { dataset_id, item_id, file_id, path, snippet } = body;
+  const { dataset_id, item_id, file_id, path, snippet, children_references } =
+    body;
+  await Promise.all(
+    children_references.map((reference_id: number) =>
+      backendRequest(req, {
+        url: `${FILE_API_URL}/v1/datasets/qa/reference/delete`,
+        method: "POST",
+        body: { dataset_id, reference_id },
+      }),
+    ),
+  );
   const res = await backendRequest(req, {
     url: `${FILE_API_URL}/v1/datasets/qa/reference/create`,
     method: "POST",
@@ -31,15 +41,6 @@ export async function POST(req: NextRequest) {
   return res;
 }
 
-export async function PUT(req: NextRequest) {
-  const body = await req.json();
-  const res = await backendRequest(req, {
-    url: `${FILE_API_URL}/v1/datasets/qa/reference/update`,
-    method: "POST",
-    body,
-  });
-  return res;
-}
 export async function DELETE(req: NextRequest) {
   const body = await req.json();
   const { dataset_id, reference_id } = body;

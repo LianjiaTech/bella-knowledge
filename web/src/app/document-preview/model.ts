@@ -159,7 +159,10 @@ const store = create<State & Action>((set, get) => ({
     );
     if (
       qaReference?.references.find(
-        (r) => r.file_id === data.file_id && r.path.join() === data.path.join(),
+        (r) =>
+          r.file_id === data.file_id &&
+          r.path.length <= data.path.length &&
+          r.path.every((v, i) => Number(v) === Number(data.path[i])),
       )
     ) {
       toast.error("当前文件的该节点已存在标注");
@@ -169,7 +172,16 @@ const store = create<State & Action>((set, get) => ({
       result,
       data: resData,
       message,
-    } = await requestCreateQaReference(data);
+    } = await requestCreateQaReference({
+      ...data,
+      children_references: qaReference?.references
+        .filter(
+          (r) =>
+            r.path.length > data.path.length &&
+            data.path.every((v, i) => Number(v) === Number(r.path[i])),
+        )
+        .map((r) => r.reference_id),
+    });
 
     if (result) {
       const newReference = {
@@ -185,12 +197,19 @@ const store = create<State & Action>((set, get) => ({
             qaReference.item_id === data.item_id
               ? {
                   ...qaReference,
-                  references: [...qaReference.references, newReference],
+                  references: [...qaReference.references, newReference].filter(
+                    (r) =>
+                      r.path.length <= newReference.path.length ||
+                      !newReference.path.every(
+                        (v, i) => Number(v) === Number(r.path[i]),
+                      ),
+                  ),
                 }
               : qaReference,
           ),
           lastEditTime: Date.now(),
         });
+        toast.success("添加成功，并且自动合并子节点");
       } else {
         set({
           qaReferenceList: [

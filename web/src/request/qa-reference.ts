@@ -6,6 +6,7 @@ export async function requestCreateQaReference(data: {
   file_id: string;
   path: number[];
   snippet: string;
+  children_references?: number[];
 }) {
   const res = await webRequest<{ reference_id: number }>({
     path: "/api/qa-reference",
