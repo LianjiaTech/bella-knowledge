@@ -28,10 +28,8 @@ const DragWidthBar = ({
     const startWidth = width;
     const handleMouseMove = (e: MouseEvent) => {
       const deltaX = e.clientX - startX;
-      console.log("deltaX", deltaX);
       const containerWidth = containerRef.current?.clientWidth || 0;
       const deltaPercentage = (deltaX / containerWidth) * 100;
-      console.log("deltaPercentage", deltaPercentage);
       const newWidth = Math.max(
         minWidthPercentage,
         Math.min(maxWidthPercentage, startWidth + deltaPercentage),

@@ -351,6 +351,7 @@ const NodeComponent: React.FC<NodeComponentProps> = ({
 // 大纲树节点组件
 interface OutlineNodeProps {
   node: DocumentNode;
+  data: DocumentData;
   level: number;
   highlightedNode: DocumentNode | null;
   searchKeyword: string;
@@ -360,6 +361,7 @@ interface OutlineNodeProps {
 
 const OutlineNode: React.FC<OutlineNodeProps> = ({
   node,
+  data,
   level,
   highlightedNode,
   searchKeyword,
@@ -369,18 +371,59 @@ const OutlineNode: React.FC<OutlineNodeProps> = ({
   const [isExpanded, setIsExpanded] = useState(true);
   const hasChildren = node.children && node.children.length > 0;
   const nodeKey = node.path ? node.path.join("-") : "";
-  const isHighlighted =
-    (highlightedNode?.element.type === "Title" && node === highlightedNode) ||
-    (highlightedNode?.element.type !== "Title" &&
-      node.path.length === (highlightedNode?.path.length || 0) - 1 &&
-      node.path.every((v, i) => v === highlightedNode?.path[i]));
+  let isHighlighted =
+    highlightedNode?.element.type === "Title" && node === highlightedNode;
+  // 初步判断当前节点是个祖先节点
+  if (
+    highlightedNode?.element.type !== "Title" &&
+    node.element.type === "Title" &&
+    node.path.every((v, i) => v === highlightedNode?.path[i])
+  ) {
+    const parentPath = highlightedNode?.path.slice(0, -1);
+    const findNodeByPath = (
+      nodes: DocumentNode[],
+      path: number[],
+    ): DocumentNode | null => {
+      for (const node of nodes) {
+        if (node.path?.join("-") === path.join("-")) {
+          return node;
+        }
+        if (node.children && node.children.length > 0) {
+          const found = findNodeByPath(node.children, path);
+          if (found) {
+            return found;
+          }
+        }
+      }
+      return null;
+    };
+    // 判断是否为最近的祖先节点
+    while (parentPath && parentPath.length > 0) {
+      const parentNode = findNodeByPath(data.children || [], parentPath);
+      if (parentNode && parentNode.element.type === "Title") {
+        // 如果当前节点不是最近的祖先节点，则不进行高亮
+        isHighlighted = parentNode === node;
+        break;
+      }
+      parentPath.pop();
+    }
+  }
   const shouldShowInOutline =
     node.element.type === "Title" && node.element.text;
+  const outlineNodeRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (isHighlighted && outlineNodeRef.current) {
+      outlineNodeRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }
+  }, [isHighlighted]);
   if (!shouldShowInOutline && !hasChildren) {
     return null;
   }
   return (
-    <div className="outline-node" data-id={nodeKey}>
+    <div className="outline-node" data-id={nodeKey} ref={outlineNodeRef}>
       {shouldShowInOutline && (
         <div
           className={cn(
@@ -423,6 +466,7 @@ const OutlineNode: React.FC<OutlineNodeProps> = ({
             <OutlineNode
               key={childNode.path ? childNode.path.join("-") : index}
               node={childNode}
+              data={data}
               level={shouldShowInOutline ? level + 1 : level}
               searchKeyword={searchKeyword}
               highlightedNode={highlightedNode}
@@ -466,6 +510,7 @@ const OutlinePanel: React.FC<OutlinePanelProps> = ({
               <OutlineNode
                 key={node.path ? node.path.join("-") : index}
                 node={node}
+                data={data}
                 level={0}
                 searchKeyword={searchKeyword}
                 highlightedNode={highlightedNode}
@@ -806,15 +851,6 @@ const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
       const element = nodeRefs.current.get(node.path?.join("-") || "");
       if (element) {
         element.scrollIntoView({
-          behavior: "smooth",
-          block: "center",
-        });
-      }
-      const outlineElement = document.querySelector(
-        `.outline-node[data-id="${node.path?.join("-")}"]`,
-      );
-      if (outlineElement) {
-        outlineElement.scrollIntoView({
           behavior: "smooth",
           block: "center",
         });

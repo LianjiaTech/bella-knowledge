@@ -28,12 +28,18 @@ const ReferenceSection = forwardRef<ReferenceSectionRef, ReferenceSectionProps>(
       deleteQuestionReference,
       onFileSelect,
     } = useDocumentPreviewStore();
+    const currentReferences =
+      qaReferenceList.find(
+        (reference) => reference.item_id === selectedQuestion?.item_id,
+      )?.references || [];
+
     useImperativeHandle(ref, () => ({
       scrollToAndHighlightNode: (path: number[]) => {
-        const node = document.querySelector(`[data-path="${path.join("/")}"]`);
+        const node = currentReferences.find((reference) =>
+          reference.path.every((v, i) => Number(v) === Number(path[i])),
+        );
         if (node) {
-          node.scrollIntoView({ behavior: "smooth", block: "nearest" });
-          setHighlightedPath(path);
+          setHighlightedPath(node.path);
         } else {
           setHighlightedPath([]);
         }
@@ -42,11 +48,6 @@ const ReferenceSection = forwardRef<ReferenceSectionRef, ReferenceSectionProps>(
     if (!selectedQuestion) {
       return null;
     }
-
-    const currentReferences =
-      qaReferenceList.find(
-        (reference) => reference.item_id === selectedQuestion?.item_id,
-      )?.references || [];
 
     return (
       <div>
@@ -72,8 +73,11 @@ const ReferenceSection = forwardRef<ReferenceSectionRef, ReferenceSectionProps>(
                 key={reference.file_id + reference.path.join("-")}
                 data-path={reference.path.join("/")}
                 className={cn(
-                  "flex justify-between items-center border border-gray-200 rounded-md p-2 bg-white cursor-pointer hover:bg-gray-50 transition-colors",
-                  highlightedPath.join("/") === reference.path.join("/")
+                  "flex justify-between items-center border border-gray-200 rounded-md p-2 bg-white cursor-pointer hover:bg-gray-50 transition-colors gap-4",
+                  highlightedPath.length >= reference.path.length &&
+                    reference.path.every(
+                      (v, i) => Number(v) === Number(highlightedPath[i]),
+                    )
                     ? "bg-blue-100"
                     : "",
                 )}
@@ -95,7 +99,14 @@ const ReferenceSection = forwardRef<ReferenceSectionRef, ReferenceSectionProps>(
               >
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center flex-1 gap-2">
-                    <div className="text-sm font-medium">
+                    <div
+                      className="text-sm font-medium flex-1"
+                      title={
+                        referenceFileList.find(
+                          (file) => file.id === reference.file_id,
+                        )?.filename
+                      }
+                    >
                       {
                         referenceFileList.find(
                           (file) => file.id === reference.file_id,
