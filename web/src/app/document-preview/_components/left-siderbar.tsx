@@ -44,43 +44,19 @@ export function LeftSidebar({ open, onOpenChange }: AppSidebarProps) {
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       const threshold = 5;
-
       if (e.clientX <= threshold && !open) {
         // 鼠标进入左侧区域，打开边栏
         if (hoverTimeoutRef.current) {
           clearTimeout(hoverTimeoutRef.current);
         }
         onOpenChange(true);
-      } else if (e.clientX > threshold && open) {
-        // 鼠标离开左侧区域，延迟关闭边栏
-        if (hoverTimeoutRef.current) {
-          clearTimeout(hoverTimeoutRef.current);
-        }
-        hoverTimeoutRef.current = setTimeout(() => {
-          onOpenChange(false);
-        }, 300); // 300ms延迟，避免意外关闭
-      }
-    };
-
-    // 鼠标离开整个窗口时关闭边栏
-    const handleMouseLeave = () => {
-      if (hoverTimeoutRef.current) {
-        clearTimeout(hoverTimeoutRef.current);
-      }
-      if (open) {
-        onOpenChange(false);
       }
     };
 
     document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseleave", handleMouseLeave);
 
     return () => {
       document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseleave", handleMouseLeave);
-      if (hoverTimeoutRef.current) {
-        clearTimeout(hoverTimeoutRef.current);
-      }
     };
   }, [open, onOpenChange]);
 
