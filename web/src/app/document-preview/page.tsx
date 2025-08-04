@@ -41,7 +41,6 @@ function DocumentPreviewPage() {
       clear();
     };
   }, [initPage, searchParams, clear, initReferenceFileList]);
-
   return (
     <>
       <TopBar lastEditTime={lastEditTime} />
