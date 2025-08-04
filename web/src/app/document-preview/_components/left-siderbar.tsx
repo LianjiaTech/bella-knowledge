@@ -5,9 +5,8 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { X, CornerDownLeft, Loader2 } from "lucide-react";
-import { Question, QuestionList } from "@/lib/types/qa";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -21,37 +20,49 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useSearchParams } from "next/navigation";
+import { useDocumentPreviewStore } from "../model";
 
 interface AppSidebarProps {
-  loading: boolean;
-  questionList: QuestionList;
-  selectedQuestion: Question | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onChangeSelectedQuestion: (question: Question) => void;
-  onDeleteQuestion: (question: Question) => void;
-  onAddQuestion: (params: {
-    question: string;
-    answer: string;
-    dataset_id: string;
-  }) => void;
 }
 
-export function LeftSidebar({
-  loading,
-  questionList,
-  selectedQuestion,
-  open,
-  onOpenChange,
-  onChangeSelectedQuestion,
-  onDeleteQuestion,
-  onAddQuestion,
-}: AppSidebarProps) {
+export function LeftSidebar({ open, onOpenChange }: AppSidebarProps) {
   const [newQuestionText, setNewQuestionText] = useState("");
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const datasetId = useSearchParams().get("dataset_id") || "";
+  const {
+    questionList,
+    selectedQuestion,
+    initLoading,
+    deleteQuestion,
+    addQuestion,
+    onChangeSelectedQuestion,
+  } = useDocumentPreviewStore();
+
+  // 鼠标悬停检测
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      const threshold = 5;
+      if (e.clientX <= threshold && !open) {
+        // 鼠标进入左侧区域，打开边栏
+        if (hoverTimeoutRef.current) {
+          clearTimeout(hoverTimeoutRef.current);
+        }
+        onOpenChange(true);
+      }
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+    };
+  }, [open, onOpenChange]);
+
   const handleAddQuestion = () => {
     if (newQuestionText.trim()) {
-      onAddQuestion({
+      addQuestion({
         question: newQuestionText.trim(),
         answer: "",
         dataset_id: datasetId,
@@ -72,7 +83,24 @@ export function LeftSidebar({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="left" className="flex flex-col w-100 p-0">
+      <SheetContent
+        side="left"
+        className="flex flex-col w-100 p-0"
+        onMouseEnter={() => {
+          // 鼠标进入边栏时，清除关闭定时器
+          if (hoverTimeoutRef.current) {
+            clearTimeout(hoverTimeoutRef.current);
+          }
+        }}
+        onMouseLeave={() => {
+          // 鼠标离开边栏时，延迟关闭
+          if (open) {
+            hoverTimeoutRef.current = setTimeout(() => {
+              onOpenChange(false);
+            }, 300);
+          }
+        }}
+      >
         <SheetHeader className="p-4 border-b">
           <SheetTitle>
             问题列表
@@ -104,7 +132,7 @@ export function LeftSidebar({
 
           <ScrollArea className="h-full">
             <div className="h-full overflow-hidden">
-              {loading ? (
+              {initLoading ? (
                 <div className="flex items-center justify-center h-full">
                   <Loader2 className="size-4 animate-spin" />
                 </div>
@@ -141,7 +169,7 @@ export function LeftSidebar({
                             <AlertDialogFooter>
                               <AlertDialogCancel>取消</AlertDialogCancel>
                               <AlertDialogAction
-                                onClick={() => onDeleteQuestion(question)}
+                                onClick={() => deleteQuestion(question)}
                               >
                                 确定
                               </AlertDialogAction>

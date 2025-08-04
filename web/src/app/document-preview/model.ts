@@ -12,10 +12,14 @@ import { KnowledgeFile } from "@/lib/types/file";
 import { getFileList } from "@/request/files";
 import { requestGetDatasetQuestionList } from "@/request/dataset";
 import { requestCreateQaReference } from "@/request/qa-reference";
+import { requestTagsList, requestCreateTag, Tag } from "@/request/tags";
 
 type State = {
   questionInputVal: string;
   answerInputVal: string;
+  selectedTags: string[];
+  reasoningText: string;
+  availableTags: Tag[];
   selectedQuestion: Question | null;
   questionList: QuestionList;
   qaReferenceList: QaReferenceList;
@@ -28,14 +32,18 @@ type State = {
 type Action = {
   onChangeQuestionInputVal: (val: string) => void;
   onChangeAnswerInputVal: (val: string) => void;
+  onChangeSelectedTags: (tags: string[]) => void;
+  onChangeReasoningText: (reasoning: string) => void;
   onChangeSelectedQuestion: (question: Question) => void;
   addQuestion: (body: {
     dataset_id: string;
     question: string;
     answer: string;
+    tags?: string[];
+    reasoning?: string;
   }) => void;
   deleteQuestion: (question: Question) => void;
-  updateQuestion: (question: Question) => void;
+  updateQuestion: (question: Question & { tags?: string[]; reasoning?: string }) => void;
   getQuestionList: (dataset_id: string) => void;
   addQuestionReference: (params: {
     dataset_id: string;
@@ -54,13 +62,20 @@ type Action = {
   addUploadFile: (file: KnowledgeFile) => void;
   initPage: (dataset_id: string) => Promise<void>;
   initReferenceFileList: (dataset_id: string) => Promise<void>;
-  setSelectFileId: (fileId: string) => void;
+  onFileSelect: (fileId: string) => void;
+  getTagsList: () => Promise<void>;
+  createTag: (name: string) => void;
+  updateTag: (id: number, name: string) => void;
+  deleteTag: (id: number) => void;
   clear: () => void;
 };
 
 const store = create<State & Action>((set, get) => ({
   questionInputVal: "",
   answerInputVal: "",
+  selectedTags: [],
+  reasoningText: "",
+  availableTags: [],
   questionList: [],
   qaReferenceList: [],
   selectedQuestion: null,
@@ -88,6 +103,8 @@ const store = create<State & Action>((set, get) => ({
         selectedQuestion: res.data,
         questionInputVal: res.data.question,
         answerInputVal: res.data.answer,
+        selectedTags: res.data.tags || [],
+        reasoningText: res.data.reasoning || "",
         lastEditTime: Date.now(),
       });
       toast.success("添加成功");
@@ -120,14 +137,16 @@ const store = create<State & Action>((set, get) => ({
       toast.success("删除成功");
     }
   },
-  updateQuestion: async ({ dataset_id, item_id, question, answer }) => {
+  updateQuestion: async ({ dataset_id, item_id, question, answer, tags, reasoning }) => {
     const { questionList } = get();
     const currentQuestion = questionList.find(
       (question) => question.item_id === item_id,
     );
     if (
       currentQuestion?.question === question &&
-      currentQuestion?.answer === answer
+      currentQuestion?.answer === answer &&
+      JSON.stringify(currentQuestion?.tags) === JSON.stringify(tags) &&
+      currentQuestion?.reasoning === reasoning
     ) {
       return;
     }
@@ -139,6 +158,8 @@ const store = create<State & Action>((set, get) => ({
         dataset_id: dataset_id,
         question: question,
         answer: answer,
+        tags: tags,
+        reasoning: reasoning,
       },
     });
     if (res.code === 200) {
@@ -147,6 +168,10 @@ const store = create<State & Action>((set, get) => ({
           question.item_id === item_id ? res.data : question,
         ),
         selectedQuestion: res.data,
+        questionInputVal: res.data.question,
+        answerInputVal: res.data.answer,
+        selectedTags: res.data.tags || [],
+        reasoningText: res.data.reasoning || "",
         lastEditTime: Date.now(),
       });
       toast.success("更新成功");
@@ -159,7 +184,10 @@ const store = create<State & Action>((set, get) => ({
     );
     if (
       qaReference?.references.find(
-        (r) => r.file_id === data.file_id && r.path.join() === data.path.join(),
+        (r) =>
+          r.file_id === data.file_id &&
+          r.path.length <= data.path.length &&
+          r.path.every((v, i) => Number(v) === Number(data.path[i])),
       )
     ) {
       toast.error("当前文件的该节点已存在标注");
@@ -169,7 +197,16 @@ const store = create<State & Action>((set, get) => ({
       result,
       data: resData,
       message,
-    } = await requestCreateQaReference(data);
+    } = await requestCreateQaReference({
+      ...data,
+      children_references: qaReference?.references
+        .filter(
+          (r) =>
+            r.path.length > data.path.length &&
+            data.path.every((v, i) => Number(v) === Number(r.path[i])),
+        )
+        .map((r) => r.reference_id),
+    });
 
     if (result) {
       const newReference = {
@@ -185,12 +222,19 @@ const store = create<State & Action>((set, get) => ({
             qaReference.item_id === data.item_id
               ? {
                   ...qaReference,
-                  references: [...qaReference.references, newReference],
+                  references: [...qaReference.references, newReference].filter(
+                    (r) =>
+                      r.path.length <= newReference.path.length ||
+                      !newReference.path.every(
+                        (v, i) => Number(v) === Number(r.path[i]),
+                      ),
+                  ),
                 }
               : qaReference,
           ),
           lastEditTime: Date.now(),
         });
+        toast.success("添加成功，并且自动合并子节点");
       } else {
         set({
           qaReferenceList: [
@@ -258,6 +302,8 @@ const store = create<State & Action>((set, get) => ({
         selectedQuestion: question,
         questionInputVal: question.question,
         answerInputVal: question.answer,
+        selectedTags: question.tags || [],
+        reasoningText: question.reasoning || "",
       });
       const { getReferenceList } = get();
       getReferenceList(question.dataset_id, question.item_id.toString());
@@ -280,8 +326,17 @@ const store = create<State & Action>((set, get) => ({
     });
   },
   initPage: async (dataset_id: string) => {
+    const { initLoading } = get();
+    if (initLoading) {
+      return;
+    }
     set({ initLoading: true });
-    await Promise.all([get().getQuestionList(dataset_id), get().getFileList()]);
+    
+    await Promise.all([
+      get().getQuestionList(dataset_id), 
+      get().getFileList(),
+      get().getTagsList()
+    ]);
     set({ initLoading: false });
   },
   initReferenceFileList: async (dataset_id: string) => {
@@ -354,13 +409,76 @@ const store = create<State & Action>((set, get) => ({
   onChangeAnswerInputVal: (val: string) => {
     set({ answerInputVal: val });
   },
-  setSelectFileId: (fileId: string) => {
+  onChangeSelectedTags: (tags: string[]) => {
+    set({ selectedTags: tags });
+  },
+  onChangeReasoningText: (reasoning: string) => {
+    set({ reasoningText: reasoning });
+  },
+  getTagsList: async () => {
+    try {
+      const res = await requestTagsList();
+      if (res.code === 200) {
+        set({ availableTags: res.data });
+      }
+    } catch (error) {
+      console.error("获取标签列表失败:", error);
+    }
+  },
+  createTag: async (name: string) => {
+    try {
+      const res = await requestCreateTag(name);
+      if (res.code === 200 && res.data) {
+        // 直接添加到现有标签列表中，避免重新请求
+        const { availableTags } = get();
+        set({
+          availableTags: [...availableTags, res.data],
+        });
+        toast.success(`标签 "${name}" 创建成功`);
+      } else {
+        toast.error(res.message || "创建标签失败");
+      }
+    } catch (error) {
+      toast.error("创建标签失败");
+      console.error("创建标签失败:", error);
+    }
+  },
+  updateTag: (id: number, name: string) => {
+    const { availableTags, selectedTags } = get();
+    const oldTag = availableTags.find(tag => tag.id === id);
+    if (oldTag) {
+      set({
+        availableTags: availableTags.map((tag) =>
+          tag.id === id ? { ...tag, name } : tag
+        ),
+        selectedTags: selectedTags.map((tag) =>
+          tag === oldTag.name ? name : tag
+        ),
+      });
+      toast.success("标签更新成功");
+    }
+  },
+  deleteTag: (id: number) => {
+    const { availableTags, selectedTags } = get();
+    const tagToDelete = availableTags.find(tag => tag.id === id);
+    if (tagToDelete) {
+      set({
+        availableTags: availableTags.filter((tag) => tag.id !== id),
+        selectedTags: selectedTags.filter((tag) => tag !== tagToDelete.name),
+      });
+      toast.success("标签删除成功");
+    }
+  },
+  onFileSelect: (fileId: string) => {
     set({ selectFileId: fileId });
   },
   clear: () => {
     set({
       questionInputVal: "",
       answerInputVal: "",
+      selectedTags: [],
+      reasoningText: "",
+      availableTags: [],
       selectedQuestion: null,
       questionList: [],
       qaReferenceList: [],

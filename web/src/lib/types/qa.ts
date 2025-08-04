@@ -28,6 +28,8 @@ export type Question = {
   mu_name: string;
   mtime: string;
   status: number;
+  tags?: string[];
+  reasoning?: string;
 };
 
 export type QuestionList = Question[];

@@ -13,7 +13,7 @@ import {
   DocumentNode,
   DocumentElement,
 } from "@/lib/types/documents";
-import { ScrollArea } from "./ui/scroll-area";
+import { ScrollArea, ScrollBar } from "./ui/scroll-area";
 import { Button } from "./ui/button";
 import {
   ChevronRight,
@@ -21,6 +21,7 @@ import {
   List,
   ArrowLeft,
   ArrowRight,
+  RefreshCcw,
 } from "lucide-react";
 import { webRequest } from "@/lib/request/web";
 import { TableRenderer } from "./table-renderer";
@@ -29,13 +30,15 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { tomorrow } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { Copy, Check } from "lucide-react";
 import { toast } from "sonner";
+import DragWidthBar from "./drag-width-bar";
+import { useLocalState } from "@/hooks/use-local-state";
+import { HighlightedText } from "./hightlighted-text";
 
 interface CodeRendererProps {
   code: string;
   className?: string;
   showLineNumbers?: boolean;
   showHeader?: boolean;
-  filename?: string;
 }
 
 const CodeRenderer: React.FC<CodeRendererProps> = ({
@@ -43,17 +46,20 @@ const CodeRenderer: React.FC<CodeRendererProps> = ({
   className,
   showLineNumbers = true,
   showHeader = true,
-  filename,
 }) => {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
     try {
-      // 优先使用现代的 Clipboard API
+      // HTTPS 协议下，navigator.clipboard 才存在
       if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(code);
         setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+        toast.success("复制成功", {
+          onAutoClose: () => {
+            setCopied(false);
+          },
+        });
         return;
       }
 
@@ -72,12 +78,15 @@ const CodeRenderer: React.FC<CodeRendererProps> = ({
 
       if (successful) {
         setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+        toast.success("复制成功", {
+          onAutoClose: () => {
+            setCopied(false);
+          },
+        });
       } else {
         throw new Error("execCommand failed");
       }
-    } catch (error) {
-      console.error("Failed to copy code:", error);
+    } catch {
       toast.error("复制失败，请手动选择复制");
     }
   };
@@ -87,7 +96,7 @@ const CodeRenderer: React.FC<CodeRendererProps> = ({
       {showHeader && (
         <div className="flex items-center justify-between bg-gray-800 text-gray-200 px-4 py-2 text-sm rounded-t-md">
           <div className="flex items-center gap-2">
-            <span className="text-gray-400">{filename || "代码"}</span>
+            <span className="text-gray-400">代码</span>
           </div>
           <Button
             variant="ghost"
@@ -150,6 +159,7 @@ interface NodeComponentProps {
   node: DocumentNode;
   level: number;
   highlightedNode: DocumentNode | null;
+  keyword: string;
   onNodeClick: (node: DocumentNode) => void;
   onNodeDoubleClick: (node: DocumentNode) => void;
   nodeRefs: React.RefObject<Map<string, HTMLDivElement>>;
@@ -159,6 +169,7 @@ const NodeComponent: React.FC<NodeComponentProps> = ({
   node,
   level,
   highlightedNode,
+  keyword,
   onNodeClick,
   onNodeDoubleClick,
   nodeRefs,
@@ -171,7 +182,6 @@ const NodeComponent: React.FC<NodeComponentProps> = ({
     highlightedNode.path.length === node.path.length &&
     highlightedNode.path.every((v, i) => v === node.path[i]);
   const nodeRef = useRef<HTMLDivElement>(null);
-  const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (nodeRef.current && node.path) {
@@ -188,20 +198,12 @@ const NodeComponent: React.FC<NodeComponentProps> = ({
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    onNodeClick(node);
+  };
 
-    // 如果已经有点击等待，说明这是双击
-    if (clickTimeoutRef.current) {
-      clearTimeout(clickTimeoutRef.current);
-      clickTimeoutRef.current = null;
-      onNodeDoubleClick(node);
-      return;
-    }
-
-    // 设置单击延迟，等待可能的双击
-    clickTimeoutRef.current = setTimeout(() => {
-      clickTimeoutRef.current = null;
-      onNodeClick(node);
-    }, 250); // 250ms 延迟来区分单击和双击
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onNodeDoubleClick(node);
   };
 
   const renderElement = (element: DocumentElement) => {
@@ -213,16 +215,16 @@ const NodeComponent: React.FC<NodeComponentProps> = ({
     switch (element.type) {
       case "Title":
         return (
-          <div
+          <HighlightedText
             className={cn(baseClasses, "font-bold text-lg mb-2", {
               "text-2xl": level === 0,
               "text-xl": level === 1,
               "text-lg": level === 2,
               "text-base": level > 2,
             })}
-          >
-            {element.text || ""}
-          </div>
+            text={element.text || ""}
+            keyword={keyword}
+          ></HighlightedText>
         );
 
       case "List":
@@ -230,18 +232,19 @@ const NodeComponent: React.FC<NodeComponentProps> = ({
           <div
             className={cn(baseClasses, "mb-2 pl-4 border-l-2 border-gray-200")}
           >
-            <span className="text-gray-700">{element.text || ""}</span>
+            <HighlightedText
+              className="text-gray-700"
+              text={element.text || ""}
+              keyword={keyword}
+            ></HighlightedText>
           </div>
         );
 
       case "Table":
         return (
           <div className={cn(baseClasses, "mb-4")}>
-            {element.text && (
-              <div className="mb-2 font-medium">{element.text}</div>
-            )}
             <div className="overflow-x-auto">
-              <TableRenderer rows={element.rows || []} />
+              <TableRenderer rows={element.rows || []} keyword={keyword} />
             </div>
           </div>
         );
@@ -251,7 +254,7 @@ const NodeComponent: React.FC<NodeComponentProps> = ({
             {element.image?.type === "image_base64" && (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                className="max-w-123"
+                className="w-full"
                 src={element.image.base64}
                 alt={element.name}
               ></img>
@@ -259,7 +262,7 @@ const NodeComponent: React.FC<NodeComponentProps> = ({
             {element.image?.type === "image_url" && (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                className="max-w-123"
+                className="w-full"
                 src={element.image.url}
                 alt={element.name}
               />
@@ -279,18 +282,22 @@ const NodeComponent: React.FC<NodeComponentProps> = ({
         );
       case "Formula":
         return (
-          <div className={cn(baseClasses, "mb-2 leading-relaxed")}>
-            {element.text || ""}
-          </div>
+          <HighlightedText
+            className={cn(baseClasses, "mb-2 leading-relaxed")}
+            text={element.text || ""}
+            keyword={keyword}
+          ></HighlightedText>
         );
       case "Text":
 
       default:
         return (
           <div className={cn(baseClasses, "mb-2 leading-relaxed")}>
-            <span className="text-gray-800 whitespace-pre-wrap">
-              {element.text || ""}
-            </span>
+            <HighlightedText
+              className="text-gray-800 whitespace-pre-wrap"
+              text={element.text || ""}
+              keyword={keyword}
+            ></HighlightedText>
           </div>
         );
     }
@@ -308,13 +315,19 @@ const NodeComponent: React.FC<NodeComponentProps> = ({
           onNodeClick={onNodeClick}
           onNodeDoubleClick={onNodeDoubleClick}
           nodeRefs={nodeRefs}
+          keyword={keyword}
         />
       ))
     );
   }
   return (
     <div className={cn("mb-1")}>
-      <div className="cursor-pointer" ref={nodeRef} onClick={handleClick}>
+      <div
+        className="cursor-pointer"
+        ref={nodeRef}
+        onClick={handleClick}
+        onDoubleClick={handleDoubleClick}
+      >
         {renderElement(node.element)}
       </div>
       {node.children &&
@@ -325,6 +338,7 @@ const NodeComponent: React.FC<NodeComponentProps> = ({
             node={childNode}
             level={level + 1}
             highlightedNode={highlightedNode}
+            keyword={keyword}
             onNodeClick={onNodeClick}
             onNodeDoubleClick={onNodeDoubleClick}
             nodeRefs={nodeRefs}
@@ -337,34 +351,79 @@ const NodeComponent: React.FC<NodeComponentProps> = ({
 // 大纲树节点组件
 interface OutlineNodeProps {
   node: DocumentNode;
+  data: DocumentData;
   level: number;
+  highlightedNode: DocumentNode | null;
+  searchKeyword: string;
   onNodeClick: (node: DocumentNode) => void;
   onNodeDoubleClick: (node: DocumentNode) => void;
-  highlightedNode: DocumentNode | null;
 }
 
 const OutlineNode: React.FC<OutlineNodeProps> = ({
   node,
+  data,
   level,
+  highlightedNode,
+  searchKeyword,
   onNodeClick,
   onNodeDoubleClick,
-  highlightedNode,
 }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const hasChildren = node.children && node.children.length > 0;
   const nodeKey = node.path ? node.path.join("-") : "";
-  const isHighlighted =
-    (highlightedNode?.element.type === "Title" && node === highlightedNode) ||
-    (highlightedNode?.element.type !== "Title" &&
-      node.path.length === (highlightedNode?.path.length || 0) - 1 &&
-      node.path.every((v, i) => v === highlightedNode?.path[i]));
+  let isHighlighted =
+    highlightedNode?.element.type === "Title" && node === highlightedNode;
+  // 初步判断当前节点是个祖先节点
+  if (
+    highlightedNode?.element.type !== "Title" &&
+    node.element.type === "Title" &&
+    node.path.every((v, i) => v === highlightedNode?.path[i])
+  ) {
+    const parentPath = highlightedNode?.path.slice(0, -1);
+    const findNodeByPath = (
+      nodes: DocumentNode[],
+      path: number[],
+    ): DocumentNode | null => {
+      for (const node of nodes) {
+        if (node.path?.join("-") === path.join("-")) {
+          return node;
+        }
+        if (node.children && node.children.length > 0) {
+          const found = findNodeByPath(node.children, path);
+          if (found) {
+            return found;
+          }
+        }
+      }
+      return null;
+    };
+    // 判断是否为最近的祖先节点
+    while (parentPath && parentPath.length > 0) {
+      const parentNode = findNodeByPath(data.children || [], parentPath);
+      if (parentNode && parentNode.element.type === "Title") {
+        // 如果当前节点不是最近的祖先节点，则不进行高亮
+        isHighlighted = parentNode === node;
+        break;
+      }
+      parentPath.pop();
+    }
+  }
   const shouldShowInOutline =
     node.element.type === "Title" && node.element.text;
+  const outlineNodeRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (isHighlighted && outlineNodeRef.current) {
+      outlineNodeRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }
+  }, [isHighlighted]);
   if (!shouldShowInOutline && !hasChildren) {
     return null;
   }
   return (
-    <div className="outline-node" data-id={nodeKey}>
+    <div className="outline-node" data-id={nodeKey} ref={outlineNodeRef}>
       {shouldShowInOutline && (
         <div
           className={cn(
@@ -394,12 +453,11 @@ const OutlineNode: React.FC<OutlineNodeProps> = ({
               )}
             </Button>
           )}
-          <span
+          <HighlightedText
             className="text-sm truncate cursor-pointer"
-            title={node.element.text}
-          >
-            {node.element.text || `节点 ${nodeKey}`}
-          </span>
+            text={node.element.text || `节点 ${nodeKey}`}
+            keyword={searchKeyword}
+          ></HighlightedText>
         </div>
       )}
       {hasChildren && isExpanded && (
@@ -408,10 +466,12 @@ const OutlineNode: React.FC<OutlineNodeProps> = ({
             <OutlineNode
               key={childNode.path ? childNode.path.join("-") : index}
               node={childNode}
+              data={data}
               level={shouldShowInOutline ? level + 1 : level}
+              searchKeyword={searchKeyword}
+              highlightedNode={highlightedNode}
               onNodeClick={onNodeClick}
               onNodeDoubleClick={onNodeDoubleClick}
-              highlightedNode={highlightedNode}
             />
           ))}
         </div>
@@ -423,56 +483,68 @@ const OutlineNode: React.FC<OutlineNodeProps> = ({
 // 大纲面板组件
 interface OutlinePanelProps {
   data: DocumentData;
+  highlightedNode: DocumentNode | null;
+  outlinePanelWidth: number;
+  searchKeyword: string;
   onInternalNodeClick: (node: DocumentNode) => void;
   onInternalNodeDoubleClick: (node: DocumentNode) => void;
-  highlightedNode: DocumentNode | null;
 }
 
 const OutlinePanel: React.FC<OutlinePanelProps> = ({
   data,
+  highlightedNode,
+  outlinePanelWidth,
+  searchKeyword,
   onInternalNodeClick,
   onInternalNodeDoubleClick,
-  highlightedNode,
 }) => {
   return (
-    <div className="w-64 border-r border-gray-200 bg-gray-50">
-      <div className="p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <List className="h-4 w-4" />
-          <h3 className="font-medium text-sm">文档大纲</h3>
+    <div
+      className="flex flex-col border-r border-gray-200 bg-gray-50 p-2"
+      style={{ width: outlinePanelWidth + "%" }}
+    >
+      <ScrollArea className="flex flex-1 overflow-hidden">
+        <div className="space-y-1">
+          {data.children &&
+            data.children.map((node, index) => (
+              <OutlineNode
+                key={node.path ? node.path.join("-") : index}
+                node={node}
+                data={data}
+                level={0}
+                searchKeyword={searchKeyword}
+                highlightedNode={highlightedNode}
+                onNodeClick={onInternalNodeClick}
+                onNodeDoubleClick={onInternalNodeDoubleClick}
+              />
+            ))}
         </div>
-        <ScrollArea className="h-[calc(100vh-280px)]">
-          <div className="space-y-1">
-            {data.children &&
-              data.children.map((node, index) => (
-                <OutlineNode
-                  key={node.path ? node.path.join("-") : index}
-                  node={node}
-                  level={0}
-                  onNodeClick={onInternalNodeClick}
-                  onNodeDoubleClick={onInternalNodeDoubleClick}
-                  highlightedNode={highlightedNode}
-                />
-              ))}
-          </div>
-        </ScrollArea>
-      </div>
+        <ScrollBar orientation="horizontal" />
+        <ScrollBar orientation="vertical" />
+      </ScrollArea>
     </div>
   );
 };
 
 const KeywordSearch: React.FC<{
   data: DocumentData;
+  keyword: string;
+  onKeywordChange: (keyword: string) => void;
   onScrollToNode: (node: DocumentNode) => void;
   onClearHighlightedNode: () => void;
-}> = ({ data, onScrollToNode, onClearHighlightedNode }) => {
-  const [keyword, setKeyword] = useState("");
+}> = ({
+  data,
+  onScrollToNode,
+  onClearHighlightedNode,
+  keyword,
+  onKeywordChange,
+}) => {
   const searchNodesRef = useRef<DocumentNode[]>([]);
   const [searchNodesLength, setSearchNodesLength] = useState(0);
   const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
   const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newKeyword = e.target.value;
-    setKeyword(newKeyword);
+    onKeywordChange(newKeyword);
     if (newKeyword.length === 0) {
       searchNodesRef.current = [];
       setSearchNodesLength(0);
@@ -481,27 +553,18 @@ const KeywordSearch: React.FC<{
       return;
     }
     const searchNodes: DocumentNode[] = [];
-    const findNodesByKeyword = (nodes: DocumentNode[]) => {
-      for (const node of nodes) {
-        if (node.element.text && node.element.text.includes(newKeyword)) {
-          searchNodes.push(node);
-        }
-        if (node.children && node.children.length > 0) {
-          findNodesByKeyword(node.children);
-        }
-      }
-    };
-    const findNodeByPath = (nodes: DocumentNode[], path: number[]) => {
-      for (const node of nodes) {
-        if (node.path && path.every((v, i) => v === node.path[i])) {
-          searchNodes.push(node);
-        }
-        if (node.children && node.children.length > 0) {
-          findNodeByPath(node.children, path);
-        }
-      }
-    };
+    // 搜索节点
     if (newKeyword.startsWith("/")) {
+      const findNodeByPath = (nodes: DocumentNode[], path: number[]) => {
+        for (const node of nodes) {
+          if (node.path && path.every((v, i) => v === node.path[i])) {
+            searchNodes.push(node);
+          }
+          if (node.children && node.children.length > 0) {
+            findNodeByPath(node.children, path);
+          }
+        }
+      };
       const path = newKeyword
         .split("/")
         .slice(1)
@@ -513,11 +576,31 @@ const KeywordSearch: React.FC<{
       }
       findNodeByPath(data.children || [], path);
     } else {
+      const findNodesByKeyword = (nodes: DocumentNode[]) => {
+        for (const node of nodes) {
+          if (node.element.text && node.element.text.includes(newKeyword)) {
+            searchNodes.push(node);
+          }
+          if (node.element.type === "Table") {
+            const rows = node.element.rows || [];
+            const found = rows.find((row) =>
+              row.cells.find((cell) => cell.text?.includes(newKeyword)),
+            );
+            if (found) {
+              searchNodes.push(node);
+            }
+          }
+          if (node.children && node.children.length > 0) {
+            findNodesByKeyword(node.children);
+          }
+        }
+      };
       findNodesByKeyword(data.children || []);
     }
+    // 获取到了搜索的节点，更新状态
     searchNodesRef.current = searchNodes;
     setSearchNodesLength(searchNodes.length);
-    // 如果搜索到节点，则跳转到第一个
+    // 如果搜索到节点，则跳转到第一个节点
     if (searchNodes.length > 0) {
       setCurrentSearchIndex(0);
       onScrollToNode(searchNodesRef.current[0]);
@@ -636,11 +719,18 @@ const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
       null,
     );
     const [showOutlinePanel, setShowOutlinePanel] = useState(showOutline);
+    const [outlinePanelWidth, setOutlinePanelWidth] = useLocalState(
+      "outlinePanelWidth",
+      30,
+    );
     const [data, setData] = useState<DocumentData | null>(null);
     const [message, setMessage] = useState("");
+    const [error, setError] = useState(false);
+    const fileUrlRef = useRef<string | null>(null);
     const fileDomData = useRef<{ fileId: string; data: DocumentData }[]>([]);
     const altKeyRef = useRef(false);
-
+    const containerRef = useRef<HTMLDivElement | null>(null);
+    const [searchKeyword, setSearchKeyword] = useState("");
     useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
         if (e.altKey) {
@@ -668,20 +758,17 @@ const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
           if (res.data.url) {
             setMessage("正在获取文档内容，请稍后...");
             const url = res.data.url;
-            fetch(url).then((res) => {
-              res.json().then((data) => {
-                setData(data);
-                fileDomData.current.push({ fileId, data });
-              });
-            });
+            fileUrlRef.current = url;
+            fetchDocument();
           } else {
             setMessage("当前文档不支持解析");
             setData(null);
           }
         });
       }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [fileId]);
-    const containerRef = useRef<HTMLDivElement>(null);
+    const scrollAreaRef = useRef<HTMLDivElement>(null);
     const nodeRefs = useRef<Map<string, HTMLDivElement>>(new Map());
     const findNodeByPath = (
       nodes: DocumentNode[],
@@ -716,7 +803,7 @@ const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
         const path = node.path.slice();
         while (path.length > 0) {
           const element = document.querySelector(
-            `.outline-node [data-id="${path.join("-")}"]`,
+            `.outline-node[data-id="${path.join("-")}"]`,
           );
           if (element) {
             element.scrollIntoView({
@@ -769,6 +856,19 @@ const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
         });
       }
     };
+    const fetchDocument = async () => {
+      try {
+        const res = await fetch(fileUrlRef.current!);
+        const data = await res.json();
+        setData(data);
+        setError(false);
+        fileDomData.current.push({ fileId, data });
+      } catch {
+        setMessage("获取文档内容失败");
+        setError(true);
+        setData(null);
+      }
+    };
 
     useImperativeHandle(ref, () => ({
       scrollToNode: (path: number[]) => {
@@ -815,24 +915,49 @@ const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
     }
     if (!data) {
       return (
-        <div className="flex items-center justify-center h-64 text-gray-500">
+        <div className="flex flex-col items-center justify-center h-64 text-gray-500 gap-2">
           {message}
+          {error && (
+            <Button onClick={fetchDocument} variant="ghost">
+              点击重试 <RefreshCcw className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       );
     }
     return (
-      <div className="flex h-full bg-gray-50 overflow-hidden">
+      <div
+        className="flex h-full bg-gray-50 overflow-hidden"
+        ref={containerRef}
+      >
         {/* 大纲面板 */}
         {showOutlinePanel && (
           <OutlinePanel
             data={data}
+            highlightedNode={highlightedNode}
+            outlinePanelWidth={outlinePanelWidth}
+            searchKeyword={searchKeyword}
             onInternalNodeClick={handleOutlineNodeClick}
             onInternalNodeDoubleClick={handleOutlineNodeDoubleClick}
-            highlightedNode={highlightedNode}
+          />
+        )}
+        {showOutlinePanel && (
+          <DragWidthBar
+            containerRef={containerRef}
+            minWidthPercentage={20}
+            maxWidthPercentage={80}
+            localStorageKey="outlinePanelWidth"
+            width={showOutlinePanel ? outlinePanelWidth : 0}
+            setWidth={setOutlinePanelWidth}
           />
         )}
         {/* 主内容区域 */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div
+          className="flex flex-col overflow-hidden"
+          style={{
+            width: `${100 - (showOutlinePanel ? outlinePanelWidth : 0)}%`,
+          }}
+        >
           {/* 工具栏 */}
           <div className="flex items-center justify-between p-2 border-b border-gray-200 bg-white">
             <Button
@@ -845,22 +970,25 @@ const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
             </Button>
             <KeywordSearch
               data={data}
+              keyword={searchKeyword}
+              onKeywordChange={setSearchKeyword}
               onScrollToNode={handleScrollToNode}
               onClearHighlightedNode={() => setHighlightedNode(null)}
             />
           </div>
           {/* 文档内容区域 */}
           <ScrollArea
-            ref={containerRef}
+            ref={scrollAreaRef}
             className="flex-1 overflow-y-auto p-6 space-y-2 scrollbar-hide"
           >
-            <div className="max-w-140 mx-auto bg-white rounded-lg shadow-sm p-6">
+            <div className="bg-white rounded-lg shadow-sm p-6">
               {data.children &&
                 data.children.map((node) => (
                   <NodeComponent
                     key={node.path ? node.path.join("-") : undefined}
                     node={node}
                     level={0}
+                    keyword={searchKeyword}
                     highlightedNode={highlightedNode}
                     onNodeClick={handleNodeClick}
                     onNodeDoubleClick={handleNodeDoubleClick}

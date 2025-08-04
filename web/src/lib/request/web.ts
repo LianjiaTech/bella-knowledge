@@ -1,3 +1,5 @@
+import { toast } from "sonner";
+
 interface WebResponse<T> {
   code: number;
   data: T;
@@ -36,6 +38,14 @@ export async function webRequest<T>(
   if (data.code === 401) {
     window.location.href =
       data.data.redirectUrl + encodeURIComponent(window.location.href);
+  }
+  if (data.code === 500) {
+    toast.error(data.message);
+    return {
+      code: 500,
+      data: null,
+      message: data.message,
+    } as WebResponse<T>;
   }
   return data as WebResponse<T>;
 }
