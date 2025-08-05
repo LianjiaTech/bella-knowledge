@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
         snippet: string;
       }) => ({
         file_id: item.file_id,
-        path: item.path.split(","),
+        path: item.path ? item.path.split("/").filter(Boolean) : [],
         reference_id: item.reference_id,
         snippet: item.snippet,
       }),

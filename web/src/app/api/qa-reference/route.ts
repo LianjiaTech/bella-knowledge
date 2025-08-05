@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
       dataset_id,
       item_id,
       file_id,
-      path: path.toString(),
+      path: path.length > 0 ? "/" + path.join("/") : "",
       snippet: snippet || "",
     },
   });
