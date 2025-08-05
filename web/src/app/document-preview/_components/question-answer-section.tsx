@@ -36,6 +36,17 @@ export function QuestionAnswerSection() {
     });
   };
 
+  // TagSelector专用的onBlur回调，接收tags参数
+  const handleTagSelectorBlur = (tags?: string[]) => {
+    updateQuestion({
+      ...selectedQuestion,
+      question: questionInputVal,
+      answer: answerInputVal,
+      tags: tags || selectedTags, // 优先使用传入的tags参数，避免状态滞后问题
+      reasoning: reasoningText,
+    });
+  };
+
   return (
     <>
       <div>
@@ -58,7 +69,7 @@ export function QuestionAnswerSection() {
             availableTags={availableTags}
             onTagsChange={onChangeSelectedTags}
             onRefreshTags={getTagsList}
-            onBlur={onBlur}
+            onBlur={handleTagSelectorBlur}
             placeholder="添加标签"
           />
         </div>

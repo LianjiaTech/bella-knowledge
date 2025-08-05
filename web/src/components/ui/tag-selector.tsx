@@ -72,23 +72,8 @@ export function TagSelector({
   // 处理下拉菜单关闭时更新状态并触发blur
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen && open) {
-      // 下拉菜单关闭时，比较临时选中的标签和实际选中的标签，如果有变化则更新状态
-      const tagsChanged = JSON.stringify(tempSelectedTags.sort()) !== JSON.stringify(selectedTags.sort());
-      console.log('TagSelector closing:', {
-        tempSelectedTags,
-        selectedTags,
-        tagsChanged
-      });
-      if (tagsChanged) {
-        console.log('Tags changed, calling onTagsChange with:', tempSelectedTags);
-        // 先更新状态
-        onTagsChange(tempSelectedTags);
-        // 延迟更长时间确保状态更新完成后再触发blur，并传入新的标签
-        setTimeout(() => {
-          console.log('Triggering onBlur with tags:', tempSelectedTags);
-          onBlur?.(tempSelectedTags);
-        }, 10);
-      }
+      onTagsChange(tempSelectedTags);
+      onBlur?.(tempSelectedTags);
     }
     setOpen(newOpen);
   };

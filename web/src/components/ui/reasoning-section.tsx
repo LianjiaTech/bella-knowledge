@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 interface ReasoningSectionProps {
   reasoning?: string;
   onReasoningChange: (value: string) => void;
-  onBlur: (tags?: string[]) => void;
+  onBlur: () => void;
   className?: string;
 }
 
