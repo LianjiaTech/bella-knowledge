@@ -79,6 +79,10 @@ public class FileService {
                 .domTreeFileId(fileDB.getDomTreeFileId())
                 .pdfFileId(fileDB.getPdfFileId())
                 .version(fileDB.getVersion())
+                .spaceCode(fileDB.getSpaceCode())
+                .metadata(fileDB.getMetaData())
+                .cuid(fileDB.getCuid())
+                .cuName(fileDB.getCuName())
                 .build();
     }
 

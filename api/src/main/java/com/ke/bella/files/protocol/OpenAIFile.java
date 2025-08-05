@@ -48,4 +48,8 @@ public class OpenAIFile {
     private String domTreeFileId;
     private String pdfFileId;
     private Long version;
+    private String metadata;
+    private String spaceCode;
+    private Long cuid;
+    private String cuName;
 }
