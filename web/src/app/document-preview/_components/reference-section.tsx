@@ -114,7 +114,7 @@ const ReferenceSection = forwardRef<ReferenceSectionRef, ReferenceSectionProps>(
                       }
                     </div>
                     <div className="text-xs text-gray-500">
-                      节点: /{reference.path.join("/")}
+                      节点: {reference.path.length > 0 ? `/${reference.path.join("/")}` : ""}
                     </div>
                   </div>
                   {reference.snippet && (
