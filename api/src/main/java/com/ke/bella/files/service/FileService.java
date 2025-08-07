@@ -20,6 +20,7 @@ import com.ke.bella.files.db.tables.pojos.FileProgressDB;
 import com.ke.bella.files.protocol.BroadcastStatus;
 import com.ke.bella.files.protocol.EventType;
 import com.ke.bella.files.protocol.FileBroadcasting;
+import com.ke.bella.files.protocol.FileException.FileNotFoundException;
 import com.ke.bella.files.protocol.FileOps;
 import com.ke.bella.files.protocol.FileStatus;
 import com.ke.bella.files.protocol.ListFileOps;
@@ -86,6 +87,28 @@ public class FileService {
                 .build();
     }
 
+    private OpenAIFile buildOpenAIFileWithSource(FileDB fileDB) {
+        OpenAIFile openAIFile = transferToOpenAIFile(fileDB);
+        String purpose = fileDB.getPurpose();
+
+        FileDB sourceFileDB = null;
+        try {
+            if("dom_tree".equals(purpose)) {
+                sourceFileDB = fileRepo.queryFileByDomTreeFileId(fileDB.getFileId());
+            } else if("pdf".equals(purpose)) {
+                sourceFileDB = fileRepo.queryFileByPdfFileId(fileDB.getFileId());
+            }
+
+            if(sourceFileDB != null) {
+                return openAIFile.toBuilder().sourceFile(transferToOpenAIFile(sourceFileDB)).build();
+            }
+        } catch (Exception e) {
+            LOGGER.warn("failed to query source file for {} file: {}, error: {}", purpose, fileDB.getFileId(), e.getMessage());
+        }
+
+        return openAIFile;
+    }
+
     private Progress transferToProgress(FileProgressDB fileProgressDB) {
         return Progress.builder()
                 .id(fileProgressDB.getId())
@@ -143,7 +166,11 @@ public class FileService {
         fileDB.setAkCode(akCode);
         fileRepo.addFile(fileDB);
         FileDB res = fileRepo.queryFile(fileId);
-        OpenAIFile openAIFile = res == null ? null : transferToOpenAIFile(res);
+        if(res == null) {
+            throw new FileNotFoundException(fileId);
+        }
+
+        OpenAIFile openAIFile = buildOpenAIFileWithSource(res);
 
         // 文件创建后的广播机制
         FileBroadcasting<OpenAIFile> message = new FileBroadcasting<>();
@@ -165,12 +192,17 @@ public class FileService {
         String spaceCode = BellaContextHelper.getOperateSpaceCode();
         List<FileDB> files = fileRepo.listFile(purpose, limit, order, after, spaceCode);
         List<OpenAIFile> emptyList = new ArrayList<>();
+        // don't set source fIle for listing
         return files == null ? emptyList : files.stream().map(this::transferToOpenAIFile).collect(Collectors.toList());
     }
 
     public OpenAIFile getFile(String fileId) {
         FileDB fileDB = fileRepo.queryFile(fileId);
-        return fileDB == null ? null : transferToOpenAIFile(fileDB);
+        if(fileDB == null) {
+            throw new FileNotFoundException(fileId);
+        }
+
+        return buildOpenAIFileWithSource(fileDB);
     }
 
     public String updateRealFile(String fileId, String filename, File file, String mimeType, String charset) {
@@ -187,18 +219,18 @@ public class FileService {
     public OpenAIFile updateFile(FileOps ops, boolean increaseVersion) {
         fileRepo.updateFile(ops, increaseVersion);
         FileDB fileDB = fileRepo.queryFile(ops.getFileId());
-        OpenAIFile openAIFile = transferToOpenAIFile(fileDB);
+        OpenAIFile finalOpenAIFile = buildOpenAIFileWithSource(fileDB);
 
         FileBroadcasting<OpenAIFile> message = new FileBroadcasting<>();
         message.setEvent(EventType.FILE_UPDATED);
-        message.setData(openAIFile);
+        message.setData(finalOpenAIFile);
         message.setMetadata(fileDB.getMetaData());
         message.setUserId(BellaContextHelper.getOperatorUserId());
         message.setUserName(BellaContextHelper.getOperatorUserName());
-        broadcastService.broadcast(message, () -> updateBroadcastStatus(openAIFile.getId(), BroadcastStatus.SUCCESS),
-                () -> updateBroadcastStatus(openAIFile.getId(), BroadcastStatus.FAILED));
+        broadcastService.broadcast(message, () -> updateBroadcastStatus(finalOpenAIFile.getId(), BroadcastStatus.SUCCESS),
+                () -> updateBroadcastStatus(finalOpenAIFile.getId(), BroadcastStatus.FAILED));
 
-        return openAIFile;
+        return finalOpenAIFile;
     }
 
     public void delete(String fileId) {
@@ -260,6 +292,7 @@ public class FileService {
     public List<OpenAIFile> getFiles(ListFileOps ops) {
         List<FileDB> files = fileRepo.getFiles(ops);
         List<OpenAIFile> emptyList = new ArrayList<>();
+        // don't set source file for listing
         return files == null ? emptyList : files.stream().map(this::transferToOpenAIFile).collect(Collectors.toList());
     }
 
