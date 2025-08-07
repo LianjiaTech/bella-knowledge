@@ -88,6 +88,24 @@ public class FileRepo implements BaseRepo {
                 .fetchOneInto(FileDB.class);
     }
 
+    public FileDB queryFileByDomTreeFileId(String domTreeFileId) {
+        String shardingKey = getShardingKeyByFileId(domTreeFileId);
+        return db(shardingKey).selectFrom(FILE)
+                .where(FILE.DOM_TREE_FILE_ID.eq(domTreeFileId)
+                        .and(FILE.STATUS.eq(FileStatus.NOT_DELETED.getValue())))
+                .fetchOne()
+                .into(FileDB.class);
+    }
+
+    public FileDB queryFileByPdfFileId(String pdfFileId) {
+        String shardingKey = getShardingKeyByFileId(pdfFileId);
+        return db(shardingKey).selectFrom(FILE)
+                .where(FILE.PDF_FILE_ID.eq(pdfFileId)
+                        .and(FILE.STATUS.eq(FileStatus.NOT_DELETED.getValue())))
+                .fetchOne()
+                .into(FileDB.class);
+    }
+
     public void addFile(FileDB fileDB) {
         String shardingKey = getShardingKeyBySpaceCode(fileDB.getSpaceCode());
         FileRecord rec = FILE.newRecord();
