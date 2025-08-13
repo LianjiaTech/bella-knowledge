@@ -19,6 +19,7 @@ public class OpenAIFile {
     private Long bytes;
     private Long createdAt;
     private String filename;
+    private Boolean isDir;
     /**
      * assistants
      * assistants_output
@@ -53,4 +54,5 @@ public class OpenAIFile {
     private String spaceCode;
     private Long cuid;
     private String cuName;
+    private String path;
 }

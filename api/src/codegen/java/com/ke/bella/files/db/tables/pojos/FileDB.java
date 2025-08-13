@@ -22,6 +22,7 @@ public class FileDB implements Operator, Serializable {
     private String        fileId;
     private Long          version;
     private String        filename;
+    private Integer       isDir;
     private String        extension;
     private String        mimeType;
     private String        type;
@@ -50,6 +51,7 @@ public class FileDB implements Operator, Serializable {
         this.fileId = value.fileId;
         this.version = value.version;
         this.filename = value.filename;
+        this.isDir = value.isDir;
         this.extension = value.extension;
         this.mimeType = value.mimeType;
         this.type = value.type;
@@ -77,6 +79,7 @@ public class FileDB implements Operator, Serializable {
         String        fileId,
         Long          version,
         String        filename,
+        Integer       isDir,
         String        extension,
         String        mimeType,
         String        type,
@@ -102,6 +105,7 @@ public class FileDB implements Operator, Serializable {
         this.fileId = fileId;
         this.version = version;
         this.filename = filename;
+        this.isDir = isDir;
         this.extension = extension;
         this.mimeType = mimeType;
         this.type = type;
@@ -178,6 +182,20 @@ public class FileDB implements Operator, Serializable {
      */
     public void setFilename(String filename) {
         this.filename = filename;
+    }
+
+    /**
+     * Getter for <code>file.is_dir</code>. 是否为目录：1为目录，0为文件
+     */
+    public Integer getIsDir() {
+        return this.isDir;
+    }
+
+    /**
+     * Setter for <code>file.is_dir</code>. 是否为目录：1为目录，0为文件
+     */
+    public void setIsDir(Integer isDir) {
+        this.isDir = isDir;
     }
 
     /**
@@ -468,6 +486,7 @@ public class FileDB implements Operator, Serializable {
         sb.append(", ").append(fileId);
         sb.append(", ").append(version);
         sb.append(", ").append(filename);
+        sb.append(", ").append(isDir);
         sb.append(", ").append(extension);
         sb.append(", ").append(mimeType);
         sb.append(", ").append(type);

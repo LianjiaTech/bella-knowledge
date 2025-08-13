@@ -4,6 +4,7 @@ import static com.ke.bella.files.db.Tables.DATASET_DOCUMENT;
 import static com.ke.bella.files.db.Tables.DATASET_QA;
 import static com.ke.bella.files.db.Tables.DATASET_QA_REFERENCE;
 import static com.ke.bella.files.db.Tables.FILE;
+import static com.ke.bella.files.db.Tables.FILE_CLOSURE;
 import static com.ke.bella.files.db.Tables.FILE_PROGRESS;
 
 import java.util.regex.Pattern;
@@ -47,6 +48,9 @@ public class DSLContextHolder {
                                         new MappedTable()
                                                 .withInput(FILE.getName())
                                                 .withOutput(targetTableName(FILE.getName(), key)),
+                                        new MappedTable()
+                                                .withInput(FILE_CLOSURE.getName())
+                                                .withOutput(targetTableName(FILE_CLOSURE.getName(), key)),
                                         new MappedTable().withInput(FILE_PROGRESS.getName())
                                                 .withOutput(targetTableName(FILE_PROGRESS.getName(), key)),
                                         new MappedTable()

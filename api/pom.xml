@@ -208,6 +208,17 @@
             <groupId>top.bella</groupId>
             <artifactId>openapi-spi</artifactId>
             <version>1.1.21</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.redisson</groupId>
+                    <artifactId>redisson</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.redisson</groupId>
+            <artifactId>redisson-spring-boot-starter</artifactId>
+            <version>3.17.7</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.kafka</groupId>
@@ -435,6 +446,19 @@
                                         <pojoImplements>com.ke.bella.files.db.repo.Operator</pojoImplements>
                                         <recordImplements>com.ke.bella.files.db.repo.Operator</recordImplements>
                                     </table>
+                                    <table>
+                                        <expression>file_closure</expression>
+                                        <daoClass>
+                                            <transform>PASCAL</transform>
+                                            <expression>$0_D_B_Dao</expression>
+                                        </daoClass>
+                                        <pojoClass>
+                                            <transform>PASCAL</transform>
+                                            <expression>$0_D_B</expression>
+                                        </pojoClass>
+                                        <pojoImplements>com.ke.bella.files.db.repo.Operator</pojoImplements>
+                                        <recordImplements>com.ke.bella.files.db.repo.Operator</recordImplements>
+                                    </table>
                                 </tables>
                             </matchers>
                         </strategy>
@@ -451,7 +475,7 @@
                                 </forcedType>
                             </forcedTypes>
                             <includes>
-                                file|file_mapping|file_progress|instance|dataset|dataset_qa|dataset_qa_reference|dataset_sharding|dataset_document|tag
+                                file|file_mapping|file_progress|instance|dataset|dataset_qa|dataset_qa_reference|dataset_sharding|dataset_document|tag|file_closure
                             </includes>
                             <unsignedTypes>false</unsignedTypes>
                         </database>
