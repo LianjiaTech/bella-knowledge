@@ -11,6 +11,7 @@ import java.nio.charset.Charset;
 import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 import javax.imageio.ImageIO;
 import javax.servlet.http.HttpServletResponse;
@@ -43,6 +44,7 @@ import com.ke.bella.files.protocol.FileCropOps.FileCropOp;
 import com.ke.bella.files.protocol.FileException.FileNotFoundException;
 import com.ke.bella.files.protocol.FileException.ProgressNotFoundException;
 import com.ke.bella.files.protocol.FileOps;
+import com.ke.bella.files.protocol.FileSystemOps.MkdirOp;
 import com.ke.bella.files.protocol.FileUrl;
 import com.ke.bella.files.protocol.ListFileOps;
 import com.ke.bella.files.protocol.OpenAIFile;
@@ -50,6 +52,8 @@ import com.ke.bella.files.protocol.OpenapiListResponse;
 import com.ke.bella.files.protocol.Progress;
 import com.ke.bella.files.protocol.UpdateProgressRequestData;
 import com.ke.bella.files.service.FileService;
+import com.ke.bella.files.service.lock.FileUniquenessLock;
+import com.ke.bella.files.utils.BellaContextHelper;
 import com.ke.bella.openapi.utils.FileUtils;
 
 import lombok.AllArgsConstructor;
@@ -63,8 +67,18 @@ import okhttp3.MediaType;
 @Slf4j
 public class FileController {
 
+    private static final long FILE_LOCK_TIMEOUT_MS = 30000L;
+
+    private static final int MAX_DIRECTORY_NAME_LENGTH = 255;
+
+    private static final Pattern WINDOWS_INVALID_CHARS = Pattern.compile("[<>:\"|?*\\\\]|[\\x00-\\x1f]");
+
+    private static final Pattern UNIX_INVALID_CHARS = Pattern.compile("[\\x00/]");
+
     @Autowired
     FileService fileService;
+    @Autowired
+    FileUniquenessLock fl;
     @Value("${bella.file-api.file.tmp-file-dir}")
     private String tmpFileDir;
 
@@ -74,25 +88,38 @@ public class FileController {
             @RequestParam(value = "purpose", required = false) String purpose,
             @RequestParam(value = "metadata", required = false) String metadata,
             @RequestParam(value = "get_url", required = false, defaultValue = "false") boolean getUrl,
-            @RequestParam(value = "expires", required = false, defaultValue = ONE_DAY_STRING) long expires) throws IOException {
-        TmpFileInfo tmpFileInfo = null;
-        try {
-            tmpFileInfo = createTempFile(file);
+            @RequestParam(value = "expires", required = false, defaultValue = ONE_DAY_STRING) long expires,
+            @RequestParam(value = "ancestor_id", required = false) String ancestorId) throws IOException {
+        String spaceCode = BellaContextHelper.getOperateSpaceCode();
+        String filename = file.getOriginalFilename();
 
-            OpenAIFile openaiFile = fileService.upload(tmpFileInfo.getTmpFile(), file.getOriginalFilename(), purpose, metadata,
-                    tmpFileInfo.getMimeType(), tmpFileInfo.getType(), tmpFileInfo.getExtension(), tmpFileInfo.getCharset());
-
-            if(getUrl) {
-                String url = fileService.getUrl(openaiFile.getId(), expires);
-                openaiFile.setUrl(url);
+        return fl.executeWithLock(spaceCode, ancestorId, filename, FILE_LOCK_TIMEOUT_MS, () -> {
+            if(fileService.exists(spaceCode, ancestorId, filename)) {
+                throw new IllegalArgumentException(
+                        String.format("File with name '%s' already exists in the specified location", filename));
             }
 
-            return openaiFile;
-        } finally {
-            if(tmpFileInfo != null) {
-                tmpFileInfo.close();
+            TmpFileInfo tmpFileInfo = null;
+            try {
+                tmpFileInfo = createTempFile(file);
+
+                OpenAIFile openaiFile = fileService.upload(tmpFileInfo.getTmpFile(), filename, purpose, metadata,
+                        tmpFileInfo.getMimeType(), tmpFileInfo.getType(), tmpFileInfo.getExtension(), tmpFileInfo.getCharset(), ancestorId);
+
+                if(getUrl) {
+                    String url = fileService.getUrl(openaiFile.getId(), expires);
+                    openaiFile.setUrl(url);
+                }
+
+                return openaiFile;
+            } catch (IOException e) {
+                throw new IllegalStateException("File upload failed", e);
+            } finally {
+                if(tmpFileInfo != null) {
+                    tmpFileInfo.close();
+                }
             }
-        }
+        });
     }
 
     private TmpFileInfo createTempFile(MultipartFile file) throws IOException {
@@ -137,6 +164,7 @@ public class FileController {
 
     @GetMapping
     public OpenapiListResponse<OpenAIFile> list(
+            @RequestParam(value = "ancestor_id", required = false) String ancestorId,
             @RequestParam(value = "purpose", required = false) String purpose,
             @RequestParam(value = "limit", required = false, defaultValue = "10000") Integer limit,
             @RequestParam(value = "order", required = false, defaultValue = "desc") String order,
@@ -159,7 +187,7 @@ public class FileController {
             throw new IllegalArgumentException("Invalid after: " + after);
         }
 
-        List<OpenAIFile> files = fileService.list(purpose, limit + 1, order, after);
+        List<OpenAIFile> files = fileService.list(purpose, limit + 1, order, after, ancestorId);
         OpenapiListResponse<OpenAIFile> res = new OpenapiListResponse<>();
         if(files.size() > limit) {
             files = files.subList(0, limit);
@@ -178,6 +206,52 @@ public class FileController {
 
         res.setData(files);
         return res;
+    }
+
+    /**
+     * 验证文件/目录名称的合法性（常见操作系统限制）
+     * 当前校验规则包括：
+     * 1. 基础校验：不能为null或空字符串
+     * 2. 首尾空格：不能以空格开头或结尾（Windows兼容）
+     * 3. 长度限制：最大255字符（大多数文件系统限制）
+     * 4. 特殊目录名：禁止完全等于 "." 或 ".."（Unix/Linux路径遍历）
+     * 5. 后缀限制：不能以点号或空格结尾（Windows限制）
+     * 7. Windows非法字符：< > : " | ? * \ 和控制字符(0x00-0x1F)
+     * 8. Unix/Linux非法字符：空字符(0x00)和斜杠(/)
+     * 9. 控制字符：除制表符外的所有ISO控制字符（安全考虑）
+     * 注意：文件名中间可以包含空格、点号等字符，只是不能在特定位置出现
+     *
+     * @param name 待验证的文件/目录名称
+     *
+     * @throws IllegalArgumentException 当名称不符合规范时抛出异常
+     */
+    private void validateDirectoryName(String name) {
+        Assert.notNull(name, "Directory name cannot be null");
+
+        String trimmedName = name.trim();
+        Assert.hasText(trimmedName, "Directory name cannot be empty");
+        Assert.isTrue(trimmedName.equals(name), "Directory name cannot start or end with whitespace");
+        Assert.isTrue(trimmedName.length() <= MAX_DIRECTORY_NAME_LENGTH,
+                String.format("Directory name too long: %d characters (max %d)",
+                        trimmedName.length(), MAX_DIRECTORY_NAME_LENGTH));
+
+        Assert.isTrue(!".".equals(trimmedName) && !"..".equals(trimmedName),
+                "Directory name cannot be '.' or '..'");
+
+        char lastChar = trimmedName.charAt(trimmedName.length() - 1);
+        Assert.isTrue(lastChar != '.' && lastChar != ' ',
+                "Directory name cannot end with '.' or space");
+
+        Assert.isTrue(!WINDOWS_INVALID_CHARS.matcher(trimmedName).find() &&
+                !UNIX_INVALID_CHARS.matcher(trimmedName).find(),
+                "Directory name contains invalid characters");
+
+        for (int i = 0; i < trimmedName.length(); i++) {
+            char c = trimmedName.charAt(i);
+            Assert.isTrue(!Character.isISOControl(c) || c == '\t',
+                    String.format("Directory name contains control character at position %d", i));
+        }
+
     }
 
     @GetMapping("/{file_id}")
@@ -256,7 +330,7 @@ public class FileController {
             throw new IllegalArgumentException("file_id is required, but not provided");
         }
 
-        OpenAIFile uploaded = upload(file, "dom_tree", metadata, getUrl, expires);
+        OpenAIFile uploaded = upload(file, "dom_tree", metadata, getUrl, expires, null);
 
         FileOps bindOp = FileOps.builder()
                 .fileId(fileId)
@@ -315,7 +389,7 @@ public class FileController {
             throw new IllegalArgumentException("file_id is required, but not provided");
         }
 
-        OpenAIFile uploaded = upload(file, "pdf", metadata, getUrl, expires);
+        OpenAIFile uploaded = upload(file, "pdf", metadata, getUrl, expires, null);
 
         FileOps bindOp = FileOps.builder()
                 .fileId(fileId)
@@ -348,6 +422,7 @@ public class FileController {
         if(file == null) {
             throw new FileNotFoundException(fileId);
         }
+        Assert.isTrue(!file.getIsDir(), String.format("file is a directory, not a file. file_id = %s", fileId));
         String url = fileService.getUrl(fileId, expires);
         return FileUrl.builder()
                 .url(url)
@@ -407,6 +482,7 @@ public class FileController {
         if(file == null) {
             throw new FileNotFoundException(fileId);
         }
+        Assert.isTrue(!file.getIsDir(), String.format("file is a directory, not a file. file_id = %s", fileId));
 
         String url;
         if(!StringUtils.isEmpty(file.getPdfFileId())) {
@@ -460,6 +536,7 @@ public class FileController {
         // 校验文件存在
         OpenAIFile file = fileService.getFile(fileId);;
         Assert.notNull(file, String.format("file not found. file_id = %s", fileId));
+        Assert.isTrue(!file.getIsDir(), String.format("file is a directory, not a file. file_id = %s", fileId));
 
         // 确认要处理的pdf文件
         String pdfFileId = fileId;
@@ -568,5 +645,47 @@ public class FileController {
                 croppedImage.flush(); // 释放裁剪图像内存
             }
         }
+    }
+
+    @PostMapping("/mkdir")
+    public OpenAIFile mkdir(@RequestBody MkdirOp op) {
+        Assert.notNull(op, "invalid request body");
+        Assert.hasText(op.getName(), "name is required");
+
+        validateDirectoryName(op.getName());
+
+        String spaceCode = BellaContextHelper.getOperateSpaceCode();
+
+        return fl.executeWithLock(spaceCode, op.getAncestorId(), op.getName(), FILE_LOCK_TIMEOUT_MS, () -> {
+            if(fileService.exists(spaceCode, op.getAncestorId(), op.getName())) {
+                throw new IllegalArgumentException(
+                        String.format("Directory '%s' already exists in current directory, ancestor_id: '%s'", op.getName(), op.getAncestorId()));
+            }
+
+            return fileService.mkdir(op.getName(), op.getAncestorId());
+        });
+    }
+
+    @GetMapping("/find")
+    public OpenapiListResponse<OpenAIFile> find(
+            @RequestParam(value = "ancestor_id", required = false) String ancestorId) {
+        List<OpenAIFile> files = fileService.findFiles(ancestorId);
+
+        OpenapiListResponse<OpenAIFile> res = new OpenapiListResponse<>();
+        res.setData(files);
+        res.setHasMore(false);
+        if(!files.isEmpty()) {
+            res.setLastId(files.get(files.size() - 1).getId());
+        }
+        return res;
+    }
+
+    @GetMapping("/{file_id}/info")
+    public OpenAIFile info(@PathVariable("file_id") String fileId) {
+        OpenAIFile file = fileService.getFile(fileId);
+        if(file == null) {
+            throw new FileNotFoundException(fileId);
+        }
+        return fileService.info(fileId);
     }
 }

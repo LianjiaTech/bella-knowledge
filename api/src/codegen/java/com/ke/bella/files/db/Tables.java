@@ -10,6 +10,7 @@ import com.ke.bella.files.db.tables.DatasetQa;
 import com.ke.bella.files.db.tables.DatasetQaReference;
 import com.ke.bella.files.db.tables.DatasetSharding;
 import com.ke.bella.files.db.tables.File;
+import com.ke.bella.files.db.tables.FileClosure;
 import com.ke.bella.files.db.tables.FileMapping;
 import com.ke.bella.files.db.tables.FileProgress;
 import com.ke.bella.files.db.tables.Instance;
@@ -51,6 +52,11 @@ public class Tables {
      * The table <code>file</code>.
      */
     public static final File FILE = File.FILE;
+
+    /**
+     * 文件闭包表
+     */
+    public static final FileClosure FILE_CLOSURE = FileClosure.FILE_CLOSURE;
 
     /**
      * The table <code>file_mapping</code>.

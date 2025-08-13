@@ -78,283 +78,297 @@ public class FileRecord extends UpdatableRecordImpl<FileRecord> implements Opera
     }
 
     /**
+     * Setter for <code>file.is_dir</code>. 是否为目录：1为目录，0为文件
+     */
+    public void setIsDir(Integer value) {
+        set(4, value);
+    }
+
+    /**
+     * Getter for <code>file.is_dir</code>. 是否为目录：1为目录，0为文件
+     */
+    public Integer getIsDir() {
+        return (Integer) get(4);
+    }
+
+    /**
      * Setter for <code>file.extension</code>. extension
      */
     public void setExtension(String value) {
-        set(4, value);
+        set(5, value);
     }
 
     /**
      * Getter for <code>file.extension</code>. extension
      */
     public String getExtension() {
-        return (String) get(4);
+        return (String) get(5);
     }
 
     /**
      * Setter for <code>file.mime_type</code>. mime type
      */
     public void setMimeType(String value) {
-        set(5, value);
+        set(6, value);
     }
 
     /**
      * Getter for <code>file.mime_type</code>. mime type
      */
     public String getMimeType() {
-        return (String) get(5);
+        return (String) get(6);
     }
 
     /**
      * Setter for <code>file.type</code>. subtype of mime type, also known as file type
      */
     public void setType(String value) {
-        set(6, value);
+        set(7, value);
     }
 
     /**
      * Getter for <code>file.type</code>. subtype of mime type, also known as file type
      */
     public String getType() {
-        return (String) get(6);
+        return (String) get(7);
     }
 
     /**
      * Setter for <code>file.bucket</code>. 存储的地方
      */
     public void setBucket(String value) {
-        set(7, value);
+        set(8, value);
     }
 
     /**
      * Getter for <code>file.bucket</code>. 存储的地方
      */
     public String getBucket() {
-        return (String) get(7);
+        return (String) get(8);
     }
 
     /**
      * Setter for <code>file.path</code>. 文件路径
      */
     public void setPath(String value) {
-        set(8, value);
+        set(9, value);
     }
 
     /**
      * Getter for <code>file.path</code>. 文件路径
      */
     public String getPath() {
-        return (String) get(8);
+        return (String) get(9);
     }
 
     /**
      * Setter for <code>file.bytes</code>. 文件大小；单位：字节
      */
     public void setBytes(Long value) {
-        set(9, value);
+        set(10, value);
     }
 
     /**
      * Getter for <code>file.bytes</code>. 文件大小；单位：字节
      */
     public Long getBytes() {
-        return (Long) get(9);
+        return (Long) get(10);
     }
 
     /**
      * Setter for <code>file.space_code</code>. 组织编码；对标OpenAI organization
      */
     public void setSpaceCode(String value) {
-        set(10, value);
+        set(11, value);
     }
 
     /**
      * Getter for <code>file.space_code</code>. 组织编码；对标OpenAI organization
      */
     public String getSpaceCode() {
-        return (String) get(10);
+        return (String) get(11);
     }
 
     /**
      * Setter for <code>file.purpose</code>. 文件目的，参考OpenAI
      */
     public void setPurpose(String value) {
-        set(11, value);
+        set(12, value);
     }
 
     /**
      * Getter for <code>file.purpose</code>. 文件目的，参考OpenAI
      */
     public String getPurpose() {
-        return (String) get(11);
+        return (String) get(12);
     }
 
     /**
      * Setter for <code>file.cuid</code>.
      */
     public void setCuid(Long value) {
-        set(12, value);
+        set(13, value);
     }
 
     /**
      * Getter for <code>file.cuid</code>.
      */
     public Long getCuid() {
-        return (Long) get(12);
+        return (Long) get(13);
     }
 
     /**
      * Setter for <code>file.cu_name</code>.
      */
     public void setCuName(String value) {
-        set(13, value);
+        set(14, value);
     }
 
     /**
      * Getter for <code>file.cu_name</code>.
      */
     public String getCuName() {
-        return (String) get(13);
+        return (String) get(14);
     }
 
     /**
      * Setter for <code>file.ctime</code>.
      */
     public void setCtime(LocalDateTime value) {
-        set(14, value);
+        set(15, value);
     }
 
     /**
      * Getter for <code>file.ctime</code>.
      */
     public LocalDateTime getCtime() {
-        return (LocalDateTime) get(14);
+        return (LocalDateTime) get(15);
     }
 
     /**
      * Setter for <code>file.muid</code>.
      */
     public void setMuid(Long value) {
-        set(15, value);
+        set(16, value);
     }
 
     /**
      * Getter for <code>file.muid</code>.
      */
     public Long getMuid() {
-        return (Long) get(15);
+        return (Long) get(16);
     }
 
     /**
      * Setter for <code>file.mu_name</code>.
      */
     public void setMuName(String value) {
-        set(16, value);
+        set(17, value);
     }
 
     /**
      * Getter for <code>file.mu_name</code>.
      */
     public String getMuName() {
-        return (String) get(16);
+        return (String) get(17);
     }
 
     /**
      * Setter for <code>file.mtime</code>.
      */
     public void setMtime(LocalDateTime value) {
-        set(17, value);
+        set(18, value);
     }
 
     /**
      * Getter for <code>file.mtime</code>.
      */
     public LocalDateTime getMtime() {
-        return (LocalDateTime) get(17);
+        return (LocalDateTime) get(18);
     }
 
     /**
      * Setter for <code>file.meta_data</code>.
      */
     public void setMetaData(String value) {
-        set(18, value);
+        set(19, value);
     }
 
     /**
      * Getter for <code>file.meta_data</code>.
      */
     public String getMetaData() {
-        return (String) get(18);
+        return (String) get(19);
     }
 
     /**
      * Setter for <code>file.status</code>. 文件是否被删除，0表示未删除，-1表示已删除
      */
     public void setStatus(Integer value) {
-        set(19, value);
+        set(20, value);
     }
 
     /**
      * Getter for <code>file.status</code>. 文件是否被删除，0表示未删除，-1表示已删除
      */
     public Integer getStatus() {
-        return (Integer) get(19);
+        return (Integer) get(20);
     }
 
     /**
      * Setter for <code>file.ak_code</code>.
      */
     public void setAkCode(String value) {
-        set(20, value);
+        set(21, value);
     }
 
     /**
      * Getter for <code>file.ak_code</code>.
      */
     public String getAkCode() {
-        return (String) get(20);
+        return (String) get(21);
     }
 
     /**
      * Setter for <code>file.broadcast_status</code>. 文件是否被广播成功，0表示广播失败，1表示广播成功
      */
     public void setBroadcastStatus(Long value) {
-        set(21, value);
+        set(22, value);
     }
 
     /**
      * Getter for <code>file.broadcast_status</code>. 文件是否被广播成功，0表示广播失败，1表示广播成功
      */
     public Long getBroadcastStatus() {
-        return (Long) get(21);
+        return (Long) get(22);
     }
 
     /**
      * Setter for <code>file.dom_tree_file_id</code>. DOM tree的文件ID
      */
     public void setDomTreeFileId(String value) {
-        set(22, value);
+        set(23, value);
     }
 
     /**
      * Getter for <code>file.dom_tree_file_id</code>. DOM tree的文件ID
      */
     public String getDomTreeFileId() {
-        return (String) get(22);
+        return (String) get(23);
     }
 
     /**
      * Setter for <code>file.pdf_file_id</code>. PDF的文件ID
      */
     public void setPdfFileId(String value) {
-        set(23, value);
+        set(24, value);
     }
 
     /**
      * Getter for <code>file.pdf_file_id</code>. PDF的文件ID
      */
     public String getPdfFileId() {
-        return (String) get(23);
+        return (String) get(24);
     }
 
     // -------------------------------------------------------------------------
@@ -380,13 +394,14 @@ public class FileRecord extends UpdatableRecordImpl<FileRecord> implements Opera
     /**
      * Create a detached, initialised FileRecord
      */
-    public FileRecord(Long id, String fileId, Long version, String filename, String extension, String mimeType, String type, String bucket, String path, Long bytes, String spaceCode, String purpose, Long cuid, String cuName, LocalDateTime ctime, Long muid, String muName, LocalDateTime mtime, String metaData, Integer status, String akCode, Long broadcastStatus, String domTreeFileId, String pdfFileId) {
+    public FileRecord(Long id, String fileId, Long version, String filename, Integer isDir, String extension, String mimeType, String type, String bucket, String path, Long bytes, String spaceCode, String purpose, Long cuid, String cuName, LocalDateTime ctime, Long muid, String muName, LocalDateTime mtime, String metaData, Integer status, String akCode, Long broadcastStatus, String domTreeFileId, String pdfFileId) {
         super(File.FILE);
 
         setId(id);
         setFileId(fileId);
         setVersion(version);
         setFilename(filename);
+        setIsDir(isDir);
         setExtension(extension);
         setMimeType(mimeType);
         setType(type);

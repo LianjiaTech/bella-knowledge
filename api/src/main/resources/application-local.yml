@@ -43,6 +43,10 @@ spring:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       topic:
         broadcast: example-topic
+  redis:
+    host: redis.example.com
+    port: 10373
+    password: redis_password
 
 bella:
   open-api-base: https://api.example.com/

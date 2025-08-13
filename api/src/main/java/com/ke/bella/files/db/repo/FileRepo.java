@@ -1,37 +1,46 @@
 package com.ke.bella.files.db.repo;
 
 import static com.ke.bella.files.db.Tables.FILE;
+import static com.ke.bella.files.db.Tables.FILE_CLOSURE;
 import static com.ke.bella.files.db.Tables.FILE_MAPPING;
 import static com.ke.bella.files.db.Tables.FILE_PROGRESS;
 import static com.ke.bella.files.db.repo.DSLContextHolder.targetTableName;
 import static org.jooq.impl.DSL.field;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import javax.annotation.Nullable;
 import javax.annotation.Resource;
 
 import org.apache.commons.lang3.StringUtils;
-import org.jooq.Condition;
+import org.jetbrains.annotations.NotNull;
 import org.jooq.DSLContext;
+import org.jooq.InsertSetMoreStep;
 import org.jooq.Record;
+import org.jooq.Record1;
 import org.jooq.SelectConditionStep;
 import org.jooq.SelectOrderByStep;
 import org.jooq.UpdateSetMoreStep;
-import org.jooq.impl.DSL;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.Assert;
+import org.springframework.util.CollectionUtils;
 
 import com.ke.bella.files.db.tables.pojos.FileDB;
 import com.ke.bella.files.db.tables.pojos.FileProgressDB;
+import com.ke.bella.files.db.tables.records.FileClosureRecord;
 import com.ke.bella.files.db.tables.records.FileProgressRecord;
 import com.ke.bella.files.db.tables.records.FileRecord;
 import com.ke.bella.files.protocol.FileException.FileNotFoundException;
 import com.ke.bella.files.protocol.FileOps;
 import com.ke.bella.files.protocol.FileStatus;
 import com.ke.bella.files.protocol.ListFileOps;
+import com.ke.bella.files.utils.BellaContextHelper;
 import com.ke.bella.files.utils.CustomStringUtils;
 
 @Component
@@ -106,7 +115,28 @@ public class FileRepo implements BaseRepo {
                 .into(FileDB.class);
     }
 
-    public void addFile(FileDB fileDB) {
+    public boolean exists(String spaceCode, @Nullable String ancestorId, @NotNull String filename) {
+        String shardingKey = getShardingKeyBySpaceCode(spaceCode);
+
+        SelectConditionStep<Record1<Integer>> sql = db(shardingKey).selectOne()
+                .from(FILE_CLOSURE)
+                .innerJoin(FILE)
+                .on(FILE_CLOSURE.DESCENDANT_ID.eq(FILE.FILE_ID))
+                .where(FILE.FILENAME.eq(filename))
+                .and(FILE_CLOSURE.SPACE_CODE.eq(spaceCode));
+
+        if(StringUtils.isEmpty(ancestorId)) {
+            sql.and(FILE_CLOSURE.ROOT_DEPTH.eq(1L));
+        } else {
+            sql.and(FILE_CLOSURE.ANCESTOR_ID.eq(ancestorId))
+                    .and(FILE_CLOSURE.DEPTH.eq(1L));
+        }
+
+        return sql.limit(1).fetchOptional().isPresent();
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void addFile(FileDB fileDB, String ancestorId) {
         String shardingKey = getShardingKeyBySpaceCode(fileDB.getSpaceCode());
         FileRecord rec = FILE.newRecord();
         rec.from(fileDB);
@@ -117,6 +147,8 @@ public class FileRepo implements BaseRepo {
         if(insertedNum != 1) {
             throw new IllegalStateException("insert file failed, fileId: " + fileDB.getFileId());
         }
+
+        addFileClosures(fileDB.getFileId(), ancestorId);
     }
 
     public void updateFile(FileOps op, boolean increaseVersion) {
@@ -183,14 +215,26 @@ public class FileRepo implements BaseRepo {
             Integer limit,
             String order,
             String after,
-            String spaceCode) {
+            String spaceCode,
+            String ancestorId) {
         String shardingKey = getShardingKeyBySpaceCode(spaceCode);
-        Condition condition = DSL.trueCondition()
-                .and(FILE.SPACE_CODE.eq(spaceCode))
-                .and(FILE.STATUS.eq(FileStatus.NOT_DELETED.getValue()));
-        // 如果purpose为空则查询所有文件
+
+        SelectConditionStep<Record> query = db(shardingKey).select(FILE.fields())
+                .from(FILE_CLOSURE)
+                .innerJoin(FILE)
+                .on(FILE_CLOSURE.DESCENDANT_ID.eq(FILE.FILE_ID))
+                .where(FILE.SPACE_CODE.eq(spaceCode))
+                .and(FILE_CLOSURE.SPACE_CODE.eq(spaceCode));
+
+        if(StringUtils.isEmpty(ancestorId)) {
+            query.and(FILE_CLOSURE.ROOT_DEPTH.eq(1L));
+        } else {
+            query.and(FILE_CLOSURE.ANCESTOR_ID.eq(ancestorId))
+                    .and(FILE_CLOSURE.DEPTH.eq(1L));
+        }
+
         if(StringUtils.isNotEmpty(purpose)) {
-            condition = condition.and(FILE.PURPOSE.eq(purpose));
+            query = query.and(FILE.PURPOSE.eq(purpose));
         }
         if(StringUtils.isNotEmpty(after)) {
             after = queryNewFileId(after);
@@ -198,10 +242,10 @@ public class FileRepo implements BaseRepo {
                     .from(FILE)
                     .where(FILE.FILE_ID.eq(after))
                     .fetchOneInto(LocalDateTime.class);
-            condition = condition.and("asc".equalsIgnoreCase(order) ? FILE.CTIME.gt(afterCtime) : FILE.CTIME.lt(afterCtime));
+            query = query.and("asc".equalsIgnoreCase(order) ? FILE.CTIME.gt(afterCtime) : FILE.CTIME.lt(afterCtime));
         }
-        return db(shardingKey).selectFrom(FILE)
-                .where(condition)
+
+        return query
                 .orderBy("asc".equalsIgnoreCase(order) ? FILE.CTIME.asc() : FILE.CTIME.desc())
                 .limit(limit)
                 .fetchInto(FileDB.class);
@@ -289,5 +333,101 @@ public class FileRepo implements BaseRepo {
         }
 
         return records.fetchInto(FileDB.class);
+    }
+
+    private InsertSetMoreStep<FileClosureRecord> createFileClosureInsert(DSLContext dsl, String fileId, String ancestorId,
+            Long depth) {
+        return createFileClosureInsert(dsl, fileId, ancestorId, depth, -1L);
+    }
+
+    private InsertSetMoreStep<FileClosureRecord> createFileClosureInsert(DSLContext dsl, String fileId, String ancestorId,
+            Long depth,
+            Long rootDepth) {
+        FileClosureRecord rec = FILE_CLOSURE.newRecord();
+        rec.setSpaceCode(BellaContextHelper.getOperateSpaceCode());
+        rec.setAncestorId(ancestorId);
+        rec.setDescendantId(fileId);
+        rec.setDepth(depth);
+        rec.setRootDepth(rootDepth);
+        fillCreatorInfo(rec);
+
+        return dsl.insertInto(FILE_CLOSURE).set(rec);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void addFileClosures(String fileId, String ancestorId) {
+        String shardingKey = getShardingKeyByFileId(fileId);
+        DSLContext dsl = db(shardingKey);
+        List<InsertSetMoreStep<FileClosureRecord>> inserts = new ArrayList<>();
+
+        long rootDepth = 1L;
+
+        if(StringUtils.isNotEmpty(ancestorId)) {
+            List<FileClosureRecord> ancestorClosures = dsl.selectFrom(FILE_CLOSURE)
+                    .where(FILE_CLOSURE.DESCENDANT_ID.eq(ancestorId))
+                    .orderBy(FILE_CLOSURE.DEPTH.asc())
+                    .fetchInto(FileClosureRecord.class);
+
+            Assert.isTrue(!CollectionUtils.isEmpty(ancestorClosures),
+                    "descendant_id not found in file_closure, descendant_id: " + ancestorId);
+
+            rootDepth = (long) (ancestorClosures.size() + 1);
+
+            for (FileClosureRecord ancestorClosure : ancestorClosures) {
+                inserts.add(createFileClosureInsert(dsl, fileId, ancestorClosure.getAncestorId(), ancestorClosure.getDepth() + 1));
+            }
+        }
+
+        inserts.add(createFileClosureInsert(dsl, fileId, fileId, 0L, rootDepth));
+
+        int[] results = dsl.batch(inserts).execute();
+        if(results.length != inserts.size()) {
+            throw new IllegalStateException("batch insert file_closure failed, fileId: " + fileId);
+        }
+    }
+
+    public void deleteFileClosure(String fileId) {
+        String shardingKey = getShardingKeyByFileId(fileId);
+        db(shardingKey).delete(FILE_CLOSURE)
+                .where(FILE_CLOSURE.DESCENDANT_ID.eq(fileId))
+                .or(FILE_CLOSURE.ANCESTOR_ID.eq(fileId))
+                .execute();
+    }
+
+    public List<FileDB> findFiles(
+            String ancestorId) {
+        String spaceCode = BellaContextHelper.getOperateSpaceCode();
+        String shardingKey = getShardingKeyBySpaceCode(spaceCode);
+
+        SelectConditionStep<Record> query = db(shardingKey).select(FILE.fields())
+                .from(FILE_CLOSURE)
+                .innerJoin(FILE)
+                .on(FILE_CLOSURE.DESCENDANT_ID.eq(FILE.FILE_ID))
+                .where(FILE.SPACE_CODE.eq(spaceCode))
+                .and(FILE_CLOSURE.SPACE_CODE.eq(spaceCode));
+
+        if(StringUtils.isEmpty(ancestorId)) {
+            query.and(FILE_CLOSURE.ROOT_DEPTH.eq(1L));
+        } else {
+            query.and(FILE_CLOSURE.ANCESTOR_ID.eq(ancestorId))
+                    .and(FILE_CLOSURE.DEPTH.eq(1L));
+        }
+
+        return query
+                .orderBy(FILE.CTIME.desc())
+                .fetchInto(FileDB.class);
+    }
+
+    public List<FileDB> getPathFiles(String fileId) {
+        fileId = queryNewFileId(fileId);
+        String shardingKey = getShardingKeyByFileId(fileId);
+
+        return db(shardingKey).select(FILE.fields())
+                .from(FILE)
+                .innerJoin(FILE_CLOSURE)
+                .on(FILE.FILE_ID.eq(FILE_CLOSURE.ANCESTOR_ID))
+                .where(FILE_CLOSURE.DESCENDANT_ID.eq(fileId))
+                .orderBy(FILE_CLOSURE.DEPTH.desc())
+                .fetchInto(FileDB.class);
     }
 }

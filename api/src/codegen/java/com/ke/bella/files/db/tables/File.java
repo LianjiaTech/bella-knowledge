@@ -71,6 +71,11 @@ public class File extends TableImpl<FileRecord> {
     public final TableField<FileRecord, String> FILENAME = createField(DSL.name("filename"), SQLDataType.VARCHAR(512).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "文件名");
 
     /**
+     * The column <code>file.is_dir</code>. 是否为目录：1为目录，0为文件
+     */
+    public final TableField<FileRecord, Integer> IS_DIR = createField(DSL.name("is_dir"), SQLDataType.INTEGER.nullable(false).defaultValue(DSL.inline("0", SQLDataType.INTEGER)), this, "是否为目录：1为目录，0为文件");
+
+    /**
      * The column <code>file.extension</code>. extension
      */
     public final TableField<FileRecord, String> EXTENSION = createField(DSL.name("extension"), SQLDataType.VARCHAR(512).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "extension");
@@ -210,7 +215,7 @@ public class File extends TableImpl<FileRecord> {
 
     @Override
     public List<Index> getIndexes() {
-        return Arrays.<Index>asList(Indexes.FILE_IDX_CTIME, Indexes.FILE_IDX_SPACE_PURPOSE);
+        return Arrays.<Index>asList(Indexes.FILE_IDX_CTIME, Indexes.FILE_IDX_SPACE_FILENAME_STATUS, Indexes.FILE_IDX_SPACE_PURPOSE);
     }
 
     @Override

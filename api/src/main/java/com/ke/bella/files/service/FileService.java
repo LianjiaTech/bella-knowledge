@@ -51,6 +51,10 @@ public class FileService {
     @Autowired
     private BroadcastService broadcastService;
 
+    public boolean exists(String spaceCode, String ancestorId, String filename) {
+        return fileRepo.exists(spaceCode, ancestorId, filename);
+    }
+
     private void updateBroadcastStatus(String fileId, BroadcastStatus status) {
         FileOps op = new FileOps();
         op.setFileId(fileId);
@@ -73,6 +77,7 @@ public class FileService {
                         .toInstant(ZoneId.systemDefault().getRules().getOffset(fileDB.getCtime()))
                         .toEpochMilli())
                 .filename(fileDB.getFilename())
+                .isDir(fileDB.getIsDir() == 1)
                 .extension(fileDB.getExtension())
                 .mimeType(fileDB.getMimeType())
                 .type(fileDB.getType())
@@ -139,6 +144,20 @@ public class FileService {
             String type,
             String extension,
             String charset) {
+        return upload(file, filename, purpose, metadata, mimeType, type, extension, charset, null);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public OpenAIFile upload(
+            File file,
+            String filename,
+            String purpose,
+            String metadata,
+            String mimeType,
+            String type,
+            String extension,
+            String charset,
+            String ancestorId) {
         String spaceCode = BellaContextHelper.getOperateSpaceCode();
         String fileId = FILEID_GEN.generate();
         String bucketName = purpose.equals(VISION) ? bucketConfig.getPublicBucket() : bucketConfig.getPrivateBucket();
@@ -164,7 +183,7 @@ public class FileService {
         fileDB.setPurpose(purpose);
         fileDB.setMetaData(metadata);
         fileDB.setAkCode(akCode);
-        fileRepo.addFile(fileDB);
+        fileRepo.addFile(fileDB, ancestorId);
         FileDB res = fileRepo.queryFile(fileId);
         if(res == null) {
             throw new FileNotFoundException(fileId);
@@ -188,9 +207,10 @@ public class FileService {
             String purpose,
             Integer limit,
             String order,
-            String after) {
+            String after,
+            String ancestorId) {
         String spaceCode = BellaContextHelper.getOperateSpaceCode();
-        List<FileDB> files = fileRepo.listFile(purpose, limit, order, after, spaceCode);
+        List<FileDB> files = fileRepo.listFile(purpose, limit, order, after, spaceCode, ancestorId);
         List<OpenAIFile> emptyList = new ArrayList<>();
         // don't set source fIle for listing
         return files == null ? emptyList : files.stream().map(this::transferToOpenAIFile).collect(Collectors.toList());
@@ -233,6 +253,7 @@ public class FileService {
         return finalOpenAIFile;
     }
 
+    @Transactional(rollbackFor = Exception.class)
     public void delete(String fileId) {
         // 只标记status字段，不删除文件，不删除数据库记录
         FileOps op = new FileOps();
@@ -240,6 +261,7 @@ public class FileService {
         op.setStatus(FileStatus.DELETED);
         try {
             fileRepo.updateFile(op);
+            fileRepo.deleteFileClosure(fileId);
         } catch (Exception e) {
             throw new IllegalStateException("Failed to update file status (indicating deletion), fileId: "
                     + fileId + ", status: " + FileStatus.DELETED, e);
@@ -321,6 +343,68 @@ public class FileService {
             LOGGER.error(errMsg, e);
             throw new IllegalStateException(errMsg, e);
         }
+    }
+
+    public OpenAIFile mkdir(String name, String ancestorId) {
+        String spaceCode = BellaContextHelper.getOperateSpaceCode();
+
+        String fileId = FILEID_GEN.generate();
+        String akCode = BellaContextHelper.getOperatorAkCode();
+
+        FileDB fileDB = new FileDB();
+        fileDB.setFileId(fileId);
+        fileDB.setFilename(name);
+        fileDB.setExtension("");
+        fileDB.setMimeType("");
+        fileDB.setType("");
+        fileDB.setBucket("");
+        fileDB.setPath("");
+        fileDB.setBytes(0L);
+        fileDB.setSpaceCode(spaceCode);
+        fileDB.setPurpose(null);
+        fileDB.setMetaData("{}");
+        fileDB.setAkCode(akCode);
+        fileDB.setIsDir(1);
+
+        fileRepo.addFile(fileDB, ancestorId);
+
+        FileDB res = fileRepo.queryFile(fileId);
+        if(res == null) {
+            throw new FileNotFoundException(fileId);
+        }
+
+        OpenAIFile openAIFile = transferToOpenAIFile(res);
+
+        FileBroadcasting<OpenAIFile> message = new FileBroadcasting<>();
+        message.setEvent(EventType.FILE_CREATED);
+        message.setData(openAIFile);
+        message.setMetadata("{}");
+        message.setUserId(BellaContextHelper.getOperatorUserId());
+        message.setUserName(BellaContextHelper.getOperatorUserName());
+        broadcastService.broadcast(message, () -> updateBroadcastStatus(fileId, BroadcastStatus.SUCCESS),
+                () -> updateBroadcastStatus(fileId, BroadcastStatus.FAILED));
+        return openAIFile;
+    }
+
+    public List<OpenAIFile> findFiles(
+            String ancestorId) {
+        List<FileDB> fileDbs = fileRepo.findFiles(ancestorId);
+        return fileDbs.stream()
+                .map(this::transferToOpenAIFile)
+                .collect(Collectors.toList());
+    }
+
+    public OpenAIFile info(String fileId) {
+        List<FileDB> pathFiles = fileRepo.getPathFiles(fileId);
+        StringBuilder pathBuilder = new StringBuilder();
+        for (FileDB file : pathFiles) {
+            pathBuilder.append("/");
+            pathBuilder.append(file.getFilename());
+        }
+
+        OpenAIFile result = transferToOpenAIFile(pathFiles.get(0));
+
+        return result.toBuilder().path(pathBuilder.toString()).build();
     }
 
     @Data
