@@ -40,6 +40,7 @@ export const requestCreateDataset = async (data: {
   name: string;
   type: "qa" | "document";
   remark: string;
+  file_id?: string;
 }) => {
   const res = await webRequest({
     path: "/api/dataset",

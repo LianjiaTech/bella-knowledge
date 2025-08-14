@@ -111,11 +111,13 @@ export function CreateDatasetForm({
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     try {
       setSubmitting(true);
-      const res = await requestCreateDataset({
+      const requestData = {
         name: data.name,
         remark: data.remark,
         type,
-      });
+        ...(uploadedFiles.length > 0 && { file_id: uploadedFiles[0].id })
+      };
+      const res = await requestCreateDataset(requestData);
       if (res.code === 200) {
         toast.success("数据集创建成功");
         onSuccess();
