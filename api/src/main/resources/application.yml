@@ -29,6 +29,8 @@ bella:
   file-api:
     file:
       tmp-file-dir: .
+      exists:
+        block: false
     bucket-name:
       public: test
       private: test

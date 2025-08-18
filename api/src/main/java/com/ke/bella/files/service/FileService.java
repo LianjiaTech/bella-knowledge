@@ -55,6 +55,14 @@ public class FileService {
         return fileRepo.exists(spaceCode, ancestorId, filename);
     }
 
+    public OpenAIFile getFile(String spaceCode, String ancestorId, String filename) {
+        FileDB fileDB = fileRepo.queryFile(spaceCode, ancestorId, filename);
+        if(fileDB == null) {
+            return null;
+        }
+        return transferToOpenAIFile(fileDB);
+    }
+
     private void updateBroadcastStatus(String fileId, BroadcastStatus status) {
         FileOps op = new FileOps();
         op.setFileId(fileId);
