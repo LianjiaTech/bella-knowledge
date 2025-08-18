@@ -12,6 +12,7 @@ public class Configs {
 
     public static Integer TASK_THREAD_NUMS;
     public static Integer DATASETS_IMPORT_BATCH_SIZE;
+    public static Boolean FILE_EXISTS_BLOCK;
 
     @Value("${spring.servlet.multipart.max-file-size}")
     public void setMaxSizeInMB(String maxFileSize) {
@@ -31,5 +32,10 @@ public class Configs {
     @Value("${bella.datasets.import.batch-size}")
     public void setDatasetsImportBatchSize(Integer batchSize) {
         DATASETS_IMPORT_BATCH_SIZE = batchSize;
+    }
+
+    @Value("${bella.file-api.file.exists.block}")
+    public void setFileExistsCheckEnabled(Boolean enabled) {
+        FILE_EXISTS_BLOCK = enabled;
     }
 }

@@ -135,6 +135,26 @@ public class FileRepo implements BaseRepo {
         return sql.limit(1).fetchOptional().isPresent();
     }
 
+    public FileDB queryFile(String spaceCode, @Nullable String ancestorId, @NotNull String filename) {
+        String shardingKey = getShardingKeyBySpaceCode(spaceCode);
+
+        SelectConditionStep<Record> sql = db(shardingKey).select(FILE.fields())
+                .from(FILE_CLOSURE)
+                .innerJoin(FILE)
+                .on(FILE_CLOSURE.DESCENDANT_ID.eq(FILE.FILE_ID))
+                .where(FILE_CLOSURE.SPACE_CODE.eq(spaceCode))
+                .and(FILE.FILENAME.eq(filename));
+
+        if(StringUtils.isEmpty(ancestorId)) {
+            sql.and(FILE_CLOSURE.ROOT_DEPTH.eq(1L));
+        } else {
+            sql.and(FILE_CLOSURE.ANCESTOR_ID.eq(ancestorId))
+                    .and(FILE_CLOSURE.DEPTH.eq(1L));
+        }
+
+        return sql.limit(1).fetchOneInto(FileDB.class);
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public void addFile(FileDB fileDB, String ancestorId) {
         String shardingKey = getShardingKeyBySpaceCode(fileDB.getSpaceCode());
