@@ -532,6 +532,7 @@ public class DatasetController {
         private String similarQ3;
         private String answer;
         private String reasoning;
+        private String scoringCriteria;
         private List<String> tags;
         private Long cuid;
         private String cuName;
@@ -553,6 +554,7 @@ public class DatasetController {
             result.setSimilarQ3(qa.getSimilarQ3());
             result.setAnswer(qa.getAnswer());
             result.setReasoning(qa.getReasoning());
+            result.setScoringCriteria(qa.getScoringCriteria());
             result.setCuid(qa.getCuid());
             result.setCuName(qa.getCuName());
             result.setCtime(qa.getCtime());

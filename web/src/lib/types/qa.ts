@@ -30,6 +30,7 @@ export type Question = {
   status: number;
   tags?: string[];
   reasoning?: string;
+  scoring_criteria?: string;
 };
 
 export type QuestionList = Question[];

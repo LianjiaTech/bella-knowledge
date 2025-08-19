@@ -58,6 +58,7 @@ public class DatasetOps {
         private String similarQ3;
         private String answer;
         private String reasoning;
+        private String scoringCriteria;
         private List<QAReferenceOp> references;
         private List<String> tags;
     }

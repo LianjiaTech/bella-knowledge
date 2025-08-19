@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   const body = await req.json();
-  const { dataset_id, item_id, question, answer, reasoning, tags } = body;
+  const { dataset_id, item_id, question, answer, reasoning, scoring_criteria, tags } = body;
   const res = await backendRequest(req, {
     url: `${FILE_API_URL}/v1/datasets/qa/update`,
     method: "POST",
@@ -36,6 +36,7 @@ export async function PUT(req: NextRequest) {
       question,
       answer,
       reasoning,
+      scoring_criteria: scoring_criteria,
       tags,
     },
   });

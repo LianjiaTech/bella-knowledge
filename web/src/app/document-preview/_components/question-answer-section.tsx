@@ -4,6 +4,7 @@ import * as React from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { TagSelector } from "@/components/ui/tag-selector";
 import { ReasoningSection } from "@/components/ui/reasoning-section";
+import { ScoringCriteriaSection } from "@/components/ui/scoring-criteria-section";
 import { useDocumentPreviewStore } from "../model";
 
 export function QuestionAnswerSection() {
@@ -13,11 +14,13 @@ export function QuestionAnswerSection() {
     answerInputVal,
     selectedTags,
     reasoningText,
+    scoringCriteriaText,
     availableTags,
     onChangeQuestionInputVal,
     onChangeAnswerInputVal,
     onChangeSelectedTags,
     onChangeReasoningText,
+    onChangeScoringCriteriaText,
     getTagsList,
     updateQuestion,
   } = useDocumentPreviewStore();
@@ -33,6 +36,7 @@ export function QuestionAnswerSection() {
       answer: answerInputVal,
       tags: selectedTags,
       reasoning: reasoningText,
+      scoring_criteria: scoringCriteriaText,
     });
   };
 
@@ -44,6 +48,7 @@ export function QuestionAnswerSection() {
       answer: answerInputVal,
       tags: tags || selectedTags, // 优先使用传入的tags参数，避免状态滞后问题
       reasoning: reasoningText,
+      scoring_criteria: scoringCriteriaText,
     });
   };
 
@@ -92,6 +97,15 @@ export function QuestionAnswerSection() {
           <ReasoningSection 
             reasoning={reasoningText}
             onReasoningChange={onChangeReasoningText}
+            onBlur={onBlur}
+          />
+        </div>
+        
+        {/* Scoring criteria section for answers */}
+        <div className="mt-3">
+          <ScoringCriteriaSection 
+            scoring_criteria={scoringCriteriaText}
+            onScoringCriteriaChange={onChangeScoringCriteriaText}
             onBlur={onBlur}
           />
         </div>

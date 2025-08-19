@@ -28,6 +28,7 @@ public class DatasetQaDB implements Operator, Serializable {
     private String        similarQ3;
     private String        answer;
     private String        reasoning;
+    private String        scoringCriteria;
     private String        tags;
     private Long          cuid;
     private String        cuName;
@@ -50,6 +51,7 @@ public class DatasetQaDB implements Operator, Serializable {
         this.similarQ3 = value.similarQ3;
         this.answer = value.answer;
         this.reasoning = value.reasoning;
+        this.scoringCriteria = value.scoringCriteria;
         this.tags = value.tags;
         this.cuid = value.cuid;
         this.cuName = value.cuName;
@@ -71,6 +73,7 @@ public class DatasetQaDB implements Operator, Serializable {
         String        similarQ3,
         String        answer,
         String        reasoning,
+        String        scoringCriteria,
         String        tags,
         Long          cuid,
         String        cuName,
@@ -90,6 +93,7 @@ public class DatasetQaDB implements Operator, Serializable {
         this.similarQ3 = similarQ3;
         this.answer = answer;
         this.reasoning = reasoning;
+        this.scoringCriteria = scoringCriteria;
         this.tags = tags;
         this.cuid = cuid;
         this.cuName = cuName;
@@ -241,6 +245,20 @@ public class DatasetQaDB implements Operator, Serializable {
     }
 
     /**
+     * Getter for <code>dataset_qa.scoring_criteria</code>. 评测集答案的评分依据/得分要点
+     */
+    public String getScoringCriteria() {
+        return this.scoringCriteria;
+    }
+
+    /**
+     * Setter for <code>dataset_qa.scoring_criteria</code>. 评测集答案的评分依据/得分要点
+     */
+    public void setScoringCriteria(String scoringCriteria) {
+        this.scoringCriteria = scoringCriteria;
+    }
+
+    /**
      * Getter for <code>dataset_qa.tags</code>. 标签信息冗余存储，格式：[{"tag_id":"","name":""}]
      */
     public String getTags() {
@@ -366,6 +384,7 @@ public class DatasetQaDB implements Operator, Serializable {
         sb.append(", ").append(similarQ3);
         sb.append(", ").append(answer);
         sb.append(", ").append(reasoning);
+        sb.append(", ").append(scoringCriteria);
         sb.append(", ").append(tags);
         sb.append(", ").append(cuid);
         sb.append(", ").append(cuName);
