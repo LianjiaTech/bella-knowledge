@@ -307,6 +307,9 @@ public class DatasetRepo implements BaseRepo {
         if(op.getReasoning() != null) {
             rec.setReasoning(op.getReasoning());
         }
+        if(op.getScoringCriteria() != null) {
+            rec.setScoringCriteria(op.getScoringCriteria());
+        }
 
         // 直接使用 QAOp 中的 tags，转换为 JSON 字符串
         if(op.getTags() != null) {
@@ -349,6 +352,9 @@ public class DatasetRepo implements BaseRepo {
 
         if(op.getReasoning() != null) {
             rec.set(DATASET_QA.REASONING, op.getReasoning());
+        }
+        if(op.getScoringCriteria() != null) {
+            rec.set(DATASET_QA.SCORING_CRITERIA, op.getScoringCriteria());
         }
 
         if(op.getTags() != null) {

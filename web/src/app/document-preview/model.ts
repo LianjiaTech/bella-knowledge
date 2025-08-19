@@ -19,6 +19,7 @@ type State = {
   answerInputVal: string;
   selectedTags: string[];
   reasoningText: string;
+  scoringCriteriaText: string;
   availableTags: Tag[];
   selectedQuestion: Question | null;
   questionList: QuestionList;
@@ -34,6 +35,7 @@ type Action = {
   onChangeAnswerInputVal: (val: string) => void;
   onChangeSelectedTags: (tags: string[]) => void;
   onChangeReasoningText: (reasoning: string) => void;
+  onChangeScoringCriteriaText: (scoring_criteria: string) => void;
   onChangeSelectedQuestion: (question: Question) => void;
   addQuestion: (body: {
     dataset_id: string;
@@ -41,9 +43,10 @@ type Action = {
     answer: string;
     tags?: string[];
     reasoning?: string;
+    scoring_criteria?: string;
   }) => void;
   deleteQuestion: (question: Question) => void;
-  updateQuestion: (question: Question & { tags?: string[]; reasoning?: string }) => void;
+  updateQuestion: (question: Question & { tags?: string[]; reasoning?: string; scoring_criteria?: string }) => void;
   getQuestionList: (dataset_id: string) => void;
   addQuestionReference: (params: {
     dataset_id: string;
@@ -75,6 +78,7 @@ const store = create<State & Action>((set, get) => ({
   answerInputVal: "",
   selectedTags: [],
   reasoningText: "",
+  scoringCriteriaText: "",
   availableTags: [],
   questionList: [],
   qaReferenceList: [],
@@ -105,6 +109,7 @@ const store = create<State & Action>((set, get) => ({
         answerInputVal: res.data.answer,
         selectedTags: res.data.tags || [],
         reasoningText: res.data.reasoning || "",
+        scoringCriteriaText: res.data.scoring_criteria || "",
         lastEditTime: Date.now(),
       });
       toast.success("添加成功");
@@ -126,6 +131,8 @@ const store = create<State & Action>((set, get) => ({
           selectedQuestion: null,
           questionInputVal: "",
           answerInputVal: "",
+          reasoningText: "",
+          scoringCriteriaText: "",
         });
       }
       set({
@@ -137,7 +144,7 @@ const store = create<State & Action>((set, get) => ({
       toast.success("删除成功");
     }
   },
-  updateQuestion: async ({ dataset_id, item_id, question, answer, tags, reasoning }) => {
+  updateQuestion: async ({ dataset_id, item_id, question, answer, tags, reasoning, scoring_criteria }) => {
     const { questionList } = get();
     const currentQuestion = questionList.find(
       (question) => question.item_id === item_id,
@@ -146,7 +153,8 @@ const store = create<State & Action>((set, get) => ({
       currentQuestion?.question === question &&
       currentQuestion?.answer === answer &&
       JSON.stringify(currentQuestion?.tags) === JSON.stringify(tags) &&
-      currentQuestion?.reasoning === reasoning
+      currentQuestion?.reasoning === reasoning &&
+      currentQuestion?.scoring_criteria === scoring_criteria
     ) {
       return;
     }
@@ -160,6 +168,7 @@ const store = create<State & Action>((set, get) => ({
         answer: answer,
         tags: tags,
         reasoning: reasoning,
+        scoring_criteria: scoring_criteria,
       },
     });
     if (res.code === 200) {
@@ -172,6 +181,7 @@ const store = create<State & Action>((set, get) => ({
         answerInputVal: res.data.answer,
         selectedTags: res.data.tags || [],
         reasoningText: res.data.reasoning || "",
+        scoringCriteriaText: res.data.scoring_criteria || "",
         lastEditTime: Date.now(),
       });
       toast.success("更新成功");
@@ -304,6 +314,7 @@ const store = create<State & Action>((set, get) => ({
         answerInputVal: question.answer,
         selectedTags: question.tags || [],
         reasoningText: question.reasoning || "",
+        scoringCriteriaText: question.scoring_criteria || "",
       });
       const { getReferenceList } = get();
       getReferenceList(question.dataset_id, question.item_id.toString());
@@ -415,6 +426,9 @@ const store = create<State & Action>((set, get) => ({
   onChangeReasoningText: (reasoning: string) => {
     set({ reasoningText: reasoning });
   },
+  onChangeScoringCriteriaText: (scoringCriteria: string) => {
+    set({ scoringCriteriaText: scoringCriteria });
+  },
   getTagsList: async () => {
     try {
       const res = await requestTagsList();
@@ -478,6 +492,7 @@ const store = create<State & Action>((set, get) => ({
       answerInputVal: "",
       selectedTags: [],
       reasoningText: "",
+      scoringCriteriaText: "",
       availableTags: [],
       selectedQuestion: null,
       questionList: [],
