@@ -596,6 +596,17 @@ public class DatasetController {
                 qaData.put("reasoning", qa.getReasoning());
             }
 
+            if(StringUtils.hasText(qa.getScoringCriteria())) {
+                qaData.put("scoring_criteria", qa.getScoringCriteria());
+            }
+
+            List<String> tags = JsonUtils.fromJson(qa.getTags(),
+                    new TypeReference<List<String>>() {
+                    });
+            if(!CollectionUtils.isEmpty(tags)) {
+                qaData.put("tags", tags);
+            }
+
             if(!CollectionUtils.isEmpty(references)) {
                 List<Map<String, Object>> refList = references.stream()
                         .map(ref -> {
