@@ -266,7 +266,8 @@ public class FileRepo implements BaseRepo {
         }
 
         return query
-                .orderBy("asc".equalsIgnoreCase(order) ? FILE.CTIME.asc() : FILE.CTIME.desc())
+                .orderBy(FILE.IS_DIR.desc(),
+                        "asc".equalsIgnoreCase(order) ? FILE.CTIME.asc() : FILE.CTIME.desc())
                 .limit(limit)
                 .fetchInto(FileDB.class);
     }
@@ -434,7 +435,8 @@ public class FileRepo implements BaseRepo {
         }
 
         return query
-                .orderBy(FILE.CTIME.desc())
+                .orderBy(FILE.IS_DIR.desc(),
+                        FILE.CTIME.desc())
                 .fetchInto(FileDB.class);
     }
 
