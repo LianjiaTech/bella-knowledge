@@ -25,7 +25,7 @@ export function FileTabs({
     <div className="flex items-center gap-2">
       <div className="flex-1 overflow-hidden relative">
         <div className="flex items-center border-b border-gray-200 bg-gray-50 rounded-t-md">
-          <ScrollArea ref={tabsScrollRef} className="sm:w-[520px] lg:w-[720px]">
+          <ScrollArea ref={tabsScrollRef} className="w-full">
             <div className="flex w-max min-h-[40px]">
               {referenceFileList.map((file) => (
                 <div

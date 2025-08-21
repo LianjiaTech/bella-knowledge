@@ -74,7 +74,7 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
   };
   const handleFileUpload = async (file: File) => {
     setUploading(true);
-    const fileData = await postUploadFile(file);
+    const fileData = await postUploadFile({ file });
 
     const fileId = fileData?.id || "";
     if (fileData && fileId) {

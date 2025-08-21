@@ -9,6 +9,7 @@ export type KnowledgeFile = {
   extension: string;
   dom_tree_file_id: string;
   mime_type: string;
+  is_dir: boolean;
 };
 
 export interface DatasetFile {

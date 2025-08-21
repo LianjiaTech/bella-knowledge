@@ -53,18 +53,45 @@ export async function webRequest<T>(
 export async function webRequestFormData<T>(params: {
   path: string;
   data: Record<string, unknown>;
+  headers?: Record<string, string>;
 }): Promise<WebResponse<T>> {
-  const { path, data } = params;
+  const { path, data, headers } = params;
   const formData = new FormData();
   Object.entries(data).forEach(([key, value]) => {
     formData.append(key, value as string);
   });
+  const currentWorkspace = JSON.parse(
+    localStorage.getItem("current_workspace") || "{}",
+  );
   const response = await fetch(path, {
     credentials: "same-origin",
     method: "POST",
     body: formData,
+    headers: {
+      "X-USER-ID": localStorage.getItem("user_id") || "",
+      "X-BELLA-SPACE-CODE": currentWorkspace.spaceCode || "",
+      ...headers,
+    },
   });
-  return response.json() as unknown as WebResponse<T>;
+  const responseData = await response.json();
+  if (responseData.code === 401) {
+    window.location.href =
+      responseData.data.redirectUrl + encodeURIComponent(window.location.href);
+    return {
+      code: 401,
+      data: null,
+      message: responseData.message,
+    } as WebResponse<T>;
+  }
+  if (responseData.code !== 200) {
+    toast.error(responseData.message);
+    return {
+      code: responseData.code,
+      data: null,
+      message: responseData.message,
+    } as WebResponse<T>;
+  }
+  return responseData as WebResponse<T>;
 }
 
 export async function webRequestFetch(url: string) {

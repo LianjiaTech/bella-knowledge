@@ -28,11 +28,10 @@ export async function backendRequest(
         body: JSON.stringify(body),
       },
     );
-
+    // 每个接口都打印一下，方便调试
     logRequestError(req, { url, method, query, body }, response);
+
     if (response.status === 401) {
-      if (url.includes("/userInfo") || url.includes("/role/list")) {
-      }
       const redirectUrl = response.headers.get("X-Redirect-Login");
       LogUtils.warning(`用户未授权，需要重新登录: ${req.url}`);
       return NextResponse.json({
@@ -44,18 +43,27 @@ export async function backendRequest(
     }
 
     if (response.status !== 200) {
-      logRequestError(req, { url, method, query, body }, response);
-
-      const data = await response.json();
-      return NextResponse.json(data);
-    } else {
-      if (
-        url.includes("/dom-tree/content") ||
-        url.includes("/role/list") ||
-        url.includes("/userInfo")
-      ) {
-        logRequestError(req, { url, method, query, body }, response);
+      try {
+        const data = await response.json();
+        if (data.error) {
+          return NextResponse.json({
+            code: 500,
+            error: true,
+            message: data.error.message,
+          });
+        }
+        return NextResponse.json({
+          code: 500,
+          error: true,
+          message: "未知错误",
+        });
+      } catch (error) {
+        return NextResponse.json({
+          code: 500,
+          message: error instanceof Error ? error.message : "服务器错误",
+        });
       }
+    } else {
       const responseData = await response.json();
       LogUtils.success(`接口请求成功: ${method} ${url}`);
       return NextResponse.json(responseData);
@@ -93,7 +101,38 @@ export async function backendRequestFormData(
     body: formData,
     method,
   });
-  return response;
+  if (response.status === 500) {
+    logRequestErrorFormData(req, { url, method: "POST", body: data }, response);
+    return NextResponse.json({
+      code: 500,
+      message: "服务器错误",
+    });
+  }
+
+  if (response.status === 401) {
+    const redirectUrl = response.headers.get("X-Redirect-Login");
+    LogUtils.warning(`用户未授权，需要重新登录: ${req.url}`);
+    return NextResponse.json({
+      code: 401,
+      data: {
+        redirectUrl: redirectUrl,
+      },
+    });
+  }
+
+  if (response.status !== 200) {
+    const resBody = await response.json();
+    logRequestErrorFormData(req, { url, method: "POST", body: data }, response);
+    return NextResponse.json({
+      code: response.status,
+      message: resBody.error.message,
+    });
+  }
+  const responseData = await response.json();
+  return NextResponse.json({
+    code: 200,
+    data: responseData,
+  });
 }
 
 const logRequestError = (
@@ -122,5 +161,33 @@ const logRequestError = (
     cookieHeader ? " \\\n  " : ""
   }${bodyParam}${url}${queryString}`;
 
+  LogUtils.error(`${method} ${url} ${response.status}\n${curl}`);
+};
+
+const logRequestErrorFormData = (
+  req: NextRequest,
+  params: {
+    url: string;
+    method: "GET" | "POST";
+    query?: Record<string, string>;
+    body?: Record<string, unknown>;
+  },
+  response: Response,
+) => {
+  if (isProd) return;
+  const { url, method, query, body } = params;
+  const cookies = req.cookies.getAll();
+  const cookieHeader =
+    cookies.length > 0
+      ? `-H "Cookie: ${cookies.map((c) => `${c.name}=${c.value}`).join("; ")}"`
+      : "";
+  const queryString = query ? `?${new URLSearchParams(query).toString()}` : "";
+  const bodyParams = Object.entries(body || {}).map(
+    ([key, value]) => `-F '${key}=${value}' \\\n  `,
+  );
+  const workspace = req.headers.get("X-BELLA-SPACE-CODE");
+  const curl = `curl -X ${method} \\\n  -H "X-BELLA-CONSOLE: true" \\\n  -H "X-BELLA-SPACE-CODE: ${workspace}" \\\n  -H "Content-Type: multipart/form-data" \\\n  ${cookieHeader}${
+    cookieHeader ? " \\\n  " : ""
+  }${bodyParams.join("")}${url}${queryString}`;
   LogUtils.error(`${method} ${url} ${response.status}\n${curl}`);
 };

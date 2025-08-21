@@ -10,5 +10,8 @@ export async function GET(req: NextRequest) {
     method: "GET",
   });
   const data = await res.json();
+  if (data.code === 401) {
+    return NextResponse.json(data);
+  }
   return NextResponse.json({ code: 200, data });
 }

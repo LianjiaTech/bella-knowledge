@@ -3,17 +3,19 @@ import { FILE_API_URL } from "@/lib/request/const ";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
-  const { file_id, bbox, page } = await req.json();
+  const body = await req.json();
   const res = await backendRequest(req, {
-    url: `${FILE_API_URL}/v1/files/crop-image`,
+    url: `${FILE_API_URL}/v1/files/mkdir`,
     method: "POST",
-    body: {
-      file_id,
-      bbox,
-      page: page + 1,
-    },
+    body,
   });
   const data = await res.json();
+  if (data.error) {
+    return NextResponse.json({
+      code: data.code,
+      message: data.message,
+    });
+  }
   if (data.code === 401) {
     return NextResponse.json(data);
   }
