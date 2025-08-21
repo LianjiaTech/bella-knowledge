@@ -9,9 +9,13 @@ export async function GET(req: NextRequest) {
     url: `${FILE_API_URL}/v1/files/${fileId}/dom-tree/url`,
     method: "GET",
   });
+  const data = await res.json();
+  if (data.code === 401) {
+    return NextResponse.json(data);
+  }
   return NextResponse.json({
     code: 200,
-    data: await res?.json(),
+    data,
   });
 }
 

@@ -5,9 +5,9 @@ import { Toaster } from "sonner";
 const layout = ({ children }: { children: React.ReactNode }) => {
   return (
     <Suspense>
-      <div className="h-screen w-screen">
+      <div className="flex flex-col h-screen w-screen">
         <TopBar></TopBar>
-        <div className="py-4 px-6 flex flex-col items-start w-screen overflow-y-auto scrollbar-scroll">
+        <div className="py-4 px-6 flex flex-col w-screen overflow-y-auto scrollbar-scroll">
           {children}
         </div>
       </div>

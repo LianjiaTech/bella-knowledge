@@ -13,7 +13,7 @@ import {
 import { useUserStore } from "@/store/user";
 import { Workspace } from "@/lib/types/user";
 import { Button } from "./ui/button";
-import { FileText, User } from "lucide-react";
+import { FileIcon, FileText, User } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -58,14 +58,19 @@ const LINK = [
     text: "数据集",
     icon: <FileText className="size-4" />,
   },
+  {
+    link: "/admin/files",
+    text: "文件管理",
+    icon: <FileIcon className="size-4" />,
+  },
 ];
 const TopBarTabs = () => {
   const pathname = usePathname();
   const isActive = (link: string) => {
-    return pathname.startsWith(link);
+    return pathname === link;
   };
   return (
-    <div className="flex h-5 items-center  space-x-4 ">
+    <div className="flex h-5 items-center space-x-4 absolute left-1/2 -translate-x-1/2">
       {LINK.map((link, index) => (
         <div key={index}>
           <Link href={link.link}>

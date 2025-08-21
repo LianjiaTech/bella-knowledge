@@ -26,6 +26,7 @@ import { Upload, X } from "lucide-react";
 import importDatasetDemo from "@/assets/import-dataset-demo.png";
 import Image from "next/image";
 import { requestCreateDataset } from "@/request/dataset";
+import { postUploadFile } from "@/request/files";
 
 const formSchema = z.object({
   name: z
@@ -68,24 +69,10 @@ export function CreateDatasetForm({
     if (!file) return;
 
     setUploading(true);
-    const formData = new FormData();
-    formData.append("file", file);
-    const currentWorkspace = JSON.parse(
-      localStorage.getItem("current_workspace") || "{}",
-    );
-
     try {
-      const response = await fetch("/api/files", {
-        method: "POST",
-        body: formData,
-        headers: {
-          "X-BELLA-SPACE-CODE": currentWorkspace.spaceCode || "",
-          "X-USER-ID": localStorage.getItem("user_id") || "",
-        },
-      });
-      const data = await response.json();
-      if (data.code === 200) {
-        setUploadedFiles([{ id: data.data.id, filename: data.data.filename }]);
+      const data = await postUploadFile({ file });
+      if (data) {
+        setUploadedFiles([{ id: data.id, filename: data.filename }]);
         toast.success("文件上传成功");
       } else {
         toast.error("文件上传失败");
@@ -245,7 +232,7 @@ const CreateDatasetSheet = ({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetTrigger asChild>
-        <Button>创建数据集</Button>
+        <Button className="self-start">创建数据集</Button>
       </SheetTrigger>
       <SheetContent className="w-[800px] overflow-y-auto pb-4">
         <SheetHeader>

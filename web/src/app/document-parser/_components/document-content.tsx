@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useDocumentParserStore } from "../model";
 import { webRequest } from "@/lib/request/web";
 import { toast } from "sonner";
+import { getFilePreviewUrl } from "@/request/files";
 
 // 设置PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
@@ -94,15 +95,12 @@ const DocumentContent: React.FC<DocumentContentProps> = ({
       setLoading(true);
       setError(null);
 
-      const response = await webRequest<{ url: string }>({
-        path: "/api/files/preview",
-        method: "GET",
-        query: {
-          fileId,
-        },
-      });
-
-      setPreviewUrl(response.data?.url);
+      const data = await getFilePreviewUrl(fileId);
+      if (data) {
+        setPreviewUrl(data.url);
+      } else {
+        setError("获取预览链接失败");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "获取预览链接失败");
     } finally {

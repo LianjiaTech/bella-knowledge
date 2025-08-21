@@ -12,6 +12,7 @@ import { Upload, FileSpreadsheet, X, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { webRequest } from "@/lib/request/web";
 import { toast } from "sonner";
+import { postUploadFile } from "@/request/files";
 
 interface AppendDatasetSheetProps {
   open: boolean;
@@ -74,24 +75,13 @@ export function AppendDatasetSheet({
 
     try {
       setIsUploading(true);
-      const formData = new FormData();
-      formData.append("file", selectedFile);
-      formData.append("purpose", "datasets_import");
-      const currentWorkspace = JSON.parse(
-        localStorage.getItem("current_workspace") || "{}",
-      );
 
-      const response = await fetch("/api/files", {
-        method: "POST",
-        body: formData,
-        headers: {
-          "X-BELLA-SPACE-CODE": currentWorkspace.spaceCode || "",
-          "X-USER-ID": localStorage.getItem("user_id") || "",
-        },
+      const data = await postUploadFile({
+        file: selectedFile,
+        purpose: "datasets_import",
       });
-      const data = await response.json();
-      if (data.code === 200) {
-        const fileId = data.data.id;
+      if (data) {
+        const fileId = data.id;
         const res = await webRequest({
           path: `/api/dataset`,
           method: "POST",
@@ -130,9 +120,8 @@ export function AppendDatasetSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-[400px]">
         <SheetHeader>
-          <SheetTitle className="text-xl">追加数据集</SheetTitle>
+          <SheetTitle>追加数据集</SheetTitle>
         </SheetHeader>
-
         <div className="px-4">
           {/* 文件上传区域 */}
           <div>

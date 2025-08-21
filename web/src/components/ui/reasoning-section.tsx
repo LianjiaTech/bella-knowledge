@@ -39,13 +39,17 @@ export function ReasoningSection({
         className={cn(
           "w-full justify-start text-left font-normal text-muted-foreground hover:text-foreground",
           "px-0 py-1 h-auto group",
-          !hasContent && "hover:bg-blue-50/50 border-l-2 border-transparent hover:border-l-blue-200 pl-2"
+          !hasContent &&
+            "hover:bg-blue-50/50 border-l-2 border-transparent hover:border-l-blue-200 pl-2",
         )}
         onClick={handleToggleExpand}
         title={isExpanded ? "收起解题思路" : "展开解题思路"}
       >
         <Lightbulb className="mr-2 h-4 w-4" />
-        <span className="flex-1 font-bold">解题思路<span className="text-xs font-normal opacity-60 ml-1">（可选）</span></span>
+        <span className="flex-1 font-bold">
+          解题思路
+          <span className="text-xs font-normal opacity-60 ml-1">（可选）</span>
+        </span>
         {!hasContent && !isExpanded && (
           <span className="text-xs opacity-70 mr-2">点击添加</span>
         )}
@@ -59,17 +63,19 @@ export function ReasoningSection({
           )}
         </div>
       </Button>
-      
+
       {isExpanded && (
-        <Textarea
-          value={reasoning || ""}
-          onChange={(e) => onReasoningChange(e.target.value)}
-          onBlur={handleBlur}
-          className="resize-none text-sm"
-          placeholder="请输入解题思路..."
-          rows={3}
-          autoFocus
-        />
+        <div className="bg-white rounded-md">
+          <Textarea
+            value={reasoning || ""}
+            onChange={(e) => onReasoningChange(e.target.value)}
+            onBlur={handleBlur}
+            className="mt-4 resize-none scrollbar-hide sm:max-h-20 lg:max-h-30"
+            placeholder="请输入解题思路..."
+            rows={3}
+            autoFocus
+          />
+        </div>
       )}
     </div>
   );
