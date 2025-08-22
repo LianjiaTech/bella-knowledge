@@ -33,16 +33,7 @@ export function RightDocumentSection({
   } = useDocumentPreviewStore();
 
   const onAddReferenceFile = (fileId: string) => {
-    if (referenceFileList.find((file) => file.id === fileId)) {
-      toast("已添加", {
-        position: "top-center",
-      });
-      return;
-    }
-    const file = fileList.find((file) => file.id === fileId);
-    if (file) {
-      addReferenceFile(file);
-    }
+    addReferenceFile(fileId);
   };
   return (
     <div className="h-full bg-white border-l border-gray-200 overflow-hidden">

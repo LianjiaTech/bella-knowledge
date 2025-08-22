@@ -46,7 +46,13 @@ type Action = {
     scoring_criteria?: string;
   }) => void;
   deleteQuestion: (question: Question) => void;
-  updateQuestion: (question: Question & { tags?: string[]; reasoning?: string; scoring_criteria?: string }) => void;
+  updateQuestion: (
+    question: Question & {
+      tags?: string[];
+      reasoning?: string;
+      scoring_criteria?: string;
+    },
+  ) => void;
   getQuestionList: (dataset_id: string) => void;
   addQuestionReference: (params: {
     dataset_id: string;
@@ -61,7 +67,7 @@ type Action = {
   }) => void;
   getReferenceList: (dataset_id: string, item_id: string) => void;
   getFileList: () => void;
-  addReferenceFile: (file: KnowledgeFile) => void;
+  addReferenceFile: (fileId: string) => void;
   addUploadFile: (file: KnowledgeFile) => void;
   initPage: (dataset_id: string) => Promise<void>;
   initReferenceFileList: (dataset_id: string) => Promise<void>;
@@ -144,7 +150,15 @@ const store = create<State & Action>((set, get) => ({
       toast.success("删除成功");
     }
   },
-  updateQuestion: async ({ dataset_id, item_id, question, answer, tags, reasoning, scoring_criteria }) => {
+  updateQuestion: async ({
+    dataset_id,
+    item_id,
+    question,
+    answer,
+    tags,
+    reasoning,
+    scoring_criteria,
+  }) => {
     const { questionList } = get();
     const currentQuestion = questionList.find(
       (question) => question.item_id === item_id,
@@ -324,11 +338,20 @@ const store = create<State & Action>((set, get) => ({
     const res = await getFileList();
     set({ fileList: res });
   },
-  addReferenceFile: async (file: KnowledgeFile) => {
-    const { referenceFileList } = get();
-    set({
-      referenceFileList: [...referenceFileList, file],
-    });
+  addReferenceFile: async (fileId: string) => {
+    const { referenceFileList, fileList } = get();
+    if (referenceFileList.find((file) => file.id === fileId)) {
+      toast("已添加", {
+        position: "top-center",
+      });
+      return;
+    }
+    const file = fileList.find((file) => file.id === fileId);
+    if (file) {
+      set({
+        referenceFileList: [...referenceFileList, file],
+      });
+    }
   },
   addUploadFile: (file: KnowledgeFile) => {
     const { fileList } = get();
@@ -342,11 +365,11 @@ const store = create<State & Action>((set, get) => ({
       return;
     }
     set({ initLoading: true });
-    
+
     await Promise.all([
-      get().getQuestionList(dataset_id), 
+      get().getQuestionList(dataset_id),
       get().getFileList(),
-      get().getTagsList()
+      get().getTagsList(),
     ]);
     set({ initLoading: false });
   },
@@ -459,14 +482,14 @@ const store = create<State & Action>((set, get) => ({
   },
   updateTag: (id: number, name: string) => {
     const { availableTags, selectedTags } = get();
-    const oldTag = availableTags.find(tag => tag.id === id);
+    const oldTag = availableTags.find((tag) => tag.id === id);
     if (oldTag) {
       set({
         availableTags: availableTags.map((tag) =>
-          tag.id === id ? { ...tag, name } : tag
+          tag.id === id ? { ...tag, name } : tag,
         ),
         selectedTags: selectedTags.map((tag) =>
-          tag === oldTag.name ? name : tag
+          tag === oldTag.name ? name : tag,
         ),
       });
       toast.success("标签更新成功");
@@ -474,7 +497,7 @@ const store = create<State & Action>((set, get) => ({
   },
   deleteTag: (id: number) => {
     const { availableTags, selectedTags } = get();
-    const tagToDelete = availableTags.find(tag => tag.id === id);
+    const tagToDelete = availableTags.find((tag) => tag.id === id);
     if (tagToDelete) {
       set({
         availableTags: availableTags.filter((tag) => tag.id !== id),
