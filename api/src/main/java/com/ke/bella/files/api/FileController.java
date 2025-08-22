@@ -115,15 +115,9 @@ public class FileController {
             try {
                 tmpFileInfo = createTempFile(file);
 
-                OpenAIFile openaiFile = fileService.upload(tmpFileInfo.getTmpFile(), filename, purpose, metadata,
-                        tmpFileInfo.getMimeType(), tmpFileInfo.getType(), tmpFileInfo.getExtension(), tmpFileInfo.getCharset(), ancestorId);
+                return fileService.uploadWithUrl(tmpFileInfo.getTmpFile(), tmpFileInfo.getType(), tmpFileInfo.getMimeType(),
+                        tmpFileInfo.getExtension(), tmpFileInfo.getCharset(), purpose, metadata, getUrl, expires, ancestorId, filename);
 
-                if(getUrl) {
-                    String url = fileService.getUrl(openaiFile.getId(), expires);
-                    openaiFile.setUrl(url);
-                }
-
-                return openaiFile;
             } catch (IOException e) {
                 throw new IllegalStateException("File upload failed", e);
             } finally {
@@ -332,11 +326,6 @@ public class FileController {
         }
         if(file0 == null) {
             throw new IllegalArgumentException("file is required, but not provided");
-        }
-
-        OpenAIFile existingFile = fileService.getFile(fileId);
-        if(existingFile == null) {
-            throw new FileNotFoundException(fileId);
         }
 
         TmpFileInfo tmpFileInfo = null;
