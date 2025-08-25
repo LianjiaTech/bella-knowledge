@@ -143,6 +143,19 @@ public class FileService {
                 .build();
     }
 
+    @Transactional(rollbackFor = Exception.class)
+    public OpenAIFile uploadWithUrl(File file, String type, String mimeType, String extension, String charset, String purpose, String metadata,
+            boolean getUrl, long expires, String ancestorId, String filename) {
+        OpenAIFile openaiFile = upload(file, filename, purpose, metadata,
+                mimeType, type, extension, charset, ancestorId);
+
+        if(getUrl) {
+            String url = getUrl(openaiFile.getId(), expires);
+            openaiFile.setUrl(url);
+        }
+        return openaiFile;
+    }
+
     public OpenAIFile upload(
             File file,
             String filename,
@@ -284,9 +297,10 @@ public class FileService {
             String fileId,
             long expires) {
         FileDB file = fileRepo.queryFile(fileId);
-        String bucketName = file.getBucket();
-        String keyName = file.getPath();
-        String purpose = file.getPurpose();
+        return getUrl(file.getBucket(), file.getPath(), file.getPurpose(), expires);
+    }
+
+    public String getUrl(String bucketName, String keyName, String purpose, long expires) {
         return purpose.equals(VISION) ? storageService.getPublicUrl(bucketName, keyName)
                 : storageService.getPresignedUrl(bucketName, keyName, expires);
     }
