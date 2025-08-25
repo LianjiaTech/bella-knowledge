@@ -51,6 +51,7 @@ import com.ke.bella.files.protocol.ListFileOps;
 import com.ke.bella.files.protocol.OpenAIFile;
 import com.ke.bella.files.protocol.OpenapiListResponse;
 import com.ke.bella.files.protocol.Progress;
+import com.ke.bella.files.protocol.Scope;
 import com.ke.bella.files.protocol.UpdateProgressRequestData;
 import com.ke.bella.files.service.FileService;
 import com.ke.bella.files.service.lock.FileUniquenessLock;
@@ -311,7 +312,7 @@ public class FileController {
                 .fileId(fileId)
                 .filename(filename)
                 .build();
-        return fileService.updateFile(ops, true);
+        return fileService.updateFile(ops, true, Scope.FILENAME);
     }
 
     @PutMapping
@@ -362,7 +363,7 @@ public class FileController {
                 .path(fileKey)
                 .build();
 
-        return fileService.updateFile(ops, true);
+        return fileService.updateFile(ops, true, Scope.CONTENT);
     }
 
     @PostMapping("/dom-tree")
@@ -398,7 +399,7 @@ public class FileController {
                             .domTreeFileId(uploaded.getId())
                             .build();
 
-                    fileService.updateFile(bindOp);
+                    fileService.updateFile(bindOp, true, Scope.DOM_TREE);
 
                     return uploaded;
                 }
@@ -482,7 +483,7 @@ public class FileController {
                             .pdfFileId(uploaded.getId())
                             .build();
 
-                    fileService.updateFile(bindOp);
+                    fileService.updateFile(bindOp, true, Scope.PDF);
 
                     return uploaded;
                 }
