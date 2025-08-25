@@ -26,6 +26,7 @@ import com.ke.bella.files.protocol.FileStatus;
 import com.ke.bella.files.protocol.ListFileOps;
 import com.ke.bella.files.protocol.OpenAIFile;
 import com.ke.bella.files.protocol.Progress;
+import com.ke.bella.files.protocol.Scope;
 import com.ke.bella.files.protocol.UpdateProgressRequestData;
 import com.ke.bella.files.service.broadcast.BroadcastService;
 import com.ke.bella.files.service.storage.StorageService;
@@ -252,18 +253,14 @@ public class FileService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public OpenAIFile updateFile(FileOps ops) {
-        return updateFile(ops, false);
-    }
-
-    @Transactional(rollbackFor = Exception.class)
-    public OpenAIFile updateFile(FileOps ops, boolean increaseVersion) {
+    public OpenAIFile updateFile(FileOps ops, boolean increaseVersion, Scope actionType) {
         fileRepo.updateFile(ops, increaseVersion);
         FileDB fileDB = fileRepo.queryFile(ops.getFileId());
         OpenAIFile finalOpenAIFile = buildOpenAIFileWithSource(fileDB);
 
         FileBroadcasting<OpenAIFile> message = new FileBroadcasting<>();
         message.setEvent(EventType.FILE_UPDATED);
+        message.setScope(actionType.getValue());
         message.setData(finalOpenAIFile);
         message.setMetadata(fileDB.getMetaData());
         message.setUserId(BellaContextHelper.getOperatorUserId());

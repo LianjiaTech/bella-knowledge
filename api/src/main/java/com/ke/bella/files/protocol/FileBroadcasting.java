@@ -9,6 +9,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class FileBroadcasting<T> {
     private String event;
+    private String scope;
     private T data;
     private String metadata;
     private Long userId;
