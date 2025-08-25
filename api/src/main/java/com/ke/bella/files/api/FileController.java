@@ -9,6 +9,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
@@ -40,6 +41,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.ke.bella.files.annotations.FileAPI;
+import com.ke.bella.files.protocol.DomTreeOps.DomTreeUploadOp;
 import com.ke.bella.files.protocol.FileCropOps;
 import com.ke.bella.files.protocol.FileCropOps.FileCropOp;
 import com.ke.bella.files.protocol.FileException.FileNotFoundException;
@@ -56,6 +58,7 @@ import com.ke.bella.files.protocol.UpdateProgressRequestData;
 import com.ke.bella.files.service.FileService;
 import com.ke.bella.files.service.lock.FileUniquenessLock;
 import com.ke.bella.files.utils.BellaContextHelper;
+import com.ke.bella.files.utils.JsonUtils;
 import com.ke.bella.openapi.utils.FileUtils;
 
 import lombok.AllArgsConstructor;
@@ -149,6 +152,44 @@ public class FileController {
         file.transferTo(tmpFile);
 
         return new TmpFileInfo(tmpFile, type, mimeType, extension, charset);
+    }
+
+    private TmpFileInfo createTempFileFromObject(Object content, String extension) throws IOException {
+        String type = "json";
+        String mimeType = "application/json";
+        String charset = StandardCharsets.UTF_8.name();
+
+        String suffix = StringUtils.isEmpty(extension) ? "" : "." + extension;
+
+        File tmpDir = new File(tmpFileDir);
+        File tmpFile = File.createTempFile("tmp", suffix, tmpDir);
+
+        JsonUtils.writeToFile(content, tmpFile);
+
+        return new TmpFileInfo(tmpFile, type, mimeType, extension, charset);
+    }
+
+    private OpenAIFile uploadDomTree(String sourceFileId, String filename, String spaceCode, TmpFileInfo tmpFileInfo) {
+        if(fileService.exists(spaceCode, null, filename)) {
+            OpenAIFile existingFile = fileService.getFile(spaceCode, null, filename);
+
+            return updateFile(existingFile.getId(), tmpFileInfo.getTmpFile(), filename,
+                    "json", "application/json",
+                    "json", tmpFileInfo.getCharset(), null);
+        } else {
+            OpenAIFile uploaded = fileService.upload(tmpFileInfo.getTmpFile(), filename, "dom_tree", null,
+                    tmpFileInfo.getMimeType(), tmpFileInfo.getType(), tmpFileInfo.getExtension(),
+                    tmpFileInfo.getCharset());
+
+            FileOps bindOp = FileOps.builder()
+                    .fileId(sourceFileId)
+                    .domTreeFileId(uploaded.getId())
+                    .build();
+
+            fileService.updateFile(bindOp, true, Scope.DOM_TREE);
+
+            return uploaded;
+        }
     }
 
     @Data
@@ -358,6 +399,7 @@ public class FileController {
                 .filename(filename)
                 .mimeType(mimeType)
                 .metadata(metadata)
+                .bytes(file0.length())
                 .type(type)
                 .extension(extension)
                 .path(fileKey)
@@ -383,30 +425,46 @@ public class FileController {
             try {
 
                 tmpFileInfo = createTempFile(file);
-                if(fileService.exists(spaceCode, null, filename)) {
-                    OpenAIFile existingFile = fileService.getFile(spaceCode, null, filename);
 
-                    return updateFile(existingFile.getId(), tmpFileInfo.getTmpFile(), filename,
-                            "json", "application/json",
-                            "json", tmpFileInfo.getCharset(), null);
-                } else {
-                    OpenAIFile uploaded = fileService.upload(tmpFileInfo.getTmpFile(), filename, "dom_tree", null,
-                            tmpFileInfo.getMimeType(), tmpFileInfo.getType(), tmpFileInfo.getExtension(),
-                            tmpFileInfo.getCharset());
-
-                    FileOps bindOp = FileOps.builder()
-                            .fileId(sourceFileId)
-                            .domTreeFileId(uploaded.getId())
-                            .build();
-
-                    fileService.updateFile(bindOp, true, Scope.DOM_TREE);
-
-                    return uploaded;
-                }
+                return uploadDomTree(sourceFileId, filename, spaceCode, tmpFileInfo);
 
             } catch (Exception e) {
                 LOGGER.error("Dom tree upload failed, file_id: {}, error: {}", sourceFileId, e.getMessage(), e);
                 throw new IllegalStateException("Dom tree upload failed", e);
+            } finally {
+                if(tmpFileInfo != null) {
+                    tmpFileInfo.close();
+                }
+            }
+        });
+    }
+
+    @PostMapping("/dom-tree/json")
+    public OpenAIFile uploadDomTreeJson(@RequestBody DomTreeUploadOp domTreeUploadOp) {
+        if(domTreeUploadOp == null) {
+            throw new IllegalArgumentException("request body is required, but not provided");
+        }
+        if(StringUtils.isEmpty(domTreeUploadOp.getFileId())) {
+            throw new IllegalArgumentException("file_id is required, but not provided");
+        }
+        if(domTreeUploadOp.getDomTree() == null) {
+            throw new IllegalArgumentException("dom_tree_content is required, but not provided");
+        }
+
+        String sourceFileId = domTreeUploadOp.getFileId();
+        String filename = String.format("dom_tree_%s.json", sourceFileId);
+        String spaceCode = BellaContextHelper.getOperateSpaceCode();
+
+        return fl.executeWithLock(spaceCode, null, filename, FILE_LOCK_TIMEOUT_MS, () -> {
+            TmpFileInfo tmpFileInfo = null;
+            try {
+                tmpFileInfo = createTempFileFromObject(domTreeUploadOp.getDomTree(), "json");
+
+                return uploadDomTree(sourceFileId, filename, spaceCode, tmpFileInfo);
+
+            } catch (Exception e) {
+                LOGGER.error("Dom tree json upload failed, file_id: {}, error: {}", sourceFileId, e.getMessage(), e);
+                throw new IllegalStateException("Dom tree json upload failed", e);
             } finally {
                 if(tmpFileInfo != null) {
                     tmpFileInfo.close();

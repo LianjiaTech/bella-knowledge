@@ -22,4 +22,5 @@ public class FileOps {
     private String type;
     private String extension;
     private String path;
+    private Long bytes;
 }
