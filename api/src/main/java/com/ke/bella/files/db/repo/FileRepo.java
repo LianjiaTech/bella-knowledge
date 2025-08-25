@@ -209,6 +209,9 @@ public class FileRepo implements BaseRepo {
         if(op.getPath() != null) {
             rec.setPath(op.getPath());
         }
+        if(op.getBytes() != null) {
+            rec.setBytes(op.getBytes());
+        }
 
         fillUpdatorInfo(rec);
 

@@ -1,9 +1,13 @@
 package com.ke.bella.files.utils;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
 
+import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -71,6 +75,13 @@ public class JsonUtils {
             return mapper2.writeValueAsString(obj);
         } catch (JsonProcessingException e) {
             throw new IllegalArgumentException(e);
+        }
+    }
+
+    public static void writeToFile(Object obj, File file) throws IOException {
+        try (FileOutputStream fos = new FileOutputStream(file);
+                JsonGenerator generator = mapper.getFactory().createGenerator(fos)) {
+            mapper.writeValue(generator, obj);
         }
     }
 }
