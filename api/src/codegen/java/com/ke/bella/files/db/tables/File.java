@@ -215,7 +215,7 @@ public class File extends TableImpl<FileRecord> {
 
     @Override
     public List<Index> getIndexes() {
-        return Arrays.<Index>asList(Indexes.FILE_IDX_CTIME, Indexes.FILE_IDX_FILENAME_STATUS, Indexes.FILE_IDX_SPACE_PURPOSE);
+        return Arrays.<Index>asList(Indexes.FILE_IDX_CTIME, Indexes.FILE_IDX_DOM_TREE_FILE_ID, Indexes.FILE_IDX_FILENAME_STATUS, Indexes.FILE_IDX_PDF_FILE_ID, Indexes.FILE_IDX_SPACE_PURPOSE);
     }
 
     @Override

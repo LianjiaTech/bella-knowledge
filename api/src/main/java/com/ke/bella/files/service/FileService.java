@@ -244,7 +244,7 @@ public class FileService {
             throw new FileNotFoundException(fileId);
         }
 
-        return buildOpenAIFileWithSource(fileDB);
+        return transferToOpenAIFile(fileDB);
     }
 
     public String updateRealFile(String fileId, String filename, File file, String mimeType, String charset) {

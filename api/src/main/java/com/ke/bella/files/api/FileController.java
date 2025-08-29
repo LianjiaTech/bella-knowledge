@@ -481,14 +481,20 @@ public class FileController {
         if(file == null) {
             throw new FileNotFoundException(fileId);
         }
+
+        String targetFileId;
         if("dom_tree".equals(file.getPurpose())) {
-            retrieveContentRedirect(response, file.getId());
+            targetFileId = file.getId();
         } else if(!StringUtils.isEmpty(file.getDomTreeFileId())) {
-            retrieveContentRedirect(response, file.getDomTreeFileId());
+            targetFileId = file.getDomTreeFileId();
         } else {
             throw new IllegalArgumentException(
                     String.format("the file does not have a legal dom file. file_id = %s", fileId));
         }
+
+        String redirectUrl = fileService.getUrl(targetFileId);
+        response.setHeader(HttpHeaders.LOCATION, redirectUrl);
+        response.setStatus(HttpServletResponse.SC_MOVED_TEMPORARILY);
     }
 
     @GetMapping("/{file_id}/dom-tree/url")
@@ -499,14 +505,21 @@ public class FileController {
         if(file == null) {
             throw new FileNotFoundException(fileId);
         }
+
+        String targetFileId;
         if("dom_tree".equals(file.getPurpose())) {
-            return getUrl(fileId, expires);
+            targetFileId = file.getId();
         } else if(!StringUtils.isEmpty(file.getDomTreeFileId())) {
-            return getUrl(file.getDomTreeFileId(), expires);
+            targetFileId = file.getDomTreeFileId();
         } else {
             throw new IllegalArgumentException(
                     String.format("the file does not have a legal dom file. file_id = %s", fileId));
         }
+
+        String url = fileService.getUrl(targetFileId, expires);
+        return FileUrl.builder()
+                .url(url)
+                .build();
     }
 
     @PostMapping("/pdf")
