@@ -1,0 +1,204 @@
+name: Build and Push Bella Knowledge Docker Images
+
+on:
+  push:
+    tags:
+      - "v*"
+  pull_request:
+    branches:
+      - "main"
+
+concurrency:
+  group: build-push-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+env:
+  DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USER }}
+  DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+
+    strategy:
+      matrix:
+        component: [api, web]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKERHUB_USER }}
+          password: ${{ env.DOCKERHUB_TOKEN }}
+
+      - name: Extract version
+        id: version
+        run: |
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          else
+            VERSION=latest
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push multi-arch images
+        if: github.event_name == 'push'
+        uses: docker/build-push-action@v5
+        with:
+          context: ./${{ matrix.component }}
+          file: ./${{ matrix.component }}/Dockerfile
+          push: true
+          tags: ${{ env.DOCKERHUB_USER }}/bella-file-${{ matrix.component }}:${{ steps.version.outputs.VERSION }}
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            MAVEN_MIRROR=aliyun
+
+      - name: Build images (PR)
+        if: github.event_name == 'pull_request'
+        uses: docker/build-push-action@v5
+        with:
+          context: ./${{ matrix.component }}
+          file: ./${{ matrix.component }}/Dockerfile
+          push: false
+          load: true
+          tags: bella-file-${{ matrix.component }}:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            MAVEN_MIRROR=aliyun
+
+  create-release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate Release Notes
+        id: release_notes
+        run: |
+          # Check if this is the first release
+          CURRENT_TAG="${{ github.ref_name }}"
+          PREVIOUS_TAG=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+' | grep -v "^${CURRENT_TAG}$" | head -1)
+          
+          if [ -z "$PREVIOUS_TAG" ]; then
+            IS_FIRST_RELEASE=true
+            echo "This is the first release"
+          else
+            IS_FIRST_RELEASE=false
+            echo "Comparing from $PREVIOUS_TAG to $CURRENT_TAG"
+          fi
+          
+          if [ "$IS_FIRST_RELEASE" = true ]; then
+            # First release - different format
+            echo "## 🎉 Welcome to Bella Knowledge ${{ github.ref_name }}" > release_notes.md
+            echo "" >> release_notes.md
+            echo "This is the **first official release** of Bella Knowledge! 🚀" >> release_notes.md
+            echo "" >> release_notes.md
+            echo "Bella Knowledge is a powerful file management and document processing platform." >> release_notes.md
+            echo "" >> release_notes.md
+          
+          else
+            # Subsequent releases - show changes
+            echo "## 🚀 What's New in ${{ github.ref_name }}" > release_notes.md
+            echo "" >> release_notes.md
+          
+            # Get recent feat: commits (up to 3)
+            FEAT_COMMITS=$(git log "${PREVIOUS_TAG}"..${{ github.sha }} --pretty=format:"- %s" --no-merges --grep="^feat:" | head -3)
+            if [ ! -z "$FEAT_COMMITS" ]; then
+              echo "### ✨ New Features" >> release_notes.md
+              echo "$FEAT_COMMITS" >> release_notes.md
+              echo "" >> release_notes.md
+            fi
+          
+            # Get all commits between tags with author information
+            echo "### 📝 All Changes" >> release_notes.md
+            echo "" >> release_notes.md
+          
+            # Use git log to get commits with author GitHub username if possible
+            git log "${PREVIOUS_TAG}"..${{ github.sha }} --no-merges --pretty=format:"- %s (%h) by @%an" >> release_notes.md
+            echo "" >> release_notes.md
+            echo "" >> release_notes.md
+          
+            # Contributors section for incremental releases
+            echo "### 👥 Contributors" >> release_notes.md
+            echo "" >> release_notes.md
+          
+            # Get unique authors and try to convert to GitHub usernames
+            AUTHORS=$(git log "${PREVIOUS_TAG}"..${{ github.sha }} --no-merges --pretty=format:"%an <%ae>" | sort -u)
+            echo "Thanks to the following contributors:" >> release_notes.md
+            echo "" >> release_notes.md
+          
+            while IFS= read -r author; do
+              # Extract name and email
+              NAME=$(echo "$author" | sed 's/ <.*$//')
+              EMAIL=$(echo "$author" | sed 's/.*<\(.*\)>.*/\1/')
+          
+              if [[ "$EMAIL" == *"@users.noreply.github.com"* ]]; then
+                # Extract GitHub username from GitHub noreply email
+                GH_USERNAME=$(echo "$EMAIL" | sed 's/.*+\([^@]*\)@users.noreply.github.com/\1/')
+                echo "- @$GH_USERNAME" >> release_notes.md
+              elif [[ "$EMAIL" == *"github.com"* ]]; then
+                # Handle other GitHub email patterns
+                echo "- $NAME" >> release_notes.md
+              else
+                # For non-GitHub emails, just show the name
+                echo "- $NAME" >> release_notes.md
+              fi
+            done <<< "$AUTHORS"
+          
+            echo "" >> release_notes.md
+          fi
+          
+          # Add Docker images info with current build time
+          BUILD_TIME=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          cat >> release_notes.md << EOF
+          ## 📦 Docker Images
+          
+          **Version**: \`${{ github.ref_name }}\`
+          
+          **Multi-Architecture Support**: All images support both \`linux/amd64\` and \`linux/arm64\` architectures.
+          
+          ### 🐳 Available Images
+          - **API Service**: \`${{ env.DOCKERHUB_USER }}/bella-file-api:${{ github.ref_name }}\`
+          - **Web Service**: \`${{ env.DOCKERHUB_USER }}/bella-file-web:${{ github.ref_name }}\`
+          
+          **Deployment**: For detailed deployment instructions, please refer to [docker/README.md](./docker/README.md)
+          
+          ### 📋 Build Information
+          - **Build Date**: ${BUILD_TIME}
+          - **Git Commit**: \`${{ github.sha }}\`
+          - **Workflow Run**: [${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          EOF
+          
+          # Set output for next step
+          {
+            echo 'RELEASE_BODY<<EOF'
+            cat release_notes.md
+            echo 'EOF'
+          } >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "Bella Knowledge ${{ github.ref_name }}"
+          body: ${{ steps.release_notes.outputs.RELEASE_BODY }}
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

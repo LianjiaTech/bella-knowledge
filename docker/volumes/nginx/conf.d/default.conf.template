@@ -1,0 +1,83 @@
+server {
+    listen       80;
+    listen  [::]:80;
+    ${SSL_LISTEN_DIRECTIVE}
+    server_name  ${SERVER_DOMAIN};
+
+    ${SSL_CONFIG_BLOCK}
+
+    # 访问日志
+    access_log  /var/log/nginx/host.access.log  main;
+
+    ${SSL_REDIRECT_BLOCK}
+
+    # 客户端上传文件大小限制
+    client_max_body_size 1024M;
+    
+    # 代理缓冲区设置
+    proxy_buffering on;
+    proxy_buffer_size 128k;
+    proxy_buffers 32 128k;
+    proxy_busy_buffers_size 128k;
+
+    # /api 路径转发到 file api 服务
+    location ^~ /api/ {
+        proxy_pass ${API_UPSTREAM}/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto ${PROXY_FORWARDED_PROTO};
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        
+        # 透传 X-BELLA- 开头的自定义 headers
+        proxy_pass_request_headers on;
+
+        # 文件上传超时配置
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 600s;
+        proxy_read_timeout 600s;
+        
+        # 支持大文件上传
+        proxy_request_buffering off;
+    }
+
+    # 直接访问 file api 服务的根路径
+    location ^~ /file/ {
+        proxy_pass ${API_UPSTREAM}/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto ${PROXY_FORWARDED_PROTO};
+        
+        # 透传 X-BELLA- 开头的自定义 headers
+        proxy_pass_request_headers on;
+
+        # 文件下载超时配置
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 600s;
+        proxy_read_timeout 600s;
+    }
+
+    # 健康检查路径
+    location /actuator/health {
+        proxy_pass ${API_UPSTREAM}/actuator/health;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto ${PROXY_FORWARDED_PROTO};
+    }
+
+    # 其他所有请求转发到 web 服务
+    location / {
+        proxy_pass ${WEB_UPSTREAM};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto ${PROXY_FORWARDED_PROTO};
+        
+        # WebSocket 支持
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}

@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
+          http://maven.apache.org/xsd/settings-1.0.0.xsd">
+
+    <!-- Aliyun Maven Mirror Configuration -->
+    <mirrors>
+        <mirror>
+            <id>aliyun-public</id>
+            <mirrorOf>*</mirrorOf>
+            <name>Aliyun Public Repository</name>
+            <url>https://maven.aliyun.com/repository/central</url>
+        </mirror>
+        <mirror>
+            <id>aliyun-central</id>
+            <mirrorOf>central</mirrorOf>
+            <name>Aliyun Central Repository</name>
+            <url>https://maven.aliyun.com/repository/central</url>
+        </mirror>
+        <mirror>
+            <id>aliyun-spring</id>
+            <mirrorOf>spring</mirrorOf>
+            <name>Aliyun Spring Repository</name>
+            <url>https://maven.aliyun.com/repository/spring</url>
+        </mirror>
+        <mirror>
+            <id>aliyun-spring-plugin</id>
+            <mirrorOf>spring-plugin</mirrorOf>
+            <name>Aliyun Spring Plugin Repository</name>
+            <url>https://maven.aliyun.com/repository/spring-plugin</url>
+        </mirror>
+        <mirror>
+            <id>aliyun-apache-snapshots</id>
+            <mirrorOf>apache-snapshots</mirrorOf>
+            <name>Aliyun Apache Snapshots Repository</name>
+            <url>https://maven.aliyun.com/repository/apache-snapshots</url>
+        </mirror>
+        <mirror>
+            <id>aliyun-gradle-plugin</id>
+            <mirrorOf>gradle-plugin</mirrorOf>
+            <name>Aliyun Gradle Plugin Repository</name>
+            <url>https://maven.aliyun.com/repository/gradle-plugin</url>
+        </mirror>
+    </mirrors>
+
+    <profiles>
+        <profile>
+            <id>aliyun</id>
+            <repositories>
+                <repository>
+                    <id>aliyun-public</id>
+                    <name>Aliyun Public Repository</name>
+                    <url>https://maven.aliyun.com/repository/central</url>
+                    <layout>default</layout>
+                    <releases>
+                        <enabled>true</enabled>
+                        <updatePolicy>never</updatePolicy>
+                    </releases>
+                    <snapshots>
+                        <enabled>true</enabled>
+                        <updatePolicy>always</updatePolicy>
+                    </snapshots>
+                </repository>
+                <repository>
+                    <id>aliyun-central</id>
+                    <name>Aliyun Central Repository</name>
+                    <url>https://maven.aliyun.com/repository/central</url>
+                    <layout>default</layout>
+                    <releases>
+                        <enabled>true</enabled>
+                    </releases>
+                    <snapshots>
+                        <enabled>false</enabled>
+                    </snapshots>
+                </repository>
+            </repositories>
+            <pluginRepositories>
+                <pluginRepository>
+                    <id>aliyun-public</id>
+                    <name>Aliyun Public Repository</name>
+                    <url>https://maven.aliyun.com/repository/central</url>
+                    <layout>default</layout>
+                    <releases>
+                        <enabled>true</enabled>
+                        <updatePolicy>never</updatePolicy>
+                    </releases>
+                    <snapshots>
+                        <enabled>true</enabled>
+                        <updatePolicy>always</updatePolicy>
+                    </snapshots>
+                </pluginRepository>
+            </pluginRepositories>
+        </profile>
+    </profiles>
+
+    <activeProfiles>
+        <activeProfile>aliyun</activeProfile>
+    </activeProfiles>
+</settings>

@@ -1,10 +1,10 @@
 spring:
   application:
-    name: example-file-api
+    name: bella-file-api
   datasource:
-    url: jdbc:mysql://localhost:3306/bella_file_api?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
-    username: root
-    password: 123456
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:bella_file_api}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD:root}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       maximum-pool-size: 20
@@ -21,34 +21,42 @@ spring:
     host: ${REDIS_HOST:localhost}
     port: ${REDIS_PORT:6379}
     password: ${REDIS_PASSWORD:bella123}
+  kafka:
+    producer:
+      bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:common-queue-04-01-online.zeus.ljnode.com:9092,common-queue-04-02-online.zeus.ljnode.com:9092,common-queue-04-03-online.zeus.ljnode.com:9092}
+      value-serializer: ${KAFKA_PRODUCER_VALUE_SERIALIZER:org.springframework.kafka.support.serializer.JsonSerializer}
+      key-serializer: ${KAFKA_PRODUCER_KEY_SERIALIZER:org.apache.kafka.common.serialization.StringSerializer}
+      topic:
+        broadcast: ${KAFKA_TOPIC_BROADCAST:bella_file_api}
 app:
-  id: example-file-api
+  id: bella-file-api
 
 bella:
-  open-api-base: https://localhost:8080/
+  open-api-base: ${BELLA_OPEN_API_BASE:https://localhost:8080/}
   file-api:
     file:
-      tmp-file-dir: .
+      tmp-file-dir: ${BELLA_TMP_FILE_DIR:.}
       exists:
         block: false
     bucket-name:
-      public: test
-      private: test
+      public: ${BELLA_STORAGE_S3_BUCKET:test}
+      private: ${BELLA_STORAGE_S3_BUCKET:test}
     storage:
-      type: local
+      type: ${BELLA_STORAGE_TYPE:local}
   server:
     initializer:
       enabled: true
   task:
     thread-nums: 1000
   login:
-    type: client
-    openapi-base: ${BELLA_LOGIN_OPENAPI_BASE:http://localhost}
+    type: ${BELLA_LOGIN_TYPE:client}
+    openapi-base: ${BELLA_OPENAPI_URL:http://localhost}
+    authorization-header: Authorization
   session:
     cookie-name: ${BELLA_COOKIE_NAME:bella_openapi_sessionId}
     max-inactive-interval: 60
     cookie-max-age: -1
-    cookie-domain: ${BELLA_COOKIE_DOMAIN:localhost}
+    cookie-domain: ${BELLA_SESSION_COOKIE_DOMAIN:ke.com}
     cookie-context-path: /
   datasets:
     import:

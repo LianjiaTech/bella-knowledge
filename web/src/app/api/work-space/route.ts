@@ -1,5 +1,5 @@
 import { backendRequest } from "@/lib/request/backend";
-import { BELLA_OPENAPI_URL } from "@/lib/request/const ";
+import { BELLA_OPENAPI_URL } from "@/lib/request/const";
 import { NextRequest } from "next/server";
 
 export async function GET(req: NextRequest) {

@@ -1,0 +1,77 @@
+name: bella-file-api
+version: "3.8"
+
+# Define shared network
+networks:
+  bella-file-api-network:
+    driver: bridge
+
+services:
+  # MySQL service
+  mysql:
+    image: mysql:8.0
+    container_name: ${MYSQL_CONTAINER_NAME:-bella-file-api-mysql}
+    ports:
+      - "${EXPOSE_MYSQL_PORT:-3306}:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-root}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-bella_file_api}
+      - MYSQL_USER=${MYSQL_USER:-bella_user}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-123456}
+    volumes:
+      - ./volumes/mysql/data:/var/lib/mysql
+      - ../api/sql:/docker-entrypoint-initdb.d
+    expose:
+      - "3306"
+    privileged: true
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_0900_ai_ci
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    env_file:
+      - .middleware.env
+    networks:
+      - bella-file-api-network
+
+  # Redis service
+  redis:
+    image: redis:7-alpine
+    container_name: ${REDIS_CONTAINER_NAME:-bella-file-api-redis}
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - ./volumes/redis/data:/data
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-bella123}
+    healthcheck:
+      test: [ "CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-bella123}", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    env_file:
+      - .middleware.env
+    networks:
+      - bella-file-api-network
+
+  # Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    container_name: ${NGINX_CONTAINER_NAME:-bella-file-api-nginx}
+    ports:
+      - "${NGINX_HTTP_PORT:-80}:80"
+      - "${NGINX_HTTPS_PORT:-443}:443"
+    volumes:
+      - ./volumes/nginx/conf.d:/etc/nginx/conf.d
+      - ./volumes/nginx/ssl:/etc/nginx/ssl
+      - ./volumes/nginx/logs:/var/log/nginx
+    healthcheck:
+      test: [ "CMD", "nginx", "-t" ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    env_file:
+      - .middleware.env
+    networks:
+      - bella-file-api-network

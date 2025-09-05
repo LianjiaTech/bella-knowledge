@@ -1,5 +1,5 @@
 import { backendRequest, backendRequestFormData } from "@/lib/request/backend";
-import { FILE_API_URL } from "@/lib/request/const ";
+import { FILE_API_URL } from "@/lib/request/const";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {

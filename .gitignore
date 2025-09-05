@@ -43,3 +43,21 @@ mysql/data/
 
 # 前端构建产物
 web/dist/
+
+docker/volumes/mysql/data
+docker/volumes/redis/data
+docker/volumes/kafka/data
+docker/volumes/minio/data
+docker/volumes/api
+
+docker/volumes/mysql/data
+docker/volumes/redis/data
+docker/volumes/kafka/data
+docker/volumes/minio/data
+docker/volumes/api
+
+docker/volumes/mysql/data
+docker/volumes/redis/data
+docker/volumes/kafka/data
+docker/volumes/minio/data
+docker/volumes/api

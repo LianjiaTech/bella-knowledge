@@ -16,7 +16,6 @@ spring:
       pool-name: HikariCP
       max-lifetime: 1800000
       connection-timeout: 30000
-      connection-test-query: SELECT 1
   servlet:
     multipart:
       max-file-size: 512MB
@@ -25,20 +24,35 @@ spring:
   jackson:
     property-naming-strategy: SNAKE_CASE
     default-property-inclusion: NON_NULL
-
+  redis:
+    host: ${REDIS_HOST:redis}
+    port: ${REDIS_PORT:6379}
+    password: ${REDIS_PASSWORD:bella123}
+  kafka:
+    producer:
+      bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+      value-serializer: ${KAFKA_PRODUCER_VALUE_SERIALIZER:org.springframework.kafka.support.serializer.JsonSerializer}
+      key-serializer: ${KAFKA_PRODUCER_KEY_SERIALIZER:org.apache.kafka.common.serialization.StringSerializer}
+      topic:
+        broadcast: ${KAFKA_TOPIC_BROADCAST:bella_file_api}
 app:
-  id: example-file-api
+  id: bella-file-api
 
 bella:
   open-api-base: ${BELLA_OPEN_API_BASE:http://localhost:8080/}
   file-api:
     file:
-      tmp-file-dir: /opt/example-file-api/cache
+      tmp-file-dir: /opt/bella-file-api/cache
     bucket-name:
-      public: test
-      private: test
+      public: ${BELLA_STORAGE_S3_BUCKET:test}
+      private: ${BELLA_STORAGE_S3_BUCKET:test}
     storage:
       type: ${BELLA_STORAGE_TYPE:local}
+      s3:
+        ak: ${S3_ACCESS_KEY:}
+        sk: ${S3_SECRET_KEY:}
+        endpoint: http://${S3_HOST:minio}:${S3_API_PORT:9000}
+        region: ${S3_REGION:us-east-1}
   server:
     initializer:
       enabled: true
@@ -49,11 +63,6 @@ apollo:
     eagerLoad:
       enabled: true
     namespaces: application
-  property:
-    order:
-      enabled: true
-  cacheDir: /opt/example-file-api/config-cache
-  cluster: default
 
 management:
   endpoints:

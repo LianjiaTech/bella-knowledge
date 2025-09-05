@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
-  allowedDevOrigins: ["example.com"],
+  allowedDevOrigins: process.env.NEXT_PUBLIC_ALLOWED_DEV_ORIGINS ? process.env.NEXT_PUBLIC_ALLOWED_DEV_ORIGINS.split(',') : [],
   images: {
     remotePatterns: [new URL("https://img.ljcdn.com/*")],
   },

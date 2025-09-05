@@ -1,5 +1,5 @@
 # base image
-FROM swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/node:20.16.0-alpine3.20 AS base
+FROM node:20.11-alpine3.19 AS base
 LABEL maintainer="takatost@gmail.com"
 
 # 安装 pnpm
@@ -14,7 +14,7 @@ FROM base AS packages
 
 WORKDIR /app/web
 
-COPY package.json pnpm-lock.yaml* ./
+COPY web/package.json web/pnpm-lock.yaml* ./
 
 # if you located in China, you can use taobao registry to speed up
 RUN pnpm install --frozen-lockfile --registry https://registry.npmmirror.com/
@@ -23,7 +23,7 @@ RUN pnpm install --frozen-lockfile --registry https://registry.npmmirror.com/
 FROM base AS builder
 WORKDIR /app/web
 COPY --from=packages /app/web/ .
-COPY . .
+COPY web/ .
 
 RUN pnpm build
 
@@ -33,6 +33,8 @@ FROM base AS production
 ENV NODE_ENV=production
 ENV EDITION=SELF_HOSTED
 ENV DEPLOY_ENV=PRODUCTION
+ENV CONSOLE_API_URL=http://127.0.0.1:5001
+ENV APP_API_URL=http://127.0.0.1:5001
 ENV PORT=3000
 
 # set timezone
@@ -41,7 +43,8 @@ RUN ln -s /usr/share/zoneinfo/${TZ} /etc/localtime \
     && echo ${TZ} > /etc/timezone
 
 # global runtime packages
-RUN npm install -g pm2
+RUN npm install -g pm2 \
+    && npm cache clean --force
 
 
 WORKDIR /app/web
@@ -50,8 +53,8 @@ COPY --from=builder /app/web/.next/standalone ./
 COPY --from=builder /app/web/.next/static ./.next/static
 
 
-COPY docker/pm2.json ./pm2.json
-COPY docker/entrypoint.sh ./entrypoint.sh
+COPY web/docker/pm2.json ./pm2.json
+COPY web/docker/entrypoint.sh ./entrypoint.sh
 
 ARG COMMIT_SHA
 ENV COMMIT_SHA=${COMMIT_SHA}

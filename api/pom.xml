@@ -12,9 +12,9 @@
     </parent>
 
     <groupId>com.ke.bella.files</groupId>
-    <artifactId>example-file-api</artifactId>
+    <artifactId>bella-file-api</artifactId>
     <version>1.0.0-SNAPSHOT</version>
-    <name>example-file-api</name>
+    <name>bella-file-api</name>
     <description>Demo project for ke.com</description>
 
     <properties>
@@ -207,7 +207,7 @@
         <dependency>
             <groupId>top.bella</groupId>
             <artifactId>openapi-spi</artifactId>
-            <version>1.1.21</version>
+            <version>1.1.65</version>
             <exclusions>
                 <exclusion>
                     <groupId>org.redisson</groupId>

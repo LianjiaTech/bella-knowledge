@@ -1,0 +1,275 @@
+name: bella-file-api-enterprise
+version: "3.8"
+
+# Define shared network
+networks:
+  bella-file-api-network:
+    driver: bridge
+
+services:
+  # MySQL service
+  mysql:
+    image: mysql:8.0
+    container_name: ${MYSQL_CONTAINER_NAME:-bella-file-api-mysql}
+    ports:
+      - "${EXPOSE_MYSQL_PORT:-3306}:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-root}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-bella_file_api}
+      - MYSQL_USER=${MYSQL_USER:-bella_user}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-123456}
+    volumes:
+      - ./volumes/mysql/data:/var/lib/mysql
+      - ../api/sql:/docker-entrypoint-initdb.d
+    expose:
+      - "3306"
+    privileged: true
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_0900_ai_ci
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "${MYSQL_USER:-bella_user}", "-p${MYSQL_PASSWORD:-123456}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    env_file:
+      - .env.enterprise
+    networks:
+      - bella-file-api-network
+
+  # Redis service
+  redis:
+    image: redis:7-alpine
+    container_name: ${REDIS_CONTAINER_NAME:-bella-file-api-redis}
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - ./volumes/redis/data:/data
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-bella123}
+    healthcheck:
+      test: [ "CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-bella123}", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    env_file:
+      - .env.enterprise
+    networks:
+      - bella-file-api-network
+
+  # S3 service (MinIO implementation)
+  minio:
+    image: minio/minio:latest
+    container_name: ${S3_CONTAINER_NAME:-bella-file-api-minio}
+    ports:
+      - "${S3_API_PORT:-9000}:9000"
+      - "${S3_CONSOLE_PORT:-9001}:9001"
+    environment:
+      - MINIO_ROOT_USER=${S3_ACCESS_KEY:-bella_user}
+      - MINIO_ROOT_PASSWORD=${S3_SECRET_KEY:-12345678}
+      - MINIO_BUCKET=${S3_BUCKET:-bella-file-api}
+      - MINIO_ROOT_PATH=${S3_ROOT_PATH:-files}
+    volumes:
+      - ./volumes/minio/data:/data
+      - ./volumes/minio/scripts:/scripts
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://${S3_HOST:-localhost}:${S3_API_PORT:-9000}/minio/health/live" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    env_file:
+      - .env.enterprise
+    networks:
+      - bella-file-api-network
+    entrypoint: [ "/bin/sh" ]
+    command: [ "-c", "minio server /data --console-address ':9001' & sleep 10 && /scripts/init-minio.sh" ]
+
+  # Kafka service (KRaft mode, no Zookeeper needed)
+  kafka:
+    image: docker.io/bitnamilegacy/kafka:3.4.1
+    container_name: ${KAFKA_CONTAINER_NAME:-bella-file-api-kafka}
+    user: "1001:0"
+    ports:
+      - '${EXPOSE_KAFKA_PLAINTEXT_PORT:-9092}:9092'
+      - '${EXPOSE_KAFKA_CONTROLLER_PORT:-9093}:9093'
+      - '${EXPOSE_KAFKA_EXTERNAL_PORT:-19092}:19092'
+    environment:
+      # KRaft settings
+      KAFKA_CFG_NODE_ID: 1
+      KAFKA_CFG_PROCESS_ROLES: controller,broker
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: '1@kafka:9093'
+      # Set cluster ID to resolve warnings
+      KAFKA_CLUSTER_ID: 'BellaFileApiKafka001'
+      # Listeners
+      KAFKA_CFG_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,EXTERNAL://0.0.0.0:19092
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://${KAFKA_HOST:-kafka}:9092,EXTERNAL://${KAFKA_EXTERNAL_HOST:-localhost}:19092
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      # Other settings
+      KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CFG_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      ALLOW_PLAINTEXT_LISTENER: 'yes'
+    env_file:
+      - .env.enterprise
+    volumes:
+      - kafka-data:/bitnami/kafka
+      - ./volumes/kafka/scripts:/scripts
+    healthcheck:
+      test: [ "CMD-SHELL", "kafka-topics.sh --bootstrap-server ${KAFKA_HOST:-kafka}:9092 --list | grep -q '${KAFKA_TOPIC_BROADCAST:-bella_file_api}'" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - bella-file-api-network
+    command: [ "bash", "-c", "/opt/bitnami/scripts/kafka/entrypoint.sh /opt/bitnami/scripts/kafka/run.sh & sleep 10 && /scripts/start-connect.sh" ]
+
+  # Spring Boot API service with S3 support
+  bella-file-api:
+    image: ${REGISTRY:-bellatop}/bella-file-api:${VERSION:-latest}
+    build:
+      context: ../
+      dockerfile: api/Dockerfile
+      args:
+        - MAVEN_ARGS="-Dmaven.test.skip=true -U -Dmaven.build.cache.enabled=false"
+        - MAVEN_MIRROR=${MAVEN_MIRROR:-central}
+    container_name: ${API_CONTAINER_NAME:-bella-file-api}
+    ports:
+      - "${API_PORT:-8081}:8081"
+      - "${DEBUGPORT:-9008}:9008"
+    expose:
+      - "8081"
+    environment:
+      - LOG_PATH=${LOG_PATH:-../api/logs}
+      # Java Configuration
+      - JAVA_OPTS=-server -Xms${API_MIN_HEAP:-1024m} -Xmx${API_MAX_HEAP:-1024m} -XX:MetaspaceSize=${API_METASPACE:-256m} -XX:MaxMetaspaceSize=${API_MAX_METASPACE:-256m} -Dbella.proxy.host=${PROXY_HOST:-} -Dbella.proxy.port=${PROXY_PORT:-} -Dbella.proxy.type=${PROXY_TYPE:-} -Dbella.storage.config=${STORAGE_CONFIG:-}
+      # Database Configuration
+      - MYSQL_HOST=${MYSQL_HOST:-mysql}
+      - MYSQL_PORT=${MYSQL_PORT:-3306}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-bella_file_api}
+      - MYSQL_USER=${MYSQL_USER:-bella_user}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-123456}
+      # Redis Configuration
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-bella123}
+      # Application Configuration
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-docker}
+      - BELLA_OPEN_API_BASE=${BELLA_OPEN_API_BASE:-https://localhost:8080/}
+      - BELLA_STORAGE_TYPE=${BELLA_STORAGE_TYPE:-s3}
+      - BELLA_TMP_FILE_DIR=${BELLA_TMP_FILE_DIR:-/opt/bella-file-api/cache}
+      # S3/MinIO Configuration
+      - S3_HOST=${S3_HOST:-minio}
+      - S3_API_PORT=${S3_API_PORT:-9000}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY:-bella_user}
+      - S3_SECRET_KEY=${S3_SECRET_KEY:-12345678}
+      - S3_BUCKET=${S3_BUCKET:-bella-file-api}
+      - S3_ROOT_PATH=${S3_ROOT_PATH:-files}
+      - BELLA_STORAGE_S3_BUCKET=${S3_BUCKET:-bella-file-api}
+      - BELLA_FILE_API_STORAGE_S3_ENDPOINT=http://${S3_HOST:-minio}:${S3_API_PORT:-9000}
+      - BELLA_FILE_API_STORAGE_S3_AK=${S3_ACCESS_KEY:-bella_user}
+      - BELLA_FILE_API_STORAGE_S3_SK=${S3_SECRET_KEY:-12345678}
+      - BELLA_FILE_API_STORAGE_S3_REGION=${S3_REGION:-us-east-1}
+      # Kafka Configuration
+      - kafka.enabled=${KAFKA_ENABLED:-true}
+      - KAFKA_BOOTSTRAP_SERVERS=${KAFKA_HOST:-kafka}:9092
+      - KAFKA_PRODUCER_VALUE_SERIALIZER=${KAFKA_PRODUCER_VALUE_SERIALIZER:-org.springframework.kafka.support.serializer.JsonSerializer}
+      - KAFKA_PRODUCER_KEY_SERIALIZER=${KAFKA_PRODUCER_KEY_SERIALIZER:-org.apache.kafka.common.serialization.StringSerializer}
+      - KAFKA_TOPIC_BROADCAST=${KAFKA_TOPIC_BROADCAST:-bella_file_api}
+      # Environment Variables
+      - IDC=zeus
+      - MODULE=bella-file-api
+      - ENVTYPE=enterprise
+      - DEBUGPORT=9008
+      - JMXPORT=9009
+      - MATRIX_CODE_DIR=/opt/bella-file-api/htdocs
+      - MATRIX_APPLOGS_DIR=/opt/bella-file-api/applogs
+      - MATRIX_ACCESSLOGS_DIR=/opt/bella-file-api/logs
+      - MATRIX_LOGS_DIR=/opt/bella-file-api/logs
+      - MATRIX_CACHE_DIR=/opt/bella-file-api/cache
+      - MATRIX_PRIVDATA_DIR=/opt/bella-file-api/privdata
+    volumes:
+      # Mount log and configuration directories
+      - ./volumes/api/applogs:/opt/bella-file-api/applogs
+      - ./volumes/api/logs:/opt/bella-file-api/logs
+      - ./volumes/api/cache:/opt/bella-file-api/cache
+      - ./volumes/api/config-cache:/opt/bella-file-api/config-cache
+      - ./volumes/api/privdata:/opt/bella-file-api/privdata
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    env_file:
+      - .env.enterprise
+    networks:
+      - bella-file-api-network
+
+  # Web Frontend service
+  bella-file-web:
+    image: ${REGISTRY:-bellatop}/bella-file-web:${VERSION:-latest}
+    build:
+      context: ../
+      dockerfile: web/Dockerfile
+    container_name: ${WEB_CONTAINER_NAME:-bella-file-web}
+    ports:
+      - "${WEB_PORT:-3001}:3000"
+    environment:
+      - NEXT_PUBLIC_BELLA_FILE_API_URL=http://${API_HOST:-bella-file-api}:${API_PORT:-8081}
+      - NEXT_PUBLIC_BELLA_OPENAPI_URL=${BELLA_OPEN_API_BASE:-https://localhost:8080/}
+      - NEXT_PUBLIC_ALLOWED_DEV_ORIGINS=${ALLOWED_DEV_ORIGINS:-}
+      - PORT=3000
+      - TZ=${TZ:-UTC}
+    env_file:
+      - .env.enterprise
+    networks:
+      - bella-file-api-network
+
+  # Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    container_name: ${NGINX_CONTAINER_NAME:-bella-file-api-nginx}
+    ports:
+      - "${NGINX_HTTP_PORT:-80}:80"
+      - "${NGINX_HTTPS_PORT:-443}:443"
+    volumes:
+      - ./volumes/nginx/conf.d:/etc/nginx/conf.d
+      - ./volumes/nginx/default.conf.template:/etc/nginx/conf.d/default.conf.template:ro
+#      - ./volumes/nginx/entrypoint.sh:/docker-entrypoint.d/40-ssl-setup.sh:ro
+#      - ./volumes/nginx/ssl:/etc/nginx/ssl
+    environment:
+      - TZ=${TZ:-UTC}
+      - SERVER_DOMAIN=${SERVER_DOMAIN:-localhost}
+      - SERVER_PROTOCOL=${SERVER_PROTOCOL:-http}
+      # SSL配置控制
+      - ENABLE_SSL=${ENABLE_SSL:-false}
+      - SSL_CERT_PATH=${SSL_CERT_PATH:-/etc/nginx/ssl/fullchain.pem}
+      - SSL_KEY_PATH=${SSL_KEY_PATH:-/etc/nginx/ssl/private.key}
+      # 动态配置变量 (由entrypoint脚本设置)
+      - SSL_LISTEN_DIRECTIVE=
+      - SSL_CONFIG_BLOCK=
+      - SSL_REDIRECT_BLOCK=
+      - PROXY_FORWARDED_PROTO=
+      # 服务upstream配置 (容器模式)
+      - API_UPSTREAM=http://bella-file-api:8081
+      - WEB_UPSTREAM=http://bella-file-web:3000
+    depends_on:
+      - bella-file-api
+      - bella-file-web
+    healthcheck:
+      test: [ "CMD", "nginx", "-t" ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    env_file:
+      - .env.enterprise
+    networks:
+      - bella-file-api-network
+
+volumes:
+  kafka-data:
