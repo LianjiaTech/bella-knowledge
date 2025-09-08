@@ -35,7 +35,7 @@ build/
 /.apt_generated_tests/
 /.idea/
 
-api/config-cache/example-file-api/config-cache/
+api/config-cache/bella-file-api/config-cache/
 
 api/logs/
 

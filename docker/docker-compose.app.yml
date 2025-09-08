@@ -24,8 +24,15 @@ services:
       # 日志配置
       - LOG_PATH=${LOG_PATH:-/opt/bella-file-api/applogs}
       
-      # Java 配置
-      - JAVA_OPTS=-server -Xms${API_MIN_HEAP:-1024m} -Xmx${API_MAX_HEAP:-2048m} -XX:MetaspaceSize=${API_METASPACE:-256m} -XX:MaxMetaspaceSize=${API_MAX_METASPACE:-512m} -Dbella.proxy.host=${PROXY_HOST:-} -Dbella.proxy.port=${PROXY_PORT:-} -Dbella.proxy.type=${PROXY_TYPE:-} -Dbella.storage.config=${STORAGE_CONFIG:-}
+      # Java 配置 - 使用环境变量让run.sh脚本读取
+      - Xms=${API_MIN_HEAP:-512m}
+      - Xmx=${API_MAX_HEAP:-1024m}
+      - MetaspaceSize=${API_METASPACE:-128m}
+      - MaxMetaspaceSize=${API_MAX_METASPACE:-256m}
+      - PROXY_HOST=${PROXY_HOST:-}
+      - PROXY_PORT=${PROXY_PORT:-}
+      - PROXY_TYPE=${PROXY_TYPE:-}
+      - STORAGE_CONFIG=${STORAGE_CONFIG:-}
       
       # 数据库配置 (连接到bella-workflow的MySQL)
       - MYSQL_HOST=${MYSQL_HOST}

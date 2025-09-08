@@ -23,7 +23,7 @@ npm run build
 构建完成后的目录结构（从项目根目录查看）：
 
 ```
-example-file-api/
+bella-file-api/
 ├── web/                 # Next.js项目源码
 └── dist/                # 构建输出目录
     ├── client/
