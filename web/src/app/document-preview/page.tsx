@@ -16,7 +16,6 @@ function DocumentPreviewPage() {
   const searchParams = useSearchParams();
 
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [leftSectionWidth, setLeftSectionWidth] = useLocalState(
     "leftSectionWidth",
     50,
@@ -44,7 +43,7 @@ function DocumentPreviewPage() {
   return (
     <>
       <TopBar lastEditTime={lastEditTime} />
-      <LeftSidebar open={sidebarOpen} onOpenChange={setSidebarOpen} />
+      <LeftSidebar />
       <main className="pt-16 h-screen flex" ref={containerRef}>
         {/* 左侧内容区域 - 撑满剩余宽度 */}
         <LeftContentSection

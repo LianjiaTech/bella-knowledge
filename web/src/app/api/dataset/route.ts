@@ -66,10 +66,13 @@ export async function DELETE(req: NextRequest) {
   });
   return res;
 }
+
 export async function PUT(req: NextRequest) {
+  const data = await req.json();
   const res = await backendRequest(req, {
     url: `${FILE_API_URL}/v1/datasets/update`,
     method: "POST",
+    body: data,
   });
   return res;
 }
