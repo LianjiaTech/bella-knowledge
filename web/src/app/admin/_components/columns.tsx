@@ -2,7 +2,7 @@
 
 import { ColumnDef, Row } from "@tanstack/react-table";
 import dayjs from "dayjs";
-import { Edit, Import, Trash2 } from "lucide-react";
+import { Edit, EditIcon, Import, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,7 @@ import {
 import { AppendDatasetSheet } from "./append-dataset-sheet";
 import { requestDeleteDataset } from "@/request/dataset";
 import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
 
 export type Dataset = {
   id: number;
@@ -150,6 +151,7 @@ const CreateRowActions = (
 };
 
 export const getColumns = (
+  onChangeRemark: (datasetId: string, remark: string) => void,
   onDelete: () => void,
   type: "qa" | "document",
 ): ColumnDef<Dataset>[] => [
@@ -160,6 +162,47 @@ export const getColumns = (
   {
     accessorKey: "remark",
     header: "描述",
+    cell({ row }) {
+      const [isHovering, setIsHovering] = useState(false);
+      const [isInputing, setIsInputing] = useState(false);
+      const [inputValue, setInputValue] = useState(row.original.remark);
+      return (
+        <div
+          className="min-w-6 flex items-center gap-1"
+          onMouseEnter={() => setIsHovering(true)}
+          onMouseLeave={() => setIsHovering(false)}
+        >
+          {isInputing ? (
+            <Input
+              autoFocus
+              value={inputValue}
+              onChange={(e) => {
+                setInputValue(e.target.value);
+              }}
+              onBlur={() => {
+                setIsInputing(false);
+                onChangeRemark(row.original.dataset_id, inputValue);
+              }}
+            />
+          ) : row.original.remark ? (
+            row.original.remark
+          ) : (
+            "-"
+          )}
+          <div className="size-9">
+            {isHovering && (
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => setIsInputing(true)}
+              >
+                <EditIcon size={16} />
+              </Button>
+            )}
+          </div>
+        </div>
+      );
+    },
   },
   {
     accessorFn(row) {

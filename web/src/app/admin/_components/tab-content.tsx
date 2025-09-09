@@ -6,24 +6,32 @@ import { getColumns } from "./columns";
 import { useUserStore } from "@/store/user";
 import { useAdminStore } from "../model";
 import CreateDatasetSheet from "../_components/create-dataset-sheet";
+import { requestUpdateDatasetRemark } from "@/request/dataset";
 interface TabContentProps {
   type: "qa" | "document";
 }
 
 const TabContent = ({ type }: TabContentProps) => {
-  const { getDatasetList, datasetList, loading } = useAdminStore();
+  const { getDatasetList, updateDatasetRemark, datasetList, loading } =
+    useAdminStore();
   const { currentWorkspace } = useUserStore();
 
   useEffect(() => {
     if (currentWorkspace) {
-      getDatasetList(1, 10, type);
+      getDatasetList({ page: 1, type });
     }
   }, [currentWorkspace, getDatasetList, type]);
 
   const columns = useMemo(() => {
-    return getColumns(() => {
-      getDatasetList(1, 10, type);
-    }, type);
+    return getColumns(
+      async (datasetId, remark) => {
+        await updateDatasetRemark(datasetId, remark);
+      },
+      () => {
+        getDatasetList({ type });
+      },
+      type,
+    );
   }, [getDatasetList, type]);
   const [open, setOpen] = useState(false);
 

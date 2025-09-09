@@ -102,7 +102,7 @@ export function CreateDatasetForm({
         name: data.name,
         remark: data.remark,
         type,
-        ...(uploadedFiles.length > 0 && { file_id: uploadedFiles[0].id })
+        ...(uploadedFiles.length > 0 && { file_id: uploadedFiles[0].id }),
       };
       const res = await requestCreateDataset(requestData);
       if (res.code === 200) {
@@ -240,7 +240,7 @@ const CreateDatasetSheet = ({
         </SheetHeader>
         <CreateDatasetForm
           onSuccess={() => {
-            getDatasetList(1, 10, type);
+            getDatasetList({ type });
             onOpenChange(false);
           }}
           type={type}

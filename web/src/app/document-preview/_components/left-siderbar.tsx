@@ -22,13 +22,9 @@ import {
 import { useSearchParams } from "next/navigation";
 import { useDocumentPreviewStore } from "../model";
 
-interface AppSidebarProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}
-
-export function LeftSidebar({ open, onOpenChange }: AppSidebarProps) {
+export function LeftSidebar() {
   const [newQuestionText, setNewQuestionText] = useState("");
+  const [open, setOpen] = useState(true);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const datasetId = useSearchParams().get("dataset_id") || "";
   const {
@@ -43,13 +39,19 @@ export function LeftSidebar({ open, onOpenChange }: AppSidebarProps) {
   // 鼠标悬停检测
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      const threshold = 5;
+      const threshold = 12;
       if (e.clientX <= threshold && !open) {
         // 鼠标进入左侧区域，打开边栏
         if (hoverTimeoutRef.current) {
           clearTimeout(hoverTimeoutRef.current);
         }
-        onOpenChange(true);
+        hoverTimeoutRef.current = setTimeout(() => {
+          setOpen(true);
+        }, 300);
+      } else if (e.clientX > threshold && !open) {
+        if (hoverTimeoutRef.current) {
+          clearTimeout(hoverTimeoutRef.current);
+        }
       }
     };
 
@@ -58,7 +60,7 @@ export function LeftSidebar({ open, onOpenChange }: AppSidebarProps) {
     return () => {
       document.removeEventListener("mousemove", handleMouseMove);
     };
-  }, [open, onOpenChange]);
+  }, [open, setOpen]);
 
   const handleAddQuestion = () => {
     if (newQuestionText.trim()) {
@@ -82,7 +84,7 @@ export function LeftSidebar({ open, onOpenChange }: AppSidebarProps) {
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={setOpen}>
       <SheetContent
         side="left"
         className="flex flex-col w-100 p-0"
@@ -96,7 +98,7 @@ export function LeftSidebar({ open, onOpenChange }: AppSidebarProps) {
           // 鼠标离开边栏时，延迟关闭
           if (open) {
             hoverTimeoutRef.current = setTimeout(() => {
-              onOpenChange(false);
+              setOpen(false);
             }, 300);
           }
         }}

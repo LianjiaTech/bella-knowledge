@@ -51,12 +51,12 @@ export function DataTable<TData, TValue>({
         if (newPagination.pageIndex !== page - 1) {
           const newPage = newPagination.pageIndex + 1;
           setCurrentPage(newPage);
-          getDatasetList(newPage, pageSize);
+          getDatasetList({ page: newPage, pageSize });
         }
 
         if (newPagination.pageSize !== pageSize) {
           setPageSize(newPagination.pageSize);
-          getDatasetList(1, newPagination.pageSize);
+          getDatasetList({ page: 1, pageSize: newPagination.pageSize });
         }
       }
     },

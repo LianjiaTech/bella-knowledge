@@ -114,3 +114,21 @@ export const getDocumentContentUrl = async (fileId: string) => {
   });
   return res;
 };
+
+export const requestUpdateDatasetRemark = async (
+  datasetId: string,
+  remark: string,
+) => {
+  const res = await webRequest<Dataset>({
+    path: `/api/dataset`,
+    method: "PUT",
+    body: {
+      dataset_id: datasetId,
+      remark,
+    },
+  });
+  if (res.code === 200) {
+    return res.data;
+  }
+  return res.message;
+};
