@@ -426,6 +426,10 @@ public class FileService {
         return result.toBuilder().path(pathBuilder.toString()).build();
     }
 
+    public String getDirectAncestorId(String fileId) {
+        return fileRepo.getDirectAncestorId(fileId);
+    }
+
     @Data
     @AllArgsConstructor
     @Builder

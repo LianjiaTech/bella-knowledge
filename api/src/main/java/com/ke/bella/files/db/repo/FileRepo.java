@@ -454,4 +454,19 @@ public class FileRepo implements BaseRepo {
                 .orderBy(FILE_CLOSURE.DEPTH.desc())
                 .fetchInto(FileDB.class);
     }
+
+    @Nullable
+    public String getDirectAncestorId(String fileId) {
+        fileId = queryNewFileId(fileId);
+        String shardingKey = getShardingKeyByFileId(fileId);
+
+        return db(shardingKey).select(FILE_CLOSURE.ANCESTOR_ID)
+                .from(FILE_CLOSURE)
+                .where(FILE_CLOSURE.DESCENDANT_ID.eq(fileId)
+                        .and(FILE_CLOSURE.DEPTH.eq(1L)))
+                .fetchOptional()
+                .map(record -> record.getValue(FILE_CLOSURE.ANCESTOR_ID))
+                .orElse(null);
+
+    }
 }

@@ -1,6 +1,5 @@
 package com.ke.bella.files.api;
 
-import static com.ke.bella.files.configuration.Configs.FILE_EXISTS_BLOCK;
 import static com.ke.bella.files.service.FileService.ONE_DAY_STRING;
 
 import java.awt.image.BufferedImage;
@@ -113,7 +112,7 @@ public class FileController {
                                     finalTmpFileInfo.getType(), finalTmpFileInfo.getMimeType(),
                                     finalTmpFileInfo.getExtension(), finalTmpFileInfo.getCharset(), metadata);
                         }
-                    } else if(FILE_EXISTS_BLOCK) {
+                    } else {
                         // fixme: may lead to unnecessary create temp file
                         throw new IllegalArgumentException(
                                 String.format("File '%s' already exists in current directory, ancestor_id: '%s'", filename, ancestorId));
@@ -123,6 +122,8 @@ public class FileController {
                 return fileService.uploadWithUrl(finalTmpFileInfo.getTmpFile(), finalTmpFileInfo.getType(), finalTmpFileInfo.getMimeType(),
                         finalTmpFileInfo.getExtension(), finalTmpFileInfo.getCharset(), purpose, metadata, getUrl, expires, ancestorId, filename);
             });
+        } catch (IllegalArgumentException e) {
+            throw e;
         } catch (Exception e) {
             LOGGER.error("File upload failed, filename: {}, error: {}", filename, e.getMessage(), e);
             throw new IllegalStateException("File upload failed", e);
@@ -349,11 +350,33 @@ public class FileController {
             throw new FileNotFoundException(fileId);
         }
 
-        FileOps ops = FileOps.builder()
-                .fileId(fileId)
-                .filename(filename)
-                .build();
-        return fileService.updateFile(ops, true, Scope.FILENAME);
+        if(filename.equals(existingFile.getFilename())) {
+            return existingFile;
+        }
+
+        String spaceCode = BellaContextHelper.getOperateSpaceCode();
+        String ancestorId = fileService.getDirectAncestorId(fileId);
+
+        try {
+            return fl.executeWithLock(spaceCode, ancestorId, filename, FILE_LOCK_TIMEOUT_MS, () -> {
+                if(fileService.exists(spaceCode, ancestorId, filename)) {
+                    String location = ancestorId == null ? "root directory" : "ancestor_id: '" + ancestorId + "'";
+                    throw new IllegalArgumentException(
+                            String.format("File '%s' already exists in current directory, %s", filename, location));
+                }
+
+                FileOps ops = FileOps.builder()
+                        .fileId(fileId)
+                        .filename(filename)
+                        .build();
+                return fileService.updateFile(ops, true, Scope.FILENAME);
+            });
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception e) {
+            LOGGER.error("File rename failed, file_id: {}, new_filename: {}, error: {}", fileId, filename, e.getMessage(), e);
+            throw new IllegalStateException("File rename failed", e);
+        }
     }
 
     @PutMapping

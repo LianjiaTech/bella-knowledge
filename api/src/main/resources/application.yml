@@ -36,8 +36,6 @@ bella:
   file-api:
     file:
       tmp-file-dir: ${BELLA_TMP_FILE_DIR:.}
-      exists:
-        block: false
     bucket-name:
       public: ${BELLA_STORAGE_S3_BUCKET:test}
       private: ${BELLA_STORAGE_S3_BUCKET:test}
