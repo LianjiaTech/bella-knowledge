@@ -39,7 +39,7 @@ export function LeftSidebar() {
   // 鼠标悬停检测
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      const threshold = 12;
+      const threshold = 3;
       if (e.clientX <= threshold && !open) {
         // 鼠标进入左侧区域，打开边栏
         if (hoverTimeoutRef.current) {
