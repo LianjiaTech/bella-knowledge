@@ -40,6 +40,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.ke.bella.files.annotations.FileAPI;
+import com.ke.bella.files.db.tables.pojos.FileDB;
 import com.ke.bella.files.protocol.DomTreeOps.DomTreeUploadOp;
 import com.ke.bella.files.protocol.FileCropOps;
 import com.ke.bella.files.protocol.FileCropOps.FileCropOp;
@@ -861,7 +862,11 @@ public class FileController {
     @GetMapping("/find")
     public OpenapiListResponse<OpenAIFile> find(
             @RequestParam(value = "ancestor_id", required = false) String ancestorId) {
-        List<OpenAIFile> files = fileService.findFiles(ancestorId);
+        FileDB ancestor = fileService.getFile0(ancestorId);
+        if(ancestor == null) {
+            throw new IllegalArgumentException("File not found. file_id = " + ancestorId);
+        }
+        List<OpenAIFile> files = fileService.findFiles(ancestor);
 
         OpenapiListResponse<OpenAIFile> res = new OpenapiListResponse<>();
         res.setData(files);
