@@ -247,6 +247,10 @@ public class FileService {
         return transferToOpenAIFile(fileDB);
     }
 
+    public FileDB getFile0(String fileId) {
+        return fileRepo.queryFile(fileId);
+    }
+
     public String updateRealFile(String fileId, String filename, File file, String mimeType, String charset) {
         FileDB fileDB = fileRepo.queryFile(fileId);
         return storageService.putObject(fileDB.getBucket(), fileDB.getPath(), mimeType, file, filename, charset);
@@ -405,9 +409,8 @@ public class FileService {
         return openAIFile;
     }
 
-    public List<OpenAIFile> findFiles(
-            String ancestorId) {
-        List<FileDB> fileDbs = fileRepo.findFiles(ancestorId);
+    public List<OpenAIFile> findFiles(FileDB ancestor) {
+        List<FileDB> fileDbs = fileRepo.findFiles(ancestor);
         return fileDbs.stream()
                 .map(this::transferToOpenAIFile)
                 .collect(Collectors.toList());

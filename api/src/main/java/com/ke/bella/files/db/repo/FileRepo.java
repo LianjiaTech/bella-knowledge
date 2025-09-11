@@ -417,9 +417,9 @@ public class FileRepo implements BaseRepo {
                 .execute();
     }
 
-    public List<FileDB> findFiles(
-            String ancestorId) {
-        String spaceCode = BellaContextHelper.getOperateSpaceCode();
+    public List<FileDB> findFiles(FileDB ancestor) {
+        String ancestorId = ancestor.getFileId();
+        String spaceCode = ancestor.getSpaceCode();
         String shardingKey = getShardingKeyBySpaceCode(spaceCode);
 
         SelectConditionStep<Record> query = db(shardingKey).select(FILE.fields())
