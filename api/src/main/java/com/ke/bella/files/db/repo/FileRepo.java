@@ -221,7 +221,7 @@ public class FileRepo implements BaseRepo {
             sql.set(FILE.VERSION, FILE.VERSION.add(1));
         }
         int updatedNum = sql
-                .where(FILE.FILE_ID.eq(fileId).and(FILE.STATUS.eq(FileStatus.NOT_DELETED.getValue())))
+                .where(FILE.FILE_ID.eq(fileId))
                 .execute();
 
         if(updatedNum != 1) {
