@@ -111,7 +111,7 @@ public class FileController {
                         if(existingFile != null) {
                             return updateFile(existingFile.getId(), finalTmpFileInfo.getTmpFile(), filename,
                                     finalTmpFileInfo.getType(), finalTmpFileInfo.getMimeType(),
-                                    finalTmpFileInfo.getExtension(), finalTmpFileInfo.getCharset(), metadata);
+                                    finalTmpFileInfo.getExtension(), finalTmpFileInfo.getCharset(), metadata, purpose);
                         }
                     } else {
                         // fixme: may lead to unnecessary create temp file
@@ -177,7 +177,7 @@ public class FileController {
 
             return updateFile(existingFile.getId(), tmpFileInfo.getTmpFile(), filename,
                     "json", "application/json",
-                    "json", tmpFileInfo.getCharset(), null);
+                    "json", tmpFileInfo.getCharset(), null, "dom_tree");
         } else {
             OpenAIFile uploaded = fileService.upload(tmpFileInfo.getTmpFile(), filename, "dom_tree", null,
                     tmpFileInfo.getMimeType(), tmpFileInfo.getType(), tmpFileInfo.getExtension(),
@@ -401,7 +401,7 @@ public class FileController {
             tmpFileInfo = createTempFile(file0);
             return updateFile(fileId, tmpFileInfo.getTmpFile(), existingFile.getFilename(),
                     tmpFileInfo.getType(), tmpFileInfo.getMimeType(),
-                    tmpFileInfo.getExtension(), tmpFileInfo.getCharset(), existingFile.getMetadata());
+                    tmpFileInfo.getExtension(), tmpFileInfo.getCharset(), existingFile.getMetadata(), existingFile.getPurpose());
 
         } catch (Exception e) {
             LOGGER.error("File update failed, file_id: {}, error: {}", fileId, e.getMessage(), e);
@@ -414,7 +414,7 @@ public class FileController {
     }
 
     private OpenAIFile updateFile(String fileId, File file0, String filename, String type, String mimeType, String extension, String charset,
-            String metadata) {
+            String metadata, String purpose) {
 
         String fileKey = fileService.updateRealFile(fileId, filename, file0, mimeType, charset);
 
@@ -427,6 +427,7 @@ public class FileController {
                 .type(type)
                 .extension(extension)
                 .path(fileKey)
+                .purpose(purpose)
                 .build();
 
         return fileService.updateFile(ops, true, Scope.CONTENT);
@@ -567,7 +568,7 @@ public class FileController {
 
                     return updateFile(existingFile.getId(), tmpFileInfo.getTmpFile(), filename,
                             "pdf", "application/pdf",
-                            "pdf", tmpFileInfo.getCharset(), null);
+                            "pdf", tmpFileInfo.getCharset(), null, "pdf");
                 } else {
                     OpenAIFile uploaded = fileService.upload(tmpFileInfo.getTmpFile(), filename, "pdf", null,
                             tmpFileInfo.getMimeType(), tmpFileInfo.getType(), tmpFileInfo.getExtension(),
