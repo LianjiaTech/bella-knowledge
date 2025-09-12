@@ -75,7 +75,7 @@ const Page = () => {
   const onClickFile = useThrottleFn(
     (file: KnowledgeFile) => {
       if (file.is_dir) {
-        enterFolder(file);
+        enterFolder(file, currentWorkspace?.spaceCode);
       } else {
         setPreviewModalOpen(true);
         previewFile.current = file;
@@ -112,7 +112,7 @@ const Page = () => {
   const handleCreateFolder = async (
     values: z.infer<typeof createFolderFormSchema>,
   ) => {
-    const res = await createFolder(values);
+    const res = await createFolder(values, currentWorkspace?.spaceCode);
     if (res) {
       setOpen(false);
       createFolderForm.reset();
@@ -121,7 +121,7 @@ const Page = () => {
   const { currentWorkspace } = useUserStore();
   useEffect(() => {
     if (currentWorkspace) {
-      initPage();
+      initPage(currentWorkspace.spaceCode);
     }
   }, [currentWorkspace]);
   return (
@@ -146,7 +146,7 @@ const Page = () => {
                     <BreadcrumbLink
                       className="cursor-pointer"
                       onClick={() => {
-                        jumpFolder(dir.id);
+                        jumpFolder(dir.id, currentWorkspace?.spaceCode);
                       }}
                     >
                       {dir.name}

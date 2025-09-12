@@ -862,12 +862,22 @@ public class FileController {
 
     @GetMapping("/find")
     public OpenapiListResponse<OpenAIFile> find(
+            @RequestParam(value = "space_code", required = false) String spaceCode,
             @RequestParam(value = "ancestor_id", required = false) String ancestorId) {
-        FileDB ancestor = fileService.getFile0(ancestorId);
-        if(ancestor == null) {
-            throw new IllegalArgumentException("File not found. file_id = " + ancestorId);
+        if(StringUtils.isEmpty(spaceCode) && StringUtils.isEmpty(ancestorId)) {
+            throw new IllegalArgumentException("either space_code or ancestor_id must be provided");
         }
-        List<OpenAIFile> files = fileService.findFiles(ancestor);
+
+        List<OpenAIFile> files = null;
+        if(StringUtils.isNotEmpty(ancestorId)) {
+            FileDB ancestor = fileService.getFile0(ancestorId);
+            if(ancestor == null) {
+                throw new IllegalArgumentException("File not found. file_id = " + ancestorId);
+            }
+            files = fileService.findFiles(ancestor);
+        } else {
+            files = fileService.findFiles(spaceCode);
+        }
 
         OpenapiListResponse<OpenAIFile> res = new OpenapiListResponse<>();
         res.setData(files);

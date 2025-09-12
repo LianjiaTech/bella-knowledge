@@ -410,7 +410,14 @@ public class FileService {
     }
 
     public List<OpenAIFile> findFiles(FileDB ancestor) {
-        List<FileDB> fileDbs = fileRepo.findFiles(ancestor);
+        List<FileDB> fileDbs = fileRepo.findFiles(ancestor.getSpaceCode(), ancestor.getFileId());
+        return fileDbs.stream()
+                .map(this::transferToOpenAIFile)
+                .collect(Collectors.toList());
+    }
+
+    public List<OpenAIFile> findFiles(String spaceCode) {
+        List<FileDB> fileDbs = fileRepo.findFiles(spaceCode, null);
         return fileDbs.stream()
                 .map(this::transferToOpenAIFile)
                 .collect(Collectors.toList());

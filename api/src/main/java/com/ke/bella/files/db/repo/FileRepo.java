@@ -417,9 +417,7 @@ public class FileRepo implements BaseRepo {
                 .execute();
     }
 
-    public List<FileDB> findFiles(FileDB ancestor) {
-        String ancestorId = ancestor.getFileId();
-        String spaceCode = ancestor.getSpaceCode();
+    public List<FileDB> findFiles(String spaceCode, String ancestorId) {
         String shardingKey = getShardingKeyBySpaceCode(spaceCode);
 
         SelectConditionStep<Record> query = db(shardingKey).select(FILE.fields())
