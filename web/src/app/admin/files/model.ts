@@ -2,6 +2,7 @@ import { KnowledgeFile } from "@/lib/types/file";
 import { findFiles, postCreateFolder, postUploadFile } from "@/request/files";
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
+import { useUserStore } from "@/store/user";
 
 // 需要设计文件夹的栈
 // 并且需要存每个文件夹下有哪些文件
@@ -16,10 +17,10 @@ type State = {
   tableLoading: boolean;
 };
 type Action = {
-  initPage: () => Promise<void>;
-  createFolder: (values: { name: string }) => Promise<boolean>;
-  enterFolder: (file: KnowledgeFile) => Promise<void>;
-  jumpFolder: (id: string) => Promise<void>;
+  initPage: (spaceCode?: string) => Promise<void>;
+  createFolder: (values: { name: string }, spaceCode?: string) => Promise<boolean>;
+  enterFolder: (file: KnowledgeFile, spaceCode?: string) => Promise<void>;
+  jumpFolder: (id: string, spaceCode?: string) => Promise<void>;
   backFolder: () => void;
   uploadFile: (file: File, ancestor_id: string) => Promise<boolean>;
 };
@@ -34,13 +35,13 @@ export const store = create<State & Action>()((set, get) => ({
     "": [],
   },
   tableLoading: false,
-  initPage: async () => {
-    const res = await findFiles({ ancestor_id: "" });
+  initPage: async (spaceCode?: string) => {
+    const res = await findFiles({ ancestor_id: "", space_code: spaceCode });
     set({
       files: { "": res.data },
     });
   },
-  createFolder: async (values: { name: string }) => {
+  createFolder: async (values: { name: string }, spaceCode?: string) => {
     const currentDirStack = get().currentDirStack;
     const currentDir = currentDirStack[currentDirStack.length - 1];
 
@@ -49,7 +50,7 @@ export const store = create<State & Action>()((set, get) => ({
       ancestor_id: currentDir.id,
     });
     if (res) {
-      const fileRes = await findFiles({ ancestor_id: currentDir.id });
+      const fileRes = await findFiles({ ancestor_id: currentDir.id, space_code: spaceCode });
       if (fileRes) {
         set((state) => {
           const newFiles = {
@@ -66,7 +67,7 @@ export const store = create<State & Action>()((set, get) => ({
     }
     return false;
   },
-  enterFolder: async (file: KnowledgeFile) => {
+  enterFolder: async (file: KnowledgeFile, spaceCode?: string) => {
     const { id, filename } = file;
     set((state) => {
       const newCurrentDirStack = [
@@ -82,7 +83,7 @@ export const store = create<State & Action>()((set, get) => ({
       };
     });
     set({ tableLoading: true });
-    const res = await findFiles({ ancestor_id: id });
+    const res = await findFiles({ ancestor_id: id, space_code: spaceCode });
     set((state) => {
       const newFiles = {
         ...state.files,
@@ -94,7 +95,7 @@ export const store = create<State & Action>()((set, get) => ({
       };
     });
   },
-  jumpFolder: async (id: string) => {
+  jumpFolder: async (id: string, spaceCode?: string) => {
     const { currentDirStack } = get();
     const dirIndex = currentDirStack.findIndex((d) => d.id === id);
     const currentDir = currentDirStack[currentDirStack.length - 1];
@@ -104,7 +105,7 @@ export const store = create<State & Action>()((set, get) => ({
     if (id === currentDir.id) {
       return;
     }
-    const res = await findFiles({ ancestor_id: id });
+    const res = await findFiles({ ancestor_id: id, space_code: spaceCode });
     set((state) => {
       const newFiles = {
         ...state.files,

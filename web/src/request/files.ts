@@ -15,6 +15,7 @@ export async function getFileList() {
 
 type FindFilesParams = {
   ancestor_id?: string;
+  space_code?: string;
 };
 
 export async function findFiles(params: FindFilesParams) {
