@@ -36,6 +36,9 @@ export function LeftSidebar() {
     onChangeSelectedQuestion,
   } = useDocumentPreviewStore();
 
+  const filterQuestionList = questionList.filter((item) =>
+    item.question.includes(newQuestionText),
+  );
   // 鼠标悬停检测
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -78,8 +81,8 @@ export function LeftSidebar() {
       return;
     }
     if (e.key === "Enter") {
+      e.preventDefault();
       handleAddQuestion();
-      setNewQuestionText("");
     }
   };
 
@@ -113,22 +116,17 @@ export function LeftSidebar() {
         </SheetHeader>
 
         <div className="p-4 pb-30 flex flex-col flex-1 overflow-hidden">
-          {/* 新增问题输入框 */}
-          <div className="mb-4 space-y-2">
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <Textarea
-                  placeholder="请输入，按下回车即可添加"
-                  value={newQuestionText}
-                  onChange={(e) => setNewQuestionText(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  rows={2}
-                  className="pr-10 !resize-none max-h-6 scrollbar-hide"
-                />
-                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                  <CornerDownLeft size={16} className="text-gray-400" />
-                </div>
-              </div>
+          <div className="relative mb-4">
+            <Textarea
+              placeholder="请输入，按下回车即可添加"
+              value={newQuestionText}
+              onChange={(e) => setNewQuestionText(e.target.value)}
+              onKeyDown={handleKeyDown}
+              rows={2}
+              className="pr-10 !resize-none max-h-6 scrollbar-hide"
+            />
+            <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+              <CornerDownLeft size={16} className="text-gray-400" />
             </div>
           </div>
 
@@ -138,13 +136,13 @@ export function LeftSidebar() {
                 <div className="flex items-center justify-center h-full">
                   <Loader2 className="size-4 animate-spin" />
                 </div>
-              ) : questionList.length === 0 ? (
-                <div className="flex items-center justify-center h-full">
-                  <span className="text-gray-500">暂无问题</span>
+              ) : filterQuestionList.length === 0 ? (
+                <div className="flex items-center justify-center h-full text-gray-500 text-sm">
+                  暂无问题
                 </div>
               ) : (
                 <div>
-                  {questionList.map((question) => {
+                  {filterQuestionList.map((question) => {
                     return (
                       <div
                         className={`w-92 h-12 border-b border-gray-200 flex items-center px-3 cursor-pointer justify-between hover:bg-gray-50 transition-colors ${
