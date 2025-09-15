@@ -579,6 +579,8 @@ public class DatasetController {
             List<DatasetQaReferenceDB> references = qaWithRefs.getReferences();
 
             Map<String, Object> qaData = new LinkedHashMap<>();
+            qaData.put("dataset_id", qa.getDatasetId());
+            qaData.put("item_id", qa.getItemId());
             qaData.put("question", qa.getQuestion());
             qaData.put("answer", qa.getAnswer());
 
