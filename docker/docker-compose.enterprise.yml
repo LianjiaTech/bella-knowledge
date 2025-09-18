@@ -71,7 +71,7 @@ services:
       - ./volumes/minio/data:/data
       - ./volumes/minio/scripts:/scripts
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://${S3_HOST:-localhost}:${S3_API_PORT:-9000}/minio/health/live" ]
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -160,14 +160,13 @@ services:
       - BELLA_STORAGE_TYPE=${BELLA_STORAGE_TYPE:-s3}
       - BELLA_TMP_FILE_DIR=${BELLA_TMP_FILE_DIR:-/opt/bella-file-api/cache}
       # S3/MinIO Configuration
-      - S3_HOST=${S3_HOST:-minio}
-      - S3_API_PORT=${S3_API_PORT:-9000}
+      - S3_ENDPOINT=${S3_ENDPOINT:-http://minio:9000}
       - S3_ACCESS_KEY=${S3_ACCESS_KEY:-bella_user}
       - S3_SECRET_KEY=${S3_SECRET_KEY:-12345678}
       - S3_BUCKET=${S3_BUCKET:-bella-file-api}
       - S3_ROOT_PATH=${S3_ROOT_PATH:-files}
       - BELLA_STORAGE_S3_BUCKET=${S3_BUCKET:-bella-file-api}
-      - BELLA_FILE_API_STORAGE_S3_ENDPOINT=http://${S3_HOST:-minio}:${S3_API_PORT:-9000}
+      - BELLA_FILE_API_STORAGE_S3_ENDPOINT=${S3_ENDPOINT:-http://minio:9000}
       - BELLA_FILE_API_STORAGE_S3_AK=${S3_ACCESS_KEY:-bella_user}
       - BELLA_FILE_API_STORAGE_S3_SK=${S3_SECRET_KEY:-12345678}
       - BELLA_FILE_API_STORAGE_S3_REGION=${S3_REGION:-us-east-1}
