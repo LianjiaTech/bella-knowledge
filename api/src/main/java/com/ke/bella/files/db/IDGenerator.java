@@ -12,19 +12,20 @@ public class IDGenerator {
         String generateId(String prefix, String now, String instanceId, String nextTick);
     }
 
-    private static final IdGenerateStrategy SPACE_CODE_STRATEGY = (prefix, now, instanceId, nextTick) -> {
+    protected static final IdGenerateStrategy SPACE_CODE_STRATEGY = (prefix, now, instanceId, nextTick) -> {
         String spaceCode = BellaContextHelper.getOperateSpaceCode();
         String spaceCodeHash = String.valueOf(Math.abs(CustomStringUtils.hashCode(spaceCode)));
         return String.format("%s%s%s%s-%s", prefix, now, instanceId, nextTick, spaceCodeHash);
     };
 
-    private static final IdGenerateStrategy SIMPLE_STRATEGY = (prefix, now, instanceId, nextTick) -> String.format("%s%s%s%s", prefix, now,
+    protected static final IdGenerateStrategy SIMPLE_STRATEGY = (prefix, now, instanceId, nextTick) -> String.format("%s%s%s%s", prefix, now,
             instanceId, nextTick);
 
     // 预定义的生成器实例
-    public static final IDGenerator FILEID_GEN = new IDGenerator("file-", SPACE_CODE_STRATEGY);
     public static final IDGenerator DATASET_ID_GEN = new IDGenerator("dataset-", SIMPLE_STRATEGY);
     public static final IDGenerator QA_ID_GEN = new IDGenerator("qa-", SIMPLE_STRATEGY);
+    // 文件ID生成器（支持purpose后缀）
+    public static final FileIdGenerator FILE_ID_GENERATOR = new FileIdGenerator();
 
     private static final String yyMMddHHmmss = "yyMMddHHmmss";
     private static final int MAX_COUNT = (int) 1e7;

@@ -13,6 +13,9 @@ import com.ke.bella.files.db.tables.File;
 import com.ke.bella.files.db.tables.FileClosure;
 import com.ke.bella.files.db.tables.FileMapping;
 import com.ke.bella.files.db.tables.FileProgress;
+import com.ke.bella.files.db.tables.FileSharding;
+import com.ke.bella.files.db.tables.FileSystem;
+import com.ke.bella.files.db.tables.FileTemp;
 import com.ke.bella.files.db.tables.Instance;
 import com.ke.bella.files.db.tables.Tag;
 import com.ke.bella.files.db.tables.records.DatasetDocumentRecord;
@@ -24,6 +27,9 @@ import com.ke.bella.files.db.tables.records.FileClosureRecord;
 import com.ke.bella.files.db.tables.records.FileMappingRecord;
 import com.ke.bella.files.db.tables.records.FileProgressRecord;
 import com.ke.bella.files.db.tables.records.FileRecord;
+import com.ke.bella.files.db.tables.records.FileShardingRecord;
+import com.ke.bella.files.db.tables.records.FileSystemRecord;
+import com.ke.bella.files.db.tables.records.FileTempRecord;
 import com.ke.bella.files.db.tables.records.InstanceRecord;
 import com.ke.bella.files.db.tables.records.TagRecord;
 
@@ -34,7 +40,7 @@ import org.jooq.impl.Internal;
 
 
 /**
- * A class modelling foreign key relationships and constraints of tables in 
+ * A class modelling foreign key relationships and constraints of tables in
  * the default schema.
  */
 @SuppressWarnings({ "all", "unchecked", "rawtypes" })
@@ -62,6 +68,12 @@ public class Keys {
     public static final UniqueKey<FileMappingRecord> KEY_FILE_MAPPING_PRIMARY = Internal.createUniqueKey(FileMapping.FILE_MAPPING, DSL.name("KEY_file_mapping_PRIMARY"), new TableField[] { FileMapping.FILE_MAPPING.ID }, true);
     public static final UniqueKey<FileProgressRecord> KEY_FILE_PROGRESS_IDX_FILE_ID_NAME = Internal.createUniqueKey(FileProgress.FILE_PROGRESS, DSL.name("KEY_file_progress_idx_file_id_name"), new TableField[] { FileProgress.FILE_PROGRESS.FILE_ID, FileProgress.FILE_PROGRESS.NAME }, true);
     public static final UniqueKey<FileProgressRecord> KEY_FILE_PROGRESS_PRIMARY = Internal.createUniqueKey(FileProgress.FILE_PROGRESS, DSL.name("KEY_file_progress_PRIMARY"), new TableField[] { FileProgress.FILE_PROGRESS.ID }, true);
+    public static final UniqueKey<FileShardingRecord> KEY_FILE_SHARDING_IDX_TYPE_KEY = Internal.createUniqueKey(FileSharding.FILE_SHARDING, DSL.name("KEY_file_sharding_idx_type_key"), new TableField[] { FileSharding.FILE_SHARDING.TYPE, FileSharding.FILE_SHARDING.KEY }, true);
+    public static final UniqueKey<FileShardingRecord> KEY_FILE_SHARDING_PRIMARY = Internal.createUniqueKey(FileSharding.FILE_SHARDING, DSL.name("KEY_file_sharding_PRIMARY"), new TableField[] { FileSharding.FILE_SHARDING.ID }, true);
+    public static final UniqueKey<FileSystemRecord> KEY_FILE_SYSTEM_IDX_FILE_SPACE = Internal.createUniqueKey(FileSystem.FILE_SYSTEM, DSL.name("KEY_file_system_idx_file_space"), new TableField[] { FileSystem.FILE_SYSTEM.FILE_ID, FileSystem.FILE_SYSTEM.SPACE_CODE }, true);
+    public static final UniqueKey<FileSystemRecord> KEY_FILE_SYSTEM_PRIMARY = Internal.createUniqueKey(FileSystem.FILE_SYSTEM, DSL.name("KEY_file_system_PRIMARY"), new TableField[] { FileSystem.FILE_SYSTEM.ID }, true);
+    public static final UniqueKey<FileTempRecord> KEY_FILE_TEMP_IDX_FILE_SPACE = Internal.createUniqueKey(FileTemp.FILE_TEMP, DSL.name("KEY_file_temp_idx_file_space"), new TableField[] { FileTemp.FILE_TEMP.FILE_ID, FileTemp.FILE_TEMP.SPACE_CODE }, true);
+    public static final UniqueKey<FileTempRecord> KEY_FILE_TEMP_PRIMARY = Internal.createUniqueKey(FileTemp.FILE_TEMP, DSL.name("KEY_file_temp_PRIMARY"), new TableField[] { FileTemp.FILE_TEMP.ID }, true);
     public static final UniqueKey<InstanceRecord> KEY_INSTANCE_PRIMARY = Internal.createUniqueKey(Instance.INSTANCE, DSL.name("KEY_instance_PRIMARY"), new TableField[] { Instance.INSTANCE.ID }, true);
     public static final UniqueKey<TagRecord> KEY_TAG_IDX_SPACE_NAME = Internal.createUniqueKey(Tag.TAG, DSL.name("KEY_tag_idx_space_name"), new TableField[] { Tag.TAG.SPACE_CODE, Tag.TAG.NAME }, true);
     public static final UniqueKey<TagRecord> KEY_TAG_PRIMARY = Internal.createUniqueKey(Tag.TAG, DSL.name("KEY_tag_PRIMARY"), new TableField[] { Tag.TAG.ID }, true);

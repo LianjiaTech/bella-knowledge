@@ -459,6 +459,45 @@
                                         <pojoImplements>com.ke.bella.files.db.repo.Operator</pojoImplements>
                                         <recordImplements>com.ke.bella.files.db.repo.Operator</recordImplements>
                                     </table>
+                                    <table>
+                                        <expression>file_sharding</expression>
+                                        <daoClass>
+                                            <transform>PASCAL</transform>
+                                            <expression>$0_D_B_Dao</expression>
+                                        </daoClass>
+                                        <pojoClass>
+                                            <transform>PASCAL</transform>
+                                            <expression>$0_D_B</expression>
+                                        </pojoClass>
+                                        <pojoImplements>com.ke.bella.files.db.repo.Operator</pojoImplements>
+                                        <recordImplements>com.ke.bella.files.db.repo.Operator</recordImplements>
+                                    </table>
+                                    <table>
+                                        <expression>file_system</expression>
+                                        <daoClass>
+                                            <transform>PASCAL</transform>
+                                            <expression>$0_D_B_Dao</expression>
+                                        </daoClass>
+                                        <pojoClass>
+                                            <transform>PASCAL</transform>
+                                            <expression>$0_D_B</expression>
+                                        </pojoClass>
+                                        <pojoImplements>com.ke.bella.files.db.repo.Operator</pojoImplements>
+                                        <recordImplements>com.ke.bella.files.db.repo.Operator</recordImplements>
+                                    </table>
+                                    <table>
+                                        <expression>file_temp</expression>
+                                        <daoClass>
+                                            <transform>PASCAL</transform>
+                                            <expression>$0_D_B_Dao</expression>
+                                        </daoClass>
+                                        <pojoClass>
+                                            <transform>PASCAL</transform>
+                                            <expression>$0_D_B</expression>
+                                        </pojoClass>
+                                        <pojoImplements>com.ke.bella.files.db.repo.Operator</pojoImplements>
+                                        <recordImplements>com.ke.bella.files.db.repo.Operator</recordImplements>
+                                    </table>
                                 </tables>
                             </matchers>
                         </strategy>
@@ -475,7 +514,7 @@
                                 </forcedType>
                             </forcedTypes>
                             <includes>
-                                file|file_mapping|file_progress|instance|dataset|dataset_qa|dataset_qa_reference|dataset_sharding|dataset_document|tag|file_closure
+                                file|file_mapping|file_progress|instance|dataset|dataset_qa|dataset_qa_reference|dataset_sharding|dataset_document|tag|file_closure|file_sharding|file_system|file_temp
                             </includes>
                             <unsignedTypes>false</unsignedTypes>
                         </database>
