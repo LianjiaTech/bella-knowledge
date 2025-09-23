@@ -41,6 +41,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.ke.bella.files.annotations.FileAPI;
 import com.ke.bella.files.db.tables.pojos.FileDB;
+import com.ke.bella.files.enums.FilePurpose;
+import com.ke.bella.files.enums.FileType;
 import com.ke.bella.files.protocol.DomTreeOps.DomTreeUploadOp;
 import com.ke.bella.files.protocol.FileCropOps;
 import com.ke.bella.files.protocol.FileCropOps.FileCropOp;
@@ -58,6 +60,7 @@ import com.ke.bella.files.protocol.UpdateProgressRequestData;
 import com.ke.bella.files.service.FileService;
 import com.ke.bella.files.service.lock.FileUniquenessLock;
 import com.ke.bella.files.utils.BellaContextHelper;
+import com.ke.bella.files.utils.FilePurposeClassifier;
 import com.ke.bella.files.utils.JsonUtils;
 import com.ke.bella.openapi.utils.FileUtils;
 
@@ -99,11 +102,19 @@ public class FileController {
         String spaceCode = BellaContextHelper.getOperateSpaceCode();
         String filename = file.getOriginalFilename();
 
+        // Validate purpose: only allow USER_PURPOSES and TEMP_PURPOSES,
+        // otherwise force to temp
+        if(!FilePurposeClassifier.allowedPurposes().contains(purpose)) {
+            LOGGER.info("Invalid purpose '{}', force to '{}'", purpose, FilePurpose.TEMP.getValue());
+            purpose = FilePurpose.TEMP.getValue();
+        }
+
         TmpFileInfo tmpFileInfo = null;
         try {
             tmpFileInfo = createTempFile(file);
             final TmpFileInfo finalTmpFileInfo = tmpFileInfo;
 
+            String finalPurpose = purpose;
             return fl.executeWithLock(spaceCode, ancestorId, filename, FILE_LOCK_TIMEOUT_MS, () -> {
                 if(fileService.exists(spaceCode, ancestorId, filename)) {
                     if(overwrite) {
@@ -111,7 +122,7 @@ public class FileController {
                         if(existingFile != null) {
                             return updateFile(existingFile.getId(), finalTmpFileInfo.getTmpFile(), filename,
                                     finalTmpFileInfo.getType(), finalTmpFileInfo.getMimeType(),
-                                    finalTmpFileInfo.getExtension(), finalTmpFileInfo.getCharset(), metadata, purpose);
+                                    finalTmpFileInfo.getExtension(), finalTmpFileInfo.getCharset(), metadata, finalPurpose);
                         }
                     } else {
                         // fixme: may lead to unnecessary create temp file
@@ -121,7 +132,8 @@ public class FileController {
                 }
 
                 return fileService.uploadWithUrl(finalTmpFileInfo.getTmpFile(), finalTmpFileInfo.getType(), finalTmpFileInfo.getMimeType(),
-                        finalTmpFileInfo.getExtension(), finalTmpFileInfo.getCharset(), purpose, metadata, getUrl, expires, ancestorId, filename);
+                        finalTmpFileInfo.getExtension(), finalTmpFileInfo.getCharset(), finalPurpose, metadata, getUrl, expires, ancestorId,
+                        filename);
             });
         } catch (IllegalArgumentException e) {
             throw e;
@@ -356,7 +368,7 @@ public class FileController {
         }
 
         String spaceCode = BellaContextHelper.getOperateSpaceCode();
-        String ancestorId = fileService.getDirectAncestorId(fileId);
+        String ancestorId = FilePurposeClassifier.isUserFile(fileId) ? fileService.getDirectAncestorId(fileId) : null;
 
         try {
             return fl.executeWithLock(spaceCode, ancestorId, filename, FILE_LOCK_TIMEOUT_MS, () -> {
@@ -631,6 +643,9 @@ public class FileController {
         if(fileService.getFile(fileId) == null) {
             throw new IllegalArgumentException("Invalid fileId: " + fileId);
         }
+        if(!FilePurposeClassifier.isUserFile(fileId)) {
+            throw new IllegalArgumentException("Progress tracking is only supported for USER files, fileId: " + fileId);
+        }
         fileService.updateProgress(data, fileId, progressName);
         return fileService.getProgress(fileId, progressName);
     }
@@ -641,6 +656,9 @@ public class FileController {
             @RequestParam("progress_name") String progressName) {
         if(fileService.getFile(fileId) == null) {
             throw new IllegalArgumentException("Invalid fileId: " + fileId);
+        }
+        if(!FilePurposeClassifier.isUserFile(fileId)) {
+            throw new IllegalArgumentException("Progress tracking is only supported for USER files, fileId: " + fileId);
         }
         Progress res = fileService.getProgress(fileId, progressName);
         if(res == null) {
@@ -890,6 +908,9 @@ public class FileController {
 
     @GetMapping("/{file_id}/info")
     public OpenAIFile info(@PathVariable("file_id") String fileId) {
+        if(!FilePurposeClassifier.isUserFile(fileId)) {
+            throw new IllegalArgumentException("only USER files support info operation, fileId: " + fileId);
+        }
         OpenAIFile file = fileService.getFile(fileId);
         if(file == null) {
             throw new FileNotFoundException(fileId);
