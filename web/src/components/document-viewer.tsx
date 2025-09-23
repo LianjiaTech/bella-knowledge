@@ -708,11 +708,12 @@ interface DocumentViewerProps {
   onClickNode: (node: DocumentNode) => void;
   onDoubleClickNode?: (node: DocumentNode) => void;
   showOutline?: boolean;
+  className?: string;
 }
 
 const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
   function DocumentViewer(
-    { fileId, onClickNode, onDoubleClickNode, showOutline = true },
+    { fileId, onClickNode, onDoubleClickNode, showOutline = true, className },
     ref,
   ) {
     const [highlightedNode, setHighlightedNode] = useState<DocumentNode | null>(
@@ -908,14 +909,18 @@ const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
     }));
     if (!fileId) {
       return (
-        <div className="flex items-center justify-center h-64 text-gray-500">
+        <div
+          className={`flex items-center justify-center h-64 text-gray-500 ${className}`}
+        >
           请选择文档
         </div>
       );
     }
     if (!data) {
       return (
-        <div className="flex flex-col items-center justify-center h-64 text-gray-500 gap-2">
+        <div
+          className={`flex flex-col items-center justify-center h-64 text-gray-500 gap-2 ${className}`}
+        >
           {message}
           {error && (
             <Button onClick={fetchDocument} variant="ghost">
@@ -927,7 +932,7 @@ const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
     }
     return (
       <div
-        className="flex h-full bg-gray-50 overflow-hidden"
+        className={`flex h-full bg-gray-50 overflow-hidden ${className}`}
         ref={containerRef}
       >
         {/* 大纲面板 */}
