@@ -211,7 +211,7 @@ function RagEvalPreview() {
                   <div className="font-semibold text-base">期望答案</div>
                 </div>
                 <div className="text-sm">
-                  {selectedRagevalData?.question || ""}
+                  {selectedRagevalData?.groundtruth || ""}
                 </div>
               </div>
               <div className="flex-1 bg-white rounded-xl p-6 border">
