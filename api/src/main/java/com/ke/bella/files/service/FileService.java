@@ -214,6 +214,7 @@ public class FileService {
         return upload(file, filename, purpose, metadata, mimeType, type, extension, charset, null);
     }
 
+
     @Transactional(rollbackFor = Exception.class)
     public OpenAIFile upload(
         File file,
