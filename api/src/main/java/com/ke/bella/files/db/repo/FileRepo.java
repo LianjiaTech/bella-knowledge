@@ -4,11 +4,13 @@ import static com.ke.bella.files.db.Tables.FILE;
 import static com.ke.bella.files.db.Tables.FILE_CLOSURE;
 import static com.ke.bella.files.db.Tables.FILE_MAPPING;
 import static com.ke.bella.files.db.Tables.FILE_PROGRESS;
+import static com.ke.bella.files.db.Tables.FILE_SHARDING;
 import static com.ke.bella.files.db.repo.DSLContextHolder.targetTableName;
 import static org.jooq.impl.DSL.count;
 import static org.jooq.impl.DSL.field;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -35,11 +37,15 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
 
+import com.ke.bella.files.db.FileIdGenerator;
 import com.ke.bella.files.db.tables.pojos.FileDB;
 import com.ke.bella.files.db.tables.pojos.FileProgressDB;
+import com.ke.bella.files.db.tables.pojos.FileShardingDB;
 import com.ke.bella.files.db.tables.records.FileClosureRecord;
 import com.ke.bella.files.db.tables.records.FileProgressRecord;
 import com.ke.bella.files.db.tables.records.FileRecord;
+import com.ke.bella.files.db.tables.records.FileShardingRecord;
+import com.ke.bella.files.enums.FileType;
 import com.ke.bella.files.protocol.FileException.FileNotFoundException;
 import com.ke.bella.files.protocol.FileOps;
 import com.ke.bella.files.protocol.FileStatus;
@@ -60,13 +66,40 @@ public class FileRepo implements BaseRepo {
         this.db = db;
     }
 
-    private static String getShardingKeyByFileId(String fileId) {
-        String[] parts = fileId.split("-");
-        if(parts.length != 3) {
-            throw new FileNotFoundException(fileId);
+    public String getShardingKeyByFileId(String fileId, FileType fileType) {
+        if(fileType.isUsersType()) {
+            return getUserFileShardingKey(fileId);
+        } else if(fileType.notUsersType()) {
+            return getTmpOrSysFileShardingKey(fileId, fileType);
+        } else {
+            throw new IllegalArgumentException("Unsupported file type: " + fileType);
         }
-        Integer spaceCodeHash = Integer.valueOf(parts[parts.length - 1]);
+    }
+
+    public String getShardingKeyByFileId(String fileId) {
+        FileType fileType = FileType.fromFileId(fileId);
+        return getShardingKeyByFileId(fileId, fileType);
+    }
+
+    private String getUserFileShardingKey(String fileId) {
+        String spaceCodeHashStr = FileIdGenerator.extractSpaceCodeHash(fileId);
+        Integer spaceCodeHash = Integer.valueOf(spaceCodeHashStr);
         return getShardingKeyBySpaceCodeHash(spaceCodeHash);
+    }
+
+    private String getTmpOrSysFileShardingKey(String fileId, FileType fileType) {
+        LocalDateTime time = FileIdGenerator.extractTimeFromFileId(fileId);
+        FileShardingDB sharding = db.selectFrom(FILE_SHARDING)
+                .where(FILE_SHARDING.KEY_TIME.le(time))
+                .and(FILE_SHARDING.TYPE.eq(fileType.getType()))
+                .orderBy(FILE_SHARDING.ID.desc())
+                .limit(1)
+                .fetchOneInto(FileShardingDB.class);
+        if(sharding == null) {
+            throw new IllegalStateException(
+                    "No file_sharding record found for " + fileType.getType() + " type. Please ensure database is properly initialized.");
+        }
+        return StringUtils.isEmpty(sharding.getKey()) ? fileType.getType() : fileType.getType() + "_" + sharding.getKey();
     }
 
     private static String getShardingKeyBySpaceCode(String spaceCode) {
@@ -95,6 +128,14 @@ public class FileRepo implements BaseRepo {
             throw new FileNotFoundException(fileId);
         }
         return newFileId;
+    }
+
+    public FileDB queryFile(String fileId, FileType fileType) {
+        fileId = queryNewFileId(fileId);
+        String shardingKey = getShardingKeyByFileId(fileId, fileType);
+        return db(shardingKey).selectFrom(FILE)
+                .where(FILE.FILE_ID.eq(fileId).and(FILE.STATUS.eq(FileStatus.NOT_DELETED.getValue())))
+                .fetchOneInto(FileDB.class);
     }
 
     public FileDB queryFile(String fileId) {
@@ -164,8 +205,9 @@ public class FileRepo implements BaseRepo {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public void addFile(FileDB fileDB, String ancestorId) {
-        String shardingKey = getShardingKeyBySpaceCode(fileDB.getSpaceCode());
+    public String addFile(FileDB fileDB, String ancestorId, FileType fileType) {
+        String shardingKey = getShardingKeyByFileId(fileDB.getFileId());
+
         FileRecord rec = FILE.newRecord();
         rec.from(fileDB);
         fillCreatorInfo(rec);
@@ -176,7 +218,11 @@ public class FileRepo implements BaseRepo {
             throw new IllegalStateException("insert file failed, fileId: " + fileDB.getFileId());
         }
 
-        addFileClosures(fileDB.getFileId(), ancestorId);
+        if(fileType.needsDirectorySupport()) {
+            addFileClosures(fileDB.getFileId(), ancestorId);
+        }
+
+        return shardingKey;
     }
 
     public void updateFile(FileOps op, boolean increaseVersion) {
@@ -353,7 +399,7 @@ public class FileRepo implements BaseRepo {
 
     public List<FileDB> getFiles(ListFileOps ops) {
         Map<String, List<String>> shardToFileIds = ops.getFileIds().stream()
-                .collect(Collectors.groupingBy(FileRepo::getShardingKeyByFileId));
+                .collect(Collectors.groupingBy(this::getShardingKeyByFileId));
 
         List<SelectConditionStep<Record>> selects = shardToFileIds.entrySet().stream()
                 .map(entry -> db
@@ -426,8 +472,8 @@ public class FileRepo implements BaseRepo {
         }
     }
 
-    public void deleteFileClosure(String fileId) {
-        String shardingKey = getShardingKeyByFileId(fileId);
+    public void deleteFileClosure(String fileId, FileType fileType) {
+        String shardingKey = getShardingKeyByFileId(fileId, fileType);
         db(shardingKey).delete(FILE_CLOSURE)
                 .where(FILE_CLOSURE.DESCENDANT_ID.eq(fileId))
                 .or(FILE_CLOSURE.ANCESTOR_ID.eq(fileId))
@@ -907,5 +953,62 @@ public class FileRepo implements BaseRepo {
 			this.subtree = subtree;
 			this.descendantIds = descendantIds;
 		}
+    }
+
+    public FileShardingDB queryLatestFileSharding(String type) {
+        return db.selectFrom(FILE_SHARDING)
+                .where(FILE_SHARDING.TYPE.eq(type))
+                .orderBy(FILE_SHARDING.ID.desc())
+                .limit(1)
+                .fetchOneInto(FileShardingDB.class);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void newFileShardingTable(String lastKey, String type) {
+        LocalDateTime keyTime = LocalDateTime.now().plusMinutes(10L);
+        String key = keyTime.format(DateTimeFormatter.ofPattern("yyMMddHHmmss"));
+
+        FileShardingRecord rec = db.selectFrom(FILE_SHARDING)
+                .where(FILE_SHARDING.LAST_KEY.eq(lastKey))
+                .and(FILE_SHARDING.TYPE.eq(type))
+                .forUpdate().fetchOne();
+        if(rec != null) {
+            return;
+        }
+
+        FileType fileType = FileType.fromType(type);
+        if(fileType == FileType.SYSTEM) {
+            db.execute(createTableLikeSql(FILE.getName(), FileType.SYSTEM.getType(), key));
+        } else if(fileType == FileType.TEMP) {
+            db.execute(createTableLikeSql(FILE.getName(), FileType.TEMP.getType(), key));
+        }
+
+        addFileSharding(keyTime, lastKey, key, type);
+    }
+
+    private static String createTableLikeSql(String tableName, String type, String key) {
+        return String.format("create table `%s_%s_%s` like `%s_%s`", tableName, type, key, tableName, type);
+    }
+
+    private void addFileSharding(LocalDateTime keyTime, String lastKey, String key, String type) {
+        FileShardingRecord rec = FILE_SHARDING.newRecord();
+        rec.setKey(key);
+        rec.setKeyTime(keyTime);
+        rec.setLastKey(lastKey);
+        rec.setType(type);
+        fillCreatorInfo(rec);
+
+        db.insertInto(FILE_SHARDING)
+                .set(rec)
+                .execute();
+    }
+
+    public void increaseFileShardingCount(String key, long delta, String type) {
+        db.update(FILE_SHARDING)
+                .set(FILE_SHARDING.COUNT, FILE_SHARDING.COUNT.plus(delta))
+                .set(FILE_SHARDING.MTIME, LocalDateTime.now())
+                .where(FILE_SHARDING.KEY.eq(key))
+                .and(FILE_SHARDING.TYPE.eq(type))
+                .execute();
     }
 }

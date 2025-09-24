@@ -1,6 +1,6 @@
 package com.ke.bella.files.service;
 
-import static com.ke.bella.files.db.IDGenerator.FILEID_GEN;
+import static com.ke.bella.files.db.IDGenerator.FILE_ID_GENERATOR;
 
 import java.io.File;
 import java.time.ZoneId;
@@ -8,6 +8,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+
+import javax.annotation.PostConstruct;
 
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.Assert;
@@ -18,10 +20,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.ke.bella.files.FileShardingCountUpdator;
+import com.ke.bella.files.TaskExecutor;
 import com.ke.bella.files.configuration.BucketConfig;
 import com.ke.bella.files.db.repo.FileRepo;
 import com.ke.bella.files.db.tables.pojos.FileDB;
 import com.ke.bella.files.db.tables.pojos.FileProgressDB;
+import com.ke.bella.files.enums.FileType;
 import com.ke.bella.files.protocol.BroadcastStatus;
 import com.ke.bella.files.protocol.EventType;
 import com.ke.bella.files.protocol.FileBroadcasting;
@@ -39,6 +44,7 @@ import com.ke.bella.files.protocol.FileCountInfo;
 import com.ke.bella.files.service.broadcast.BroadcastService;
 import com.ke.bella.files.service.storage.StorageService;
 import com.ke.bella.files.utils.BellaContextHelper;
+import com.ke.bella.files.utils.FilePurposeClassifier;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -59,6 +65,8 @@ public class FileService {
     private BucketConfig bucketConfig;
     @Autowired
     private BroadcastService broadcastService;
+    @Autowired
+    private FileShardingCountUpdator fileShardingCountUpdator;
 
     public boolean exists(String spaceCode, String ancestorId, String filename) {
         return fileRepo.exists(spaceCode, ancestorId, filename);
@@ -210,6 +218,19 @@ public class FileService {
         return upload(file, filename, purpose, metadata, mimeType, type, extension, charset, null);
     }
 
+	@Transactional(rollbackFor = Exception.class)
+	public OpenAIFile upload(
+		File file,
+		String filename,
+		String purpose,
+		String metadata,
+		String mimeType,
+		String type,
+		String extension,
+		String charset,
+		String ancestorId) {
+		return upload(file, filename, purpose, metadata, mimeType, type, extension, charset, ancestorId, null, null, null);
+	}
 
     @Transactional(rollbackFor = Exception.class)
     public OpenAIFile upload(
@@ -221,26 +242,13 @@ public class FileService {
             String type,
             String extension,
             String charset,
-            String ancestorId) {
-		return upload(file, filename, purpose, metadata, mimeType, type, extension, charset, ancestorId, null, null, null);
-	}
-
-	@Transactional(rollbackFor = Exception.class)
-	public OpenAIFile upload(
-		File file,
-		String filename,
-		String purpose,
-		String metadata,
-		String mimeType,
-		String type,
-		String extension,
-		String charset,
-		String ancestorId,
-		String description,
-		String cities,
-		String tags) {
+            String ancestorId,
+			String description,
+			String cities,
+			String tags) {
         String spaceCode = BellaContextHelper.getOperateSpaceCode();
-        String fileId = FILEID_GEN.generate();
+        FileType fileType = FilePurposeClassifier.classify(purpose);
+        String fileId = FILE_ID_GENERATOR.generateWithType(fileType);
         String bucketName = purpose.equals(VISION) ? bucketConfig.getPublicBucket() : bucketConfig.getPrivateBucket();
         String keyName = String.format("%s/%s", purpose, fileId);
         if(StringUtils.isNotEmpty(extension)) {
@@ -267,8 +275,12 @@ public class FileService {
 		fileDB.setDescription(StringUtils.isNotEmpty(description) ? description : "");
 		fileDB.setCities(StringUtils.isNotEmpty(cities) ? cities : "");
 		fileDB.setTags(StringUtils.isNotEmpty(tags) ? tags : "");
-        fileRepo.addFile(fileDB, ancestorId);
-        FileDB res = fileRepo.queryFile(fileId);
+        String shardingKey = fileRepo.addFile(fileDB, ancestorId, fileType);
+        if(fileType.notUsersType()) {
+            fileShardingCountUpdator.increase(shardingKey, fileType.getType());
+        }
+
+        FileDB res = fileRepo.queryFile(fileId, fileType);
         if(res == null) {
             throw new FileNotFoundException(fileId);
         }
@@ -301,7 +313,8 @@ public class FileService {
     }
 
     public OpenAIFile getFile(String fileId) {
-        FileDB fileDB = fileRepo.queryFile(fileId);
+        FileType fileType = FileType.fromFileId(fileId);
+        FileDB fileDB = fileRepo.queryFile(fileId, fileType);
         if(fileDB == null) {
             throw new FileNotFoundException(fileId);
         }
@@ -310,18 +323,21 @@ public class FileService {
     }
 
     public FileDB getFile0(String fileId) {
-        return fileRepo.queryFile(fileId);
+        FileType fileType = FileType.fromFileId(fileId);
+        return fileRepo.queryFile(fileId, fileType);
     }
 
     public String updateRealFile(String fileId, String filename, File file, String mimeType, String charset) {
-        FileDB fileDB = fileRepo.queryFile(fileId);
+        FileType fileType = FileType.fromFileId(fileId);
+        FileDB fileDB = fileRepo.queryFile(fileId, fileType);
         return storageService.putObject(fileDB.getBucket(), fileDB.getPath(), mimeType, file, filename, charset);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public OpenAIFile updateFile(FileOps ops, boolean increaseVersion, Scope actionType) {
+        FileType fileType = FileType.fromFileId(ops.getFileId());
         fileRepo.updateFile(ops, increaseVersion);
-        FileDB fileDB = fileRepo.queryFile(ops.getFileId());
+        FileDB fileDB = fileRepo.queryFile(ops.getFileId(), fileType);
         OpenAIFile finalOpenAIFile = buildOpenAIFileWithSource(fileDB);
 
         FileBroadcasting<OpenAIFile> message = new FileBroadcasting<>();
@@ -339,13 +355,16 @@ public class FileService {
 
     @Transactional(rollbackFor = Exception.class)
     public void delete(String fileId) {
+        FileType fileType = FileType.fromFileId(fileId);
         // 只标记status字段，不删除文件，不删除数据库记录
         FileOps op = new FileOps();
         op.setFileId(fileId);
         op.setStatus(FileStatus.DELETED);
         try {
-            fileRepo.updateFile(op);
-            fileRepo.deleteFileClosure(fileId);
+            fileRepo.updateFile(op, false);
+            if(fileType.needsDirectorySupport()) {
+                fileRepo.deleteFileClosure(fileId, fileType);
+            }
         } catch (Exception e) {
             throw new IllegalStateException("Failed to update file status (indicating deletion), fileId: "
                     + fileId + ", status: " + FileStatus.DELETED, e);
@@ -433,7 +452,8 @@ public class FileService {
 	public OpenAIFile mkdir(String name, String ancestorId, String description) {
         String spaceCode = BellaContextHelper.getOperateSpaceCode();
 
-        String fileId = FILEID_GEN.generate();
+        FileType fileType = FileType.DIRECTORY;
+        String fileId = FILE_ID_GENERATOR.generateDirId();
         String akCode = BellaContextHelper.getOperatorAkCode();
 
         FileDB fileDB = new FileDB();
@@ -452,9 +472,9 @@ public class FileService {
         fileDB.setIsDir(1);
 		fileDB.setDescription(description == null ? "" : description);
 
-        fileRepo.addFile(fileDB, ancestorId);
+        fileRepo.addFile(fileDB, ancestorId, fileType);
 
-        FileDB res = fileRepo.queryFile(fileId);
+        FileDB res = fileRepo.queryFile(fileId, fileType);
         if(res == null) {
             throw new FileNotFoundException(fileId);
         }
@@ -503,6 +523,19 @@ public class FileService {
         return fileRepo.getDirectAncestorId(fileId);
     }
 
+    /**
+     * 初始化文件分片管理定时任务
+     */
+    @PostConstruct
+    public void init() {
+        // 每5秒刷新文件分片计数到数据库
+        TaskExecutor.scheduleAtFixedRate(() -> fileShardingCountUpdator.flush(), 5);
+        // 每60秒检查是否需要创建新分片
+        TaskExecutor.scheduleAtFixedRate(() -> fileShardingCountUpdator.trySharding(), 60);
+    }
+
+    @Data
+    @AllArgsConstructor
 	public Page<OpenAIFile> pageFiles(PageFileOps ops) {
 		Page<FileDB> pageResult = fileRepo.pageFiles(ops);
 		List<OpenAIFile> openAIFiles = pageResult.getRecords().stream()

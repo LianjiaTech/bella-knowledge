@@ -42,6 +42,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.ke.bella.files.annotations.FileAPI;
 import com.ke.bella.files.db.tables.pojos.FileDB;
+import com.ke.bella.files.enums.FilePurpose;
+import com.ke.bella.files.enums.FileType;
 import com.ke.bella.files.protocol.DomTreeOps.DomTreeUploadOp;
 import com.ke.bella.files.protocol.FileCropOps;
 import com.ke.bella.files.protocol.FileCropOps.FileCropOp;
@@ -67,6 +69,7 @@ import com.ke.bella.files.protocol.BatchCountOps;
 import com.ke.bella.files.service.FileService;
 import com.ke.bella.files.service.lock.FileUniquenessLock;
 import com.ke.bella.files.utils.BellaContextHelper;
+import com.ke.bella.files.utils.FilePurposeClassifier;
 import com.ke.bella.files.utils.JsonUtils;
 import com.ke.bella.openapi.utils.FileUtils;
 
@@ -114,6 +117,13 @@ public class FileController {
         String spaceCode = BellaContextHelper.getOperateSpaceCode();
         String filename = file.getOriginalFilename();
 
+        // Validate purpose: only allow USER_PURPOSES and TEMP_PURPOSES,
+        // otherwise force to temp
+        if(!FilePurposeClassifier.allowedPurposes().contains(purpose)) {
+            LOGGER.info("Invalid purpose '{}', force to '{}'", purpose, FilePurpose.TEMP.getValue());
+            purpose = FilePurpose.TEMP.getValue();
+        }
+
         TmpFileInfo tmpFileInfo = null;
         try {
             tmpFileInfo = createTempFile(file);
@@ -122,17 +132,15 @@ public class FileController {
 			final List<String> finalCities = cities;
 			final List<String> finalTags = tags;
 
+            String finalPurpose = purpose;
             return fl.executeWithLock(spaceCode, ancestorId, filename, FILE_LOCK_TIMEOUT_MS, () -> {
                 if(fileService.exists(spaceCode, ancestorId, filename)) {
                     if(overwrite) {
                         OpenAIFile existingFile = fileService.getFile(spaceCode, ancestorId, filename);
                         if(existingFile != null) {
-							// 对于更新操作，只更新文件内容，忽略description，cities，tags
-							OpenAIFile updatedFile = updateFile(existingFile.getId(), finalTmpFileInfo.getTmpFile(), filename,
+                            return updateFile(existingFile.getId(), finalTmpFileInfo.getTmpFile(), filename,
                                     finalTmpFileInfo.getType(), finalTmpFileInfo.getMimeType(),
-                                    finalTmpFileInfo.getExtension(), finalTmpFileInfo.getCharset(), metadata, purpose);
-
-							return updatedFile;
+                                    finalTmpFileInfo.getExtension(), finalTmpFileInfo.getCharset(), metadata, finalPurpose);
                         }
                     } else {
                         // fixme: may lead to unnecessary create temp file
@@ -152,7 +160,7 @@ public class FileController {
 				validateTagsJson(tagsJson);
 
                 return fileService.uploadWithUrl(finalTmpFileInfo.getTmpFile(), finalTmpFileInfo.getType(), finalTmpFileInfo.getMimeType(),
-					finalTmpFileInfo.getExtension(), finalTmpFileInfo.getCharset(), purpose, metadata, getUrl, expires, ancestorId, filename,
+					finalTmpFileInfo.getExtension(), finalTmpFileInfo.getCharset(), finalPurpose, metadata, getUrl, expires, ancestorId, filename,
 					finalDescription, citiesJson, tagsJson);
             });
         } catch (IllegalArgumentException e) {
@@ -388,7 +396,7 @@ public class FileController {
         }
 
         String spaceCode = BellaContextHelper.getOperateSpaceCode();
-        String ancestorId = fileService.getDirectAncestorId(fileId);
+        String ancestorId = FilePurposeClassifier.isUserFile(fileId) ? fileService.getDirectAncestorId(fileId) : null;
 
         try {
             return fl.executeWithLock(spaceCode, ancestorId, filename, FILE_LOCK_TIMEOUT_MS, () -> {
@@ -398,9 +406,12 @@ public class FileController {
                             String.format("File '%s' already exists in current directory, %s", filename, location));
                 }
 
+                String extension = FileUtils.getFileExtension(filename);
+
                 FileOps ops = FileOps.builder()
                         .fileId(fileId)
                         .filename(filename)
+                        .extension(extension)
                         .build();
                 return fileService.updateFile(ops, true, Scope.FILENAME);
             });
@@ -663,6 +674,9 @@ public class FileController {
         if(fileService.getFile(fileId) == null) {
             throw new IllegalArgumentException("Invalid fileId: " + fileId);
         }
+        if(!FilePurposeClassifier.isUserFile(fileId)) {
+            throw new IllegalArgumentException("Progress tracking is only supported for USER files, fileId: " + fileId);
+        }
         fileService.updateProgress(data, fileId, progressName);
         return fileService.getProgress(fileId, progressName);
     }
@@ -673,6 +687,9 @@ public class FileController {
             @RequestParam("progress_name") String progressName) {
         if(fileService.getFile(fileId) == null) {
             throw new IllegalArgumentException("Invalid fileId: " + fileId);
+        }
+        if(!FilePurposeClassifier.isUserFile(fileId)) {
+            throw new IllegalArgumentException("Progress tracking is only supported for USER files, fileId: " + fileId);
         }
         Progress res = fileService.getProgress(fileId, progressName);
         if(res == null) {
@@ -963,7 +980,7 @@ public class FileController {
 		}
 	}
 
-	@GetMapping("/find")
+    @GetMapping("/find")
     public OpenapiListResponse<OpenAIFile> find(
             @RequestParam(value = "space_code", required = false) String spaceCode,
             @RequestParam(value = "ancestor_id", required = false) String ancestorId) {
@@ -987,9 +1004,9 @@ public class FileController {
         res.setHasMore(false);
         if(!files.isEmpty()) {
             res.setLastId(files.get(files.size() - 1).getId());
-		}
-		return res;
-	}
+        }
+        return res;
+    }
 
 	@PutMapping("/{fileId}/description")
 	public OpenAIFile updateDescription(
@@ -1131,6 +1148,9 @@ public class FileController {
 
 	@GetMapping("/{file_id}/info")
     public OpenAIFile info(@PathVariable("file_id") String fileId) {
+        if(!FilePurposeClassifier.isUserFile(fileId)) {
+            throw new IllegalArgumentException("only USER files support info operation, fileId: " + fileId);
+        }
         OpenAIFile file = fileService.getFile(fileId);
         if(file == null) {
 			throw new FileNotFoundException(fileId);
