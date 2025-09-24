@@ -378,9 +378,12 @@ public class FileController {
                             String.format("File '%s' already exists in current directory, %s", filename, location));
                 }
 
+                String extension = FileUtils.getFileExtension(filename);
+
                 FileOps ops = FileOps.builder()
                         .fileId(fileId)
                         .filename(filename)
+                        .extension(extension)
                         .build();
                 return fileService.updateFile(ops, true, Scope.FILENAME);
             });
