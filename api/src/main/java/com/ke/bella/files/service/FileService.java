@@ -534,8 +534,6 @@ public class FileService {
         TaskExecutor.scheduleAtFixedRate(() -> fileShardingCountUpdator.trySharding(), 60);
     }
 
-    @Data
-    @AllArgsConstructor
 	public Page<OpenAIFile> pageFiles(PageFileOps ops) {
 		Page<FileDB> pageResult = fileRepo.pageFiles(ops);
 		List<OpenAIFile> openAIFiles = pageResult.getRecords().stream()
