@@ -6,7 +6,7 @@ import {
   BreadcrumbList,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useModel } from "./model";
 import { ArrowLeftIcon } from "lucide-react";
 import { KnowledgeFile } from "@/lib/types/file";
@@ -58,6 +58,7 @@ const Page = () => {
     createFolder,
     backFolder,
     uploadFile,
+    renameFile,
   } = useModel();
   const currentDir = currentDirStack[currentDirStack.length - 1];
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
@@ -106,9 +107,22 @@ const Page = () => {
     };
     input.click();
   };
+  const handleRename = useCallback(
+    async (file: KnowledgeFile, filename: string) => {
+      const success = await renameFile(file, filename, currentDir.id);
+      if (success) {
+        toast.success("重命名成功");
+      }
+      return success;
+    },
+    [renameFile, currentDir.id],
+  );
+
   const columns = useMemo(() => {
-    return getColumns();
-  }, []);
+    return getColumns({
+      onRename: handleRename,
+    });
+  }, [handleRename]);
   const handleCreateFolder = async (
     values: z.infer<typeof createFolderFormSchema>,
   ) => {
@@ -123,7 +137,7 @@ const Page = () => {
     if (currentWorkspace) {
       initPage(currentWorkspace.spaceCode);
     }
-  }, [currentWorkspace]);
+  }, [currentWorkspace, initPage]);
   return (
     <>
       <div className="flex items-center justify-between">

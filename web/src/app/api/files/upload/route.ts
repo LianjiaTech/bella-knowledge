@@ -1,4 +1,4 @@
-import { backendRequest, backendRequestFormData } from "@/lib/request/backend";
+import { backendRequestFormData } from "@/lib/request/backend";
 import { FILE_API_URL } from "@/lib/request/const";
 import { NextRequest } from "next/server";
 

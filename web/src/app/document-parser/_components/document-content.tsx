@@ -13,7 +13,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDocumentParserStore } from "../model";
-import { webRequest } from "@/lib/request/web";
 import { toast } from "sonner";
 import { getFilePreviewUrl } from "@/request/files";
 
