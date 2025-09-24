@@ -76,24 +76,24 @@ public class FileService {
         return transferToOpenAIFile(fileDB);
     }
 
-	/**
-	 * 根据space_code在根目录下查找文件（只查第一层）
-	 */
-	public OpenAIFile getFileByNameInSpace(String spaceCode, String filename) {
-		return getFile(spaceCode, null, filename);
-	}
+    /**
+     * 根据space_code在根目录下查找文件（只查第一层）
+     */
+    public OpenAIFile getFileByNameInSpace(String spaceCode, String filename) {
+        return getFile(spaceCode, null, filename);
+    }
 
-	/**
-	 * 根据ancestor_id在第一层子目录中查找文件
-	 */
-	public OpenAIFile getFileByNameInDirectory(String ancestorId, String filename) {
-		// 先获取ancestorId对应的文件信息以获取spaceCode
-		FileDB ancestorFileDB = fileRepo.queryFile(ancestorId);
-		if(ancestorFileDB == null) {
-			return null;
-		}
-		return getFile(ancestorFileDB.getSpaceCode(), ancestorId, filename);
-	}
+    /**
+     * 根据ancestor_id在第一层子目录中查找文件
+     */
+    public OpenAIFile getFileByNameInDirectory(String ancestorId, String filename) {
+        // 先获取ancestorId对应的文件信息以获取spaceCode
+        FileDB ancestorFileDB = fileRepo.queryFile(ancestorId);
+        if(ancestorFileDB == null) {
+            return null;
+        }
+        return getFile(ancestorFileDB.getSpaceCode(), ancestorId, filename);
+    }
 
     private void updateBroadcastStatus(String fileId, BroadcastStatus status) {
         FileOps op = new FileOps();
@@ -103,7 +103,7 @@ public class FileService {
             fileRepo.updateFile(op);
         } catch (Exception e) {
             String msg = "Failed to update file broadcast status, fileId: "
-                    + fileId + ", broadcastStatus: " + status.getValue();
+                + fileId + ", broadcastStatus: " + status.getValue();
             LOGGER.error(msg, e);
             throw new IllegalStateException(msg, e);
         }
@@ -111,39 +111,39 @@ public class FileService {
 
     private OpenAIFile transferToOpenAIFile(FileDB fileDB) {
         return OpenAIFile.builder()
-                .id(fileDB.getFileId())
-                .bytes(fileDB.getBytes())
-                .createdAt(fileDB.getCtime()
-                        .toInstant(ZoneId.systemDefault().getRules().getOffset(fileDB.getCtime()))
-                        .toEpochMilli())
-                .filename(fileDB.getFilename())
-                .isDir(fileDB.getIsDir() == 1)
-                .extension(fileDB.getExtension())
-                .mimeType(fileDB.getMimeType())
-                .type(fileDB.getType())
-                .purpose(fileDB.getPurpose())
-                .domTreeFileId(fileDB.getDomTreeFileId())
-                .pdfFileId(fileDB.getPdfFileId())
-                .version(fileDB.getVersion())
-                .spaceCode(fileDB.getSpaceCode())
-                .metadata(fileDB.getMetaData())
-                .cuid(fileDB.getCuid())
-                .cuName(fileDB.getCuName())
-			.muid(fileDB.getMuid())
-			.muName(fileDB.getMuName())
-			.mtime(fileDB.getMtime()
-				.toInstant(ZoneId.systemDefault().getRules().getOffset(fileDB.getMtime()))
-				.toEpochMilli())
-			.description(fileDB.getDescription())
-			.cities(StringUtils.isNotEmpty(fileDB.getCities()) ?
-				JsonUtils.fromJson(fileDB.getCities(), new TypeReference<List<String>>() {
-				}) :
-				new ArrayList<>())
-			.tags(StringUtils.isNotEmpty(fileDB.getTags()) ?
-				JsonUtils.fromJson(fileDB.getTags(), new TypeReference<List<String>>() {
-				}) :
-				new ArrayList<>())
-                .build();
+            .id(fileDB.getFileId())
+            .bytes(fileDB.getBytes())
+            .createdAt(fileDB.getCtime()
+                .toInstant(ZoneId.systemDefault().getRules().getOffset(fileDB.getCtime()))
+                .toEpochMilli())
+            .filename(fileDB.getFilename())
+            .isDir(fileDB.getIsDir() == 1)
+            .extension(fileDB.getExtension())
+            .mimeType(fileDB.getMimeType())
+            .type(fileDB.getType())
+            .purpose(fileDB.getPurpose())
+            .domTreeFileId(fileDB.getDomTreeFileId())
+            .pdfFileId(fileDB.getPdfFileId())
+            .version(fileDB.getVersion())
+            .spaceCode(fileDB.getSpaceCode())
+            .metadata(fileDB.getMetaData())
+            .cuid(fileDB.getCuid())
+            .cuName(fileDB.getCuName())
+            .muid(fileDB.getMuid())
+            .muName(fileDB.getMuName())
+            .mtime(fileDB.getMtime()
+                .toInstant(ZoneId.systemDefault().getRules().getOffset(fileDB.getMtime()))
+                .toEpochMilli())
+            .description(fileDB.getDescription())
+            .cities(StringUtils.isNotEmpty(fileDB.getCities()) ?
+                JsonUtils.fromJson(fileDB.getCities(), new TypeReference<List<String>>() {
+                }) :
+                new ArrayList<>())
+            .tags(StringUtils.isNotEmpty(fileDB.getTags()) ?
+                JsonUtils.fromJson(fileDB.getTags(), new TypeReference<List<String>>() {
+                }) :
+                new ArrayList<>())
+            .build();
     }
 
     private OpenAIFile buildOpenAIFileWithSource(FileDB fileDB) {
@@ -170,30 +170,30 @@ public class FileService {
 
     private Progress transferToProgress(FileProgressDB fileProgressDB) {
         return Progress.builder()
-                .id(fileProgressDB.getId())
-                .fileId(fileProgressDB.getFileId())
-                .name(fileProgressDB.getName())
-                .status(fileProgressDB.getStatus())
-                .message(fileProgressDB.getMessage())
-                .percent(fileProgressDB.getPercent())
-                .cuid(fileProgressDB.getCuid())
-                .cuName(fileProgressDB.getCuName())
-                .ctime(fileProgressDB.getCtime()
-                        .toInstant(ZoneId.systemDefault().getRules().getOffset(fileProgressDB.getCtime()))
-                        .toEpochMilli())
-                .muid(fileProgressDB.getMuid())
-                .muName(fileProgressDB.getMuName())
-                .mtime(fileProgressDB.getMtime()
-                        .toInstant(ZoneId.systemDefault().getRules().getOffset(fileProgressDB.getMtime()))
-                        .toEpochMilli())
-                .build();
+            .id(fileProgressDB.getId())
+            .fileId(fileProgressDB.getFileId())
+            .name(fileProgressDB.getName())
+            .status(fileProgressDB.getStatus())
+            .message(fileProgressDB.getMessage())
+            .percent(fileProgressDB.getPercent())
+            .cuid(fileProgressDB.getCuid())
+            .cuName(fileProgressDB.getCuName())
+            .ctime(fileProgressDB.getCtime()
+                .toInstant(ZoneId.systemDefault().getRules().getOffset(fileProgressDB.getCtime()))
+                .toEpochMilli())
+            .muid(fileProgressDB.getMuid())
+            .muName(fileProgressDB.getMuName())
+            .mtime(fileProgressDB.getMtime()
+                .toInstant(ZoneId.systemDefault().getRules().getOffset(fileProgressDB.getMtime()))
+                .toEpochMilli())
+            .build();
     }
 
     @Transactional(rollbackFor = Exception.class)
     public OpenAIFile uploadWithUrl(File file, String type, String mimeType, String extension, String charset, String purpose, String metadata,
-		boolean getUrl, long expires, String ancestorId, String filename, String description, String cities, String tags) {
+        boolean getUrl, long expires, String ancestorId, String filename, String description, String cities, String tags) {
         OpenAIFile openaiFile = upload(file, filename, purpose, metadata,
-			mimeType, type, extension, charset, ancestorId, description, cities, tags);
+            mimeType, type, extension, charset, ancestorId, description, cities, tags);
 
         if(getUrl) {
             String url = getUrl(openaiFile.getId(), expires);
@@ -203,45 +203,45 @@ public class FileService {
     }
 
     public OpenAIFile upload(
-            File file,
-            String filename,
-            String purpose,
-            String metadata,
-            String mimeType,
-            String type,
-            String extension,
-            String charset) {
+        File file,
+        String filename,
+        String purpose,
+        String metadata,
+        String mimeType,
+        String type,
+        String extension,
+        String charset) {
         return upload(file, filename, purpose, metadata, mimeType, type, extension, charset, null);
     }
 
-	@Transactional(rollbackFor = Exception.class)
-	public OpenAIFile upload(
-		File file,
-		String filename,
-		String purpose,
-		String metadata,
-		String mimeType,
-		String type,
-		String extension,
-		String charset,
-		String ancestorId) {
-		return upload(file, filename, purpose, metadata, mimeType, type, extension, charset, ancestorId, null, null, null);
-	}
+    @Transactional(rollbackFor = Exception.class)
+    public OpenAIFile upload(
+        File file,
+        String filename,
+        String purpose,
+        String metadata,
+        String mimeType,
+        String type,
+        String extension,
+        String charset,
+        String ancestorId) {
+        return upload(file, filename, purpose, metadata, mimeType, type, extension, charset, ancestorId, null, null, null);
+    }
 
     @Transactional(rollbackFor = Exception.class)
     public OpenAIFile upload(
-            File file,
-            String filename,
-            String purpose,
-            String metadata,
-            String mimeType,
-            String type,
-            String extension,
-            String charset,
-            String ancestorId,
-			String description,
-			String cities,
-			String tags) {
+        File file,
+        String filename,
+        String purpose,
+        String metadata,
+        String mimeType,
+        String type,
+        String extension,
+        String charset,
+        String ancestorId,
+        String description,
+        String cities,
+        String tags) {
         String spaceCode = BellaContextHelper.getOperateSpaceCode();
         FileType fileType = FilePurposeClassifier.classify(purpose);
         String fileId = FILE_ID_GENERATOR.generateWithType(fileType);
@@ -268,9 +268,9 @@ public class FileService {
         fileDB.setPurpose(purpose);
         fileDB.setMetaData(metadata);
         fileDB.setAkCode(akCode);
-		fileDB.setDescription(StringUtils.isNotEmpty(description) ? description : "");
-		fileDB.setCities(StringUtils.isNotEmpty(cities) ? cities : "");
-		fileDB.setTags(StringUtils.isNotEmpty(tags) ? tags : "");
+        fileDB.setDescription(StringUtils.isNotEmpty(description) ? description : "");
+        fileDB.setCities(StringUtils.isNotEmpty(cities) ? cities : "");
+        fileDB.setTags(StringUtils.isNotEmpty(tags) ? tags : "");
         String shardingKey = fileRepo.addFile(fileDB, ancestorId, fileType);
         if(fileType.notUsersType()) {
             fileShardingCountUpdator.increase(shardingKey, fileType.getType());
@@ -291,16 +291,16 @@ public class FileService {
         message.setUserId(BellaContextHelper.getOperatorUserId());
         message.setUserName(BellaContextHelper.getOperatorUserName());
         broadcastService.broadcast(message, () -> updateBroadcastStatus(fileId, BroadcastStatus.SUCCESS),
-                () -> updateBroadcastStatus(fileId, BroadcastStatus.FAILED));
+            () -> updateBroadcastStatus(fileId, BroadcastStatus.FAILED));
         return openAIFile;
     }
 
     public List<OpenAIFile> list(
-            String purpose,
-            Integer limit,
-            String order,
-            String after,
-            String ancestorId) {
+        String purpose,
+        Integer limit,
+        String order,
+        String after,
+        String ancestorId) {
         String spaceCode = BellaContextHelper.getOperateSpaceCode();
         List<FileDB> files = fileRepo.listFile(purpose, limit, order, after, spaceCode, ancestorId);
         List<OpenAIFile> emptyList = new ArrayList<>();
@@ -344,7 +344,7 @@ public class FileService {
         message.setUserId(BellaContextHelper.getOperatorUserId());
         message.setUserName(BellaContextHelper.getOperatorUserName());
         broadcastService.broadcast(message, () -> updateBroadcastStatus(finalOpenAIFile.getId(), BroadcastStatus.SUCCESS),
-                () -> updateBroadcastStatus(finalOpenAIFile.getId(), BroadcastStatus.FAILED));
+            () -> updateBroadcastStatus(finalOpenAIFile.getId(), BroadcastStatus.FAILED));
 
         return finalOpenAIFile;
     }
@@ -363,7 +363,7 @@ public class FileService {
             }
         } catch (Exception e) {
             throw new IllegalStateException("Failed to update file status (indicating deletion), fileId: "
-                    + fileId + ", status: " + FileStatus.DELETED, e);
+                + fileId + ", status: " + FileStatus.DELETED, e);
         }
     }
 
@@ -372,21 +372,21 @@ public class FileService {
     }
 
     public String getUrl(
-            String fileId,
-            long expires) {
+        String fileId,
+        long expires) {
         FileDB file = fileRepo.queryFile(fileId);
         return getUrl(file.getBucket(), file.getPath(), file.getPurpose(), expires);
     }
 
     public String getUrl(String bucketName, String keyName, String purpose, long expires) {
         return purpose.equals(VISION) ? storageService.getPublicUrl(bucketName, keyName)
-                : storageService.getPresignedUrl(bucketName, keyName, expires);
+            : storageService.getPresignedUrl(bucketName, keyName, expires);
     }
 
     public void updateProgress(
-            UpdateProgressRequestData data,
-            String fileId,
-            String progressName) {
+        UpdateProgressRequestData data,
+        String fileId,
+        String progressName) {
         String status = data.getStatus();
         String message = data.getMessage();
         Integer percent = data.getPercent();
@@ -398,8 +398,8 @@ public class FileService {
     }
 
     public Progress getProgress(
-            String fileId,
-            String progressName) {
+        String fileId,
+        String progressName) {
         FileProgressDB fileProgressDB = fileRepo.queryProgress(fileId, progressName);
         return fileProgressDB == null ? null : transferToProgress(fileProgressDB);
     }
@@ -445,7 +445,7 @@ public class FileService {
         }
     }
 
-	public OpenAIFile mkdir(String name, String ancestorId, String description) {
+    public OpenAIFile mkdir(String name, String ancestorId, String description) {
         String spaceCode = BellaContextHelper.getOperateSpaceCode();
 
         FileType fileType = FileType.DIRECTORY;
@@ -466,7 +466,7 @@ public class FileService {
         fileDB.setMetaData("{}");
         fileDB.setAkCode(akCode);
         fileDB.setIsDir(1);
-		fileDB.setDescription(description == null ? "" : description);
+        fileDB.setDescription(description == null ? "" : description);
 
         fileRepo.addFile(fileDB, ancestorId, fileType);
 
@@ -484,22 +484,22 @@ public class FileService {
         message.setUserId(BellaContextHelper.getOperatorUserId());
         message.setUserName(BellaContextHelper.getOperatorUserName());
         broadcastService.broadcast(message, () -> updateBroadcastStatus(fileId, BroadcastStatus.SUCCESS),
-                () -> updateBroadcastStatus(fileId, BroadcastStatus.FAILED));
+            () -> updateBroadcastStatus(fileId, BroadcastStatus.FAILED));
         return openAIFile;
     }
 
     public List<OpenAIFile> findFiles(FileDB ancestor) {
         List<FileDB> fileDbs = fileRepo.findFiles(ancestor.getSpaceCode(), ancestor.getFileId());
         return fileDbs.stream()
-                .map(this::transferToOpenAIFile)
-                .collect(Collectors.toList());
+            .map(this::transferToOpenAIFile)
+            .collect(Collectors.toList());
     }
 
     public List<OpenAIFile> findFiles(String spaceCode) {
         List<FileDB> fileDbs = fileRepo.findFiles(spaceCode, null);
         return fileDbs.stream()
-                .map(this::transferToOpenAIFile)
-                .collect(Collectors.toList());
+            .map(this::transferToOpenAIFile)
+            .collect(Collectors.toList());
     }
 
     public OpenAIFile info(String fileId) {
@@ -541,199 +541,199 @@ public class FileService {
         TaskExecutor.scheduleAtFixedRate(() -> fileShardingCountUpdator.trySharding(), 60);
     }
 
-	public Page<OpenAIFile> pageFiles(PageFileOps ops) {
-		Page<FileDB> pageResult = fileRepo.pageFiles(ops);
-		List<OpenAIFile> openAIFiles = pageResult.getRecords().stream()
-			.map(this::transferToOpenAIFile)
-			.collect(Collectors.toList());
+    public Page<OpenAIFile> pageFiles(PageFileOps ops) {
+        Page<FileDB> pageResult = fileRepo.pageFiles(ops);
+        List<OpenAIFile> openAIFiles = pageResult.getRecords().stream()
+            .map(this::transferToOpenAIFile)
+            .collect(Collectors.toList());
 
-		if(ops.isGetUrl()) {
-			long expires = ops.getExpires() > 0 ? ops.getExpires() : ONE_DAY;
-			for (OpenAIFile file : openAIFiles) {
-				String url = getUrl(file.getId(), expires);
-				file.setUrl(url);
-			}
-		}
+        if(ops.isGetUrl()) {
+            long expires = ops.getExpires() > 0 ? ops.getExpires() : ONE_DAY;
+            for (OpenAIFile file : openAIFiles) {
+                String url = getUrl(file.getId(), expires);
+                file.setUrl(url);
+            }
+        }
 
-		return Page.<OpenAIFile>builder()
-			.pageNo(pageResult.getPageNo())
-			.pageSize(pageResult.getPageSize())
-			.total(pageResult.getTotal())
-			.pages(pageResult.getPages())
-			.records(openAIFiles)
-			.build();
-	}
+        return Page.<OpenAIFile>builder()
+            .pageNo(pageResult.getPageNo())
+            .pageSize(pageResult.getPageSize())
+            .total(pageResult.getTotal())
+            .pages(pageResult.getPages())
+            .records(openAIFiles)
+            .build();
+    }
 
-	public int count(String ancestorId, String type) {
-		return fileRepo.countFiles(ancestorId, type);
-	}
+    public int count(String ancestorId, String type) {
+        return fileRepo.countFiles(ancestorId, type);
+    }
 
-	public List<FileCountInfo> batchCount(List<String> ancestorIds, String type, String spaceCode) {
-		return fileRepo.batchCountFiles(ancestorIds, type, spaceCode);
-	}
+    public List<FileCountInfo> batchCount(List<String> ancestorIds, String type, String spaceCode) {
+        return fileRepo.batchCountFiles(ancestorIds, type, spaceCode);
+    }
 
-	/**
-	 * 移动文件/目录到指定位置，包含完整的业务校验和事务处理
-	 *
-	 * @param fileIds            要移动的文件/目录ID列表
-	 * @param targetAncestorId   目标父目录ID，为null表示移动到根目录
-	 * @param effectiveSpaceCode 有效的空间编码
-	 *
-	 * @return 移动后的文件/目录列表
-	 */
-	@Transactional(rollbackFor = Exception.class)
-	public List<OpenAIFile> moveFiles(List<String> fileIds, String targetAncestorId, String effectiveSpaceCode) {
-		// 验证目标目录
-		validateTargetDirectory(targetAncestorId);
+    /**
+     * 移动文件/目录到指定位置，包含完整的业务校验和事务处理
+     *
+     * @param fileIds            要移动的文件/目录ID列表
+     * @param targetAncestorId   目标父目录ID，为null表示移动到根目录
+     * @param effectiveSpaceCode 有效的空间编码
+     *
+     * @return 移动后的文件/目录列表
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public List<OpenAIFile> moveFiles(List<String> fileIds, String targetAncestorId, String effectiveSpaceCode) {
+        // 验证目标目录
+        validateTargetDirectory(targetAncestorId);
 
-		// 验证要移动的文件
-		validateFilesToMove(fileIds, targetAncestorId, effectiveSpaceCode);
+        // 验证要移动的文件
+        validateFilesToMove(fileIds, targetAncestorId, effectiveSpaceCode);
 
-		// 执行移动操作
-		List<OpenAIFile> movedFiles = new ArrayList<>();
-		for (String fileId : fileIds) {
-			fileRepo.moveSubtree(fileId, targetAncestorId);
-			movedFiles.add(getFile(fileId));
-		}
+        // 执行移动操作
+        List<OpenAIFile> movedFiles = new ArrayList<>();
+        for (String fileId : fileIds) {
+            fileRepo.moveSubtree(fileId, targetAncestorId);
+            movedFiles.add(getFile(fileId));
+        }
 
-		return movedFiles;
-	}
+        return movedFiles;
+    }
 
-	/**
-	 * 验证目标目录的有效性
-	 */
-	private void validateTargetDirectory(String targetAncestorId) {
-		if(targetAncestorId != null) {
-			OpenAIFile targetDir = getFile(targetAncestorId);
-			Assert.notNull(targetDir, "Target directory not found: " + targetAncestorId);
-			Assert.isTrue(targetDir.getIsDir(), "Target must be a directory: " + targetAncestorId);
-		}
-	}
+    /**
+     * 验证目标目录的有效性
+     */
+    private void validateTargetDirectory(String targetAncestorId) {
+        if(targetAncestorId != null) {
+            OpenAIFile targetDir = getFile(targetAncestorId);
+            Assert.notNull(targetDir, "Target directory not found: " + targetAncestorId);
+            Assert.isTrue(targetDir.getIsDir(), "Target must be a directory: " + targetAncestorId);
+        }
+    }
 
-	/**
-	 * 验证要移动的文件列表
-	 */
-	private void validateFilesToMove(List<String> fileIds, String targetAncestorId, String spaceCode) {
-		// 批量查询所有要移动的文件信息
-		ListFileOps ops = new ListFileOps();
-		ops.setFileIds(fileIds);
-		List<OpenAIFile> queriedFiles = getFiles(ops);
+    /**
+     * 验证要移动的文件列表
+     */
+    private void validateFilesToMove(List<String> fileIds, String targetAncestorId, String spaceCode) {
+        // 批量查询所有要移动的文件信息
+        ListFileOps ops = new ListFileOps();
+        ops.setFileIds(fileIds);
+        List<OpenAIFile> queriedFiles = getFiles(ops);
 
-		// 验证查询结果
-		if(queriedFiles.size() != fileIds.size()) {
-			// 找出未找到的文件ID
-			List<String> foundIds = queriedFiles.stream().map(OpenAIFile::getId).collect(Collectors.toList());
-			List<String> notFoundIds = fileIds.stream().filter(id -> !foundIds.contains(id)).collect(Collectors.toList());
-			throw new IllegalArgumentException("Files not found: " + notFoundIds);
-		}
+        // 验证查询结果
+        if(queriedFiles.size() != fileIds.size()) {
+            // 找出未找到的文件ID
+            List<String> foundIds = queriedFiles.stream().map(OpenAIFile::getId).collect(Collectors.toList());
+            List<String> notFoundIds = fileIds.stream().filter(id -> !foundIds.contains(id)).collect(Collectors.toList());
+            throw new IllegalArgumentException("Files not found: " + notFoundIds);
+        }
 
-		// 验证空间编码
-		for (OpenAIFile file : queriedFiles) {
-			if(!StringUtils.equals(spaceCode, file.getSpaceCode())) {
-				throw new IllegalArgumentException("space mismatch for file: " + file.getId());
-			}
-		}
+        // 验证空间编码
+        for (OpenAIFile file : queriedFiles) {
+            if(!StringUtils.equals(spaceCode, file.getSpaceCode())) {
+                throw new IllegalArgumentException("space mismatch for file: " + file.getId());
+            }
+        }
 
-		// 校验防环 - 不能将节点移动到自身或其后代下面
-		validateNoCycles(queriedFiles, targetAncestorId);
+        // 校验防环 - 不能将节点移动到自身或其后代下面
+        validateNoCycles(queriedFiles, targetAncestorId);
 
-		// 校验同级重名 - 目标位置下不能存在重名文件/目录
-		validateNoDuplicateNames(queriedFiles, targetAncestorId, spaceCode);
-	}
+        // 校验同级重名 - 目标位置下不能存在重名文件/目录
+        validateNoDuplicateNames(queriedFiles, targetAncestorId, spaceCode);
+    }
 
-	/**
-	 * 校验防环：不能将目录移动到自身或其后代节点
-	 */
-	private void validateNoCycles(List<OpenAIFile> filesToMove, String targetAncestorId) {
-		if(targetAncestorId == null) {
-			return; // 移动到根目录不会有环
-		}
+    /**
+     * 校验防环：不能将目录移动到自身或其后代节点
+     */
+    private void validateNoCycles(List<OpenAIFile> filesToMove, String targetAncestorId) {
+        if(targetAncestorId == null) {
+            return; // 移动到根目录不会有环
+        }
 
-		// 检查是否有文件要移动到自身
-		for (OpenAIFile file : filesToMove) {
-			Assert.isTrue(!file.getId().equals(targetAncestorId),
-				String.format("Cannot move file to itself: %s", file.getId()));
-		}
+        // 检查是否有文件要移动到自身
+        for (OpenAIFile file : filesToMove) {
+            Assert.isTrue(!file.getId().equals(targetAncestorId),
+                String.format("Cannot move file to itself: %s", file.getId()));
+        }
 
-		// 批量检查目录是否移动到其后代节点
-		// 正确逻辑：检查目标位置是否是要移动的目录的后代
-		List<String> dirIds = filesToMove.stream()
-			.filter(OpenAIFile::getIsDir)
-			.map(OpenAIFile::getId)
-			.collect(Collectors.toList());
+        // 批量检查目录是否移动到其后代节点
+        // 正确逻辑：检查目标位置是否是要移动的目录的后代
+        List<String> dirIds = filesToMove.stream()
+            .filter(OpenAIFile::getIsDir)
+            .map(OpenAIFile::getId)
+            .collect(Collectors.toList());
 
-		if(!dirIds.isEmpty()) {
-			// 检查targetAncestorId是否是dirIds中任一目录的后代
-			List<String> ancestorIds = fileRepo.batchCheckTargetAsDescendant(targetAncestorId, dirIds);
-			for (String ancestorId : ancestorIds) {
-				String filename = filesToMove.stream()
-					.filter(f -> f.getId().equals(ancestorId))
-					.findFirst()
-					.map(OpenAIFile::getFilename)
-					.orElse(ancestorId);
-				throw new IllegalArgumentException(
-					String.format("Cannot move directory '%s' to its descendant '%s'",
-						filename, targetAncestorId));
-			}
-		}
-	}
+        if(!dirIds.isEmpty()) {
+            // 检查targetAncestorId是否是dirIds中任一目录的后代
+            List<String> ancestorIds = fileRepo.batchCheckTargetAsDescendant(targetAncestorId, dirIds);
+            for (String ancestorId : ancestorIds) {
+                String filename = filesToMove.stream()
+                    .filter(f -> f.getId().equals(ancestorId))
+                    .findFirst()
+                    .map(OpenAIFile::getFilename)
+                    .orElse(ancestorId);
+                throw new IllegalArgumentException(
+                    String.format("Cannot move directory '%s' to its descendant '%s'",
+                        filename, targetAncestorId));
+            }
+        }
+    }
 
-	/**
-	 * 校验同级重名：目标目录下不能存在同名文件/目录（批量优化版本）
-	 */
-	private void validateNoDuplicateNames(List<OpenAIFile> filesToMove, String targetAncestorId, String spaceCode) {
-		if(filesToMove.isEmpty()) {
-			return;
-		}
+    /**
+     * 校验同级重名：目标目录下不能存在同名文件/目录（批量优化版本）
+     */
+    private void validateNoDuplicateNames(List<OpenAIFile> filesToMove, String targetAncestorId, String spaceCode) {
+        if(filesToMove.isEmpty()) {
+            return;
+        }
 
-		// 1. 批量获取所有文件的当前父目录ID
-		List<String> fileIds = filesToMove.stream().map(OpenAIFile::getId).collect(Collectors.toList());
-		Map<String, String> fileToAncestorMap = fileRepo.batchGetDirectAncestorIds(spaceCode, fileIds);
+        // 1. 批量获取所有文件的当前父目录ID
+        List<String> fileIds = filesToMove.stream().map(OpenAIFile::getId).collect(Collectors.toList());
+        Map<String, String> fileToAncestorMap = fileRepo.batchGetDirectAncestorIds(spaceCode, fileIds);
 
-		// 2. 过滤出需要校验的文件（不在目标目录的文件）
-		List<String> filenamesToCheck = filesToMove.stream()
-			.filter(file -> !StringUtils.equals(fileToAncestorMap.get(file.getId()), targetAncestorId))
-			.map(OpenAIFile::getFilename)
-			.collect(Collectors.toList());
+        // 2. 过滤出需要校验的文件（不在目标目录的文件）
+        List<String> filenamesToCheck = filesToMove.stream()
+            .filter(file -> !StringUtils.equals(fileToAncestorMap.get(file.getId()), targetAncestorId))
+            .map(OpenAIFile::getFilename)
+            .collect(Collectors.toList());
 
-		if(filenamesToCheck.isEmpty()) {
-			return;
-		}
+        if(filenamesToCheck.isEmpty()) {
+            return;
+        }
 
-		// 3. 批量检查目标目录下是否存在同名文件
-		List<String> existingFilenames = fileRepo.batchCheckExistingFilenames(spaceCode, targetAncestorId, filenamesToCheck);
+        // 3. 批量检查目标目录下是否存在同名文件
+        List<String> existingFilenames = fileRepo.batchCheckExistingFilenames(spaceCode, targetAncestorId, filenamesToCheck);
 
-		if(!existingFilenames.isEmpty()) {
-			String location = targetAncestorId == null ? "root directory" : "target directory";
-			throw new IllegalArgumentException(
-				String.format("Files already exist in %s: %s", location, String.join(", ", existingFilenames)));
-		}
-	}
+        if(!existingFilenames.isEmpty()) {
+            String location = targetAncestorId == null ? "root directory" : "target directory";
+            throw new IllegalArgumentException(
+                String.format("Files already exist in %s: %s", location, String.join(", ", existingFilenames)));
+        }
+    }
 
-	/**
-	 * 确定有效的空间编码和祖先ID 优先级：如果ancestorId不为空，从ancestorId获取spaceCode；否则使用提供的spaceCode
-	 */
-	public EffectiveParams determineEffectiveParams(String spaceCode, String ancestorId) {
-		if(StringUtils.isNotEmpty(ancestorId)) {
-			OpenAIFile ancestorFile = getFile(ancestorId);
-			if(ancestorFile == null) {
-				throw new IllegalArgumentException("ancestor_id not found: " + ancestorId);
-			}
-			return new EffectiveParams(ancestorFile.getSpaceCode(), ancestorId);
-		} else {
-			return new EffectiveParams(spaceCode, null);
-		}
-	}
+    /**
+     * 确定有效的空间编码和祖先ID 优先级：如果ancestorId不为空，从ancestorId获取spaceCode；否则使用提供的spaceCode
+     */
+    public EffectiveParams determineEffectiveParams(String spaceCode, String ancestorId) {
+        if(StringUtils.isNotEmpty(ancestorId)) {
+            OpenAIFile ancestorFile = getFile(ancestorId);
+            if(ancestorFile == null) {
+                throw new IllegalArgumentException("ancestor_id not found: " + ancestorId);
+            }
+            return new EffectiveParams(ancestorFile.getSpaceCode(), ancestorId);
+        } else {
+            return new EffectiveParams(spaceCode, null);
+        }
+    }
 
-	@Data
-	@AllArgsConstructor
-	public static class EffectiveParams {
-		private String spaceCode;
-		private String ancestorId;
-	}
+    @Data
+    @AllArgsConstructor
+    public static class EffectiveParams {
+        private String spaceCode;
+        private String ancestorId;
+    }
 
-	@Data
-	@AllArgsConstructor
+    @Data
+    @AllArgsConstructor
     @Builder
     public static class InputStreamWithCharset {
         private java.io.InputStream inputStream;

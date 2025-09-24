@@ -1,7 +1,5 @@
 package com.ke.bella.files.protocol;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -9,6 +7,7 @@ import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 
 import java.util.List;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 @SuperBuilder(toBuilder = true)
 @AllArgsConstructor
@@ -23,13 +22,7 @@ public class OpenAIFile {
     private String filename;
     private Boolean isDir;
     /**
-     * assistants
-     * assistants_output
-     * batch
-     * batch_output
-     * fine-tune
-     * fine-tune-results
-     * vision
+     * assistants assistants_output batch batch_output fine-tune fine-tune-results vision
      */
     private String purpose;
     private Boolean deleted;
@@ -57,10 +50,10 @@ public class OpenAIFile {
     private Long cuid;
     private String cuName;
     private String path;
-	private Long muid;
-	private String muName;
-	private Long mtime;
-	private String description;
-	private List<String> cities;
-	private List<String> tags;
+    private Long muid;
+    private String muName;
+    private Long mtime;
+    private String description;
+    private List<String> cities;
+    private List<String> tags;
 }

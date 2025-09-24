@@ -1,11 +1,11 @@
 package com.ke.bella.files.protocol;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 @Data
 @AllArgsConstructor
@@ -13,9 +13,9 @@ import lombok.experimental.SuperBuilder;
 @SuperBuilder(toBuilder = true)
 public class FileCountInfo {
 
-	@JsonProperty("ancestor_id")
-	private String ancestorId;
+    @JsonProperty("ancestor_id")
+    private String ancestorId;
 
-	private Integer count;
+    private Integer count;
 
 }

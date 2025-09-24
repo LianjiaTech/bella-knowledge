@@ -1,24 +1,20 @@
 package com.ke.bella.files;
 
+import lombok.extern.slf4j.Slf4j;
+
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
-
 import javax.annotation.Resource;
-
 import org.springframework.stereotype.Component;
-
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.ke.bella.files.db.repo.FileRepo;
 import com.ke.bella.files.db.tables.pojos.FileShardingDB;
 import com.ke.bella.files.enums.FileType;
 
-import lombok.extern.slf4j.Slf4j;
-
 /**
- * 文件分片计数更新器
- * 参考DatasetShardingCountUpdator实现，管理file_temp和file_system的分片计数
+ * 文件分片计数更新器 参考DatasetShardingCountUpdator实现，管理file_temp和file_system的分片计数
  */
 @Component
 @Slf4j
@@ -29,13 +25,13 @@ public class FileShardingCountUpdator {
 
     // System类型的计数缓存
     private final Cache<String, AtomicLong> systemDeltas = CacheBuilder.newBuilder()
-            .maximumSize(10)
-            .build();
+        .maximumSize(10)
+        .build();
 
     // Temp类型的计数缓存
     private final Cache<String, AtomicLong> tempDeltas = CacheBuilder.newBuilder()
-            .maximumSize(10)
-            .build();
+        .maximumSize(10)
+        .build();
 
     /**
      * 增加单个文件计数

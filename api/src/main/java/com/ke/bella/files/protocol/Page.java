@@ -13,13 +13,13 @@ import java.util.List;
 @NoArgsConstructor
 public class Page<T> {
 
-	private long pageNo;
+    private long pageNo;
 
-	private long pageSize;
+    private long pageSize;
 
-	private long total;
+    private long total;
 
-	private long pages;
+    private long pages;
 
-	private List<T> records;
+    private List<T> records;
 }
