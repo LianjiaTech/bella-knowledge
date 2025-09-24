@@ -135,11 +135,6 @@ const RagevalViewer = ({
                               正确
                             </Badge>
                           )}
-                          {isIncorrect && (
-                            <Badge className="bg-red-100 text-red-700 text-xs">
-                              错召回
-                            </Badge>
-                          )}
                         </div>
                         <p className="text-xs text-gray-600 line-clamp-2 mb-1">
                           {ref.text}
@@ -167,14 +162,16 @@ const RagevalViewer = ({
             <CheckCircle className="h-4 w-4 text-green-500" />
             <div className="font-semibold text-base">期望答案</div>
           </div>
-          <div className="text-sm">{data?.groundtruth || ""}</div>
+          <div className="text-sm whitespace-pre-wrap">
+            {data.groundtruth || ""}
+          </div>
         </div>
         <div className="flex-1 bg-white rounded-xl p-6 border">
           <div className="flex items-center gap-2 mb-4">
             <AlertCircle className="h-4 w-4 text-blue-500" />
             <div className="font-semibold text-base">实际答案</div>
           </div>
-          <div className="text-sm">{data?.response || ""}</div>
+          <div className="text-sm whitespace-pre-wrap">{data?.response || ""}</div>
         </div>
       </div>
     </div>
