@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
 import javax.imageio.ImageIO;
@@ -52,9 +53,17 @@ import com.ke.bella.files.protocol.FileUrl;
 import com.ke.bella.files.protocol.ListFileOps;
 import com.ke.bella.files.protocol.OpenAIFile;
 import com.ke.bella.files.protocol.OpenapiListResponse;
+import com.ke.bella.files.protocol.Page;
+import com.ke.bella.files.protocol.PageFileOps;
 import com.ke.bella.files.protocol.Progress;
 import com.ke.bella.files.protocol.Scope;
+import com.ke.bella.files.protocol.UpdateCitiesOps;
+import com.ke.bella.files.protocol.UpdateDescriptionOps;
 import com.ke.bella.files.protocol.UpdateProgressRequestData;
+import com.ke.bella.files.protocol.UpdateTagsOps;
+import com.ke.bella.files.protocol.MoveOps;
+import com.ke.bella.files.protocol.FileCountInfo;
+import com.ke.bella.files.protocol.BatchCountOps;
 import com.ke.bella.files.service.FileService;
 import com.ke.bella.files.service.lock.FileUniquenessLock;
 import com.ke.bella.files.utils.BellaContextHelper;
@@ -75,6 +84,9 @@ public class FileController {
     private static final long FILE_LOCK_TIMEOUT_MS = 30000L;
 
     private static final int MAX_DIRECTORY_NAME_LENGTH = 255;
+	private static final int MAX_DESCRIPTION_LENGTH = 256;
+	private static final int MAX_CITIES_JSON_LENGTH = 512;
+	private static final int MAX_TAGS_JSON_LENGTH = 512;
 
     private static final Pattern WINDOWS_INVALID_CHARS = Pattern.compile("[<>:\"|?*\\\\]|[\\x00-\\x1f]");
 
@@ -92,10 +104,13 @@ public class FileController {
             @RequestPart(value = "file") MultipartFile file,
             @RequestParam(value = "purpose", required = false) String purpose,
             @RequestParam(value = "metadata", required = false) String metadata,
+		@RequestParam(value = "description", required = false) String description,
             @RequestParam(value = "get_url", required = false, defaultValue = "false") boolean getUrl,
             @RequestParam(value = "expires", required = false, defaultValue = ONE_DAY_STRING) long expires,
             @RequestParam(value = "ancestor_id", required = false) String ancestorId,
-            @RequestParam(value = "overwrite", required = false, defaultValue = "false") boolean overwrite) throws IOException {
+		@RequestParam(value = "overwrite", required = false, defaultValue = "false") boolean overwrite,
+		@RequestParam(value = "cities", required = false) List<String> cities,
+		@RequestParam(value = "tags", required = false) List<String> tags) throws IOException {
         String spaceCode = BellaContextHelper.getOperateSpaceCode();
         String filename = file.getOriginalFilename();
 
@@ -103,15 +118,21 @@ public class FileController {
         try {
             tmpFileInfo = createTempFile(file);
             final TmpFileInfo finalTmpFileInfo = tmpFileInfo;
+			final String finalDescription = description == null ? "" : description;
+			final List<String> finalCities = cities;
+			final List<String> finalTags = tags;
 
             return fl.executeWithLock(spaceCode, ancestorId, filename, FILE_LOCK_TIMEOUT_MS, () -> {
                 if(fileService.exists(spaceCode, ancestorId, filename)) {
                     if(overwrite) {
                         OpenAIFile existingFile = fileService.getFile(spaceCode, ancestorId, filename);
                         if(existingFile != null) {
-                            return updateFile(existingFile.getId(), finalTmpFileInfo.getTmpFile(), filename,
+							// 对于更新操作，只更新文件内容，忽略description，cities，tags
+							OpenAIFile updatedFile = updateFile(existingFile.getId(), finalTmpFileInfo.getTmpFile(), filename,
                                     finalTmpFileInfo.getType(), finalTmpFileInfo.getMimeType(),
                                     finalTmpFileInfo.getExtension(), finalTmpFileInfo.getCharset(), metadata, purpose);
+
+							return updatedFile;
                         }
                     } else {
                         // fixme: may lead to unnecessary create temp file
@@ -120,8 +141,19 @@ public class FileController {
                     }
                 }
 
+				validateDescription(description);
+
+				// 将cities和tags转换为JSON格式字符串
+				String citiesJson = CollectionUtils.isEmpty(finalCities) ? "" : JsonUtils.toJson(finalCities);
+				String tagsJson = CollectionUtils.isEmpty(finalTags) ? "" : JsonUtils.toJson(finalTags);
+
+				// 校验citiesJson和tagsJson长度
+				validateCitiesJson(citiesJson);
+				validateTagsJson(tagsJson);
+
                 return fileService.uploadWithUrl(finalTmpFileInfo.getTmpFile(), finalTmpFileInfo.getType(), finalTmpFileInfo.getMimeType(),
-                        finalTmpFileInfo.getExtension(), finalTmpFileInfo.getCharset(), purpose, metadata, getUrl, expires, ancestorId, filename);
+					finalTmpFileInfo.getExtension(), finalTmpFileInfo.getCharset(), purpose, metadata, getUrl, expires, ancestorId, filename,
+					finalDescription, citiesJson, tagsJson);
             });
         } catch (IllegalArgumentException e) {
             throw e;
@@ -847,8 +879,9 @@ public class FileController {
         Assert.hasText(op.getName(), "name is required");
 
         validateDirectoryName(op.getName());
+		validateDescription(op.getDescription());
 
-        String spaceCode = BellaContextHelper.getOperateSpaceCode();
+		String spaceCode = BellaContextHelper.getOperateSpaceCode();
 
         return fl.executeWithLock(spaceCode, op.getAncestorId(), op.getName(), FILE_LOCK_TIMEOUT_MS, () -> {
             if(fileService.exists(spaceCode, op.getAncestorId(), op.getName())) {
@@ -856,11 +889,81 @@ public class FileController {
                         String.format("Directory '%s' already exists in current directory, ancestor_id: '%s'", op.getName(), op.getAncestorId()));
             }
 
-            return fileService.mkdir(op.getName(), op.getAncestorId());
+			return fileService.mkdir(op.getName(), op.getAncestorId(), op.getDescription());
         });
     }
 
-    @GetMapping("/find")
+	private static void validateDescription(String description) {
+		if(description != null) {
+			Assert.isTrue(description.length() <= MAX_DESCRIPTION_LENGTH,
+				String.format("Description too long: %d characters (max %d)",
+					description.length(), MAX_DESCRIPTION_LENGTH));
+		}
+	}
+
+	private static void validateCitiesJson(String citiesJson) {
+		if(citiesJson != null) {
+			Assert.isTrue(citiesJson.length() <= MAX_CITIES_JSON_LENGTH,
+				String.format("Cities JSON too long: %d characters (max %d)",
+					citiesJson.length(), MAX_CITIES_JSON_LENGTH));
+		}
+	}
+
+	private static void validateTagsJson(String tagsJson) {
+		if(tagsJson != null) {
+			Assert.isTrue(tagsJson.length() <= MAX_TAGS_JSON_LENGTH,
+				String.format("Tags JSON too long: %d characters (max %d)",
+					tagsJson.length(), MAX_TAGS_JSON_LENGTH));
+		}
+	}
+
+	/**
+	 * 根据space_code在根目录下查找文件
+	 *
+	 * @param spaceCode 空间代码
+	 * @param filename  文件名
+	 *
+	 * @return 如果文件存在返回文件实体，不存在抛出FileNotFoundException
+	 */
+	@GetMapping("/spaces/{spaceCode}/files")
+	public OpenAIFile getFileInSpace(
+		@PathVariable String spaceCode,
+		@RequestParam String filename) {
+		Assert.hasText(spaceCode, "space_code is required and cannot be empty");
+		Assert.hasText(filename, "filename is required and cannot be empty");
+
+		OpenAIFile file = fileService.getFileByNameInSpace(spaceCode, filename);
+		if(file != null) {
+			return file;
+		} else {
+			throw new FileNotFoundException("File not found: " + filename + " in space: " + spaceCode);
+		}
+	}
+
+	/**
+	 * 根据ancestor_id在第一层子目录中查找文件
+	 *
+	 * @param ancestorId 父级目录ID
+	 * @param filename   文件名
+	 *
+	 * @return 如果文件存在返回文件实体，不存在抛出FileNotFoundException
+	 */
+	@GetMapping("/files/{ancestorId}/children")
+	public OpenAIFile getChildFile(
+		@PathVariable String ancestorId,
+		@RequestParam String filename) {
+		Assert.hasText(ancestorId, "ancestor_id is required and cannot be empty");
+		Assert.hasText(filename, "filename is required and cannot be empty");
+
+		OpenAIFile file = fileService.getFileByNameInDirectory(ancestorId, filename);
+		if(file != null) {
+			return file;
+		} else {
+			throw new FileNotFoundException("File not found: " + filename + " in directory: " + ancestorId);
+		}
+	}
+
+	@GetMapping("/find")
     public OpenapiListResponse<OpenAIFile> find(
             @RequestParam(value = "space_code", required = false) String spaceCode,
             @RequestParam(value = "ancestor_id", required = false) String ancestorId) {
@@ -884,16 +987,216 @@ public class FileController {
         res.setHasMore(false);
         if(!files.isEmpty()) {
             res.setLastId(files.get(files.size() - 1).getId());
-        }
-        return res;
+		}
+		return res;
+	}
+
+	@PutMapping("/{fileId}/description")
+	public OpenAIFile updateDescription(
+		@PathVariable String fileId,
+		@RequestBody UpdateDescriptionOps op) {
+		Assert.hasText(fileId, "file_id is required");
+		Assert.notNull(op, "invalid request body");
+		Assert.notNull(op.getDescription(), "description is required");
+
+		validateDescription(op.getDescription());
+
+		OpenAIFile existingFile = fileService.getFile(fileId);
+		if(existingFile == null) {
+			throw new FileNotFoundException(fileId);
+		}
+
+		FileOps ops = FileOps.builder()
+			.fileId(fileId)
+			.description(op.getDescription())
+			.build();
+
+		return fileService.updateFile(ops, false, Scope.DESCRIPTION);
+	}
+
+	/**
+	 * 更新文件的城市信息
+	 *
+	 * @param fileId 文件ID
+	 * @param op     更新城市操作对象，包含新城市列表
+	 *
+	 * @return 更新后的文件对象
+	 *
+	 * @throws IllegalArgumentException 当请求体为空、文件ID为空、城市列表为空或城市总长度超过512字符时抛出
+	 * @throws FileNotFoundException    当指定的文件不存在时抛出
+	 */
+	@PutMapping("/{fileId}/cities")
+	public OpenAIFile updateCities(
+		@PathVariable String fileId,
+		@RequestBody UpdateCitiesOps op) {
+		Assert.hasText(fileId, "file_id is required");
+		Assert.notNull(op, "invalid request body");
+		Assert.notNull(op.getCities(), "cities is required");
+
+		// 计算所有city的总长度
+		int totalLength = op.getCities().stream().mapToInt(String::length).sum();
+		Assert.isTrue(totalLength <= 512, "cities total length cannot exceed 512 characters");
+
+		OpenAIFile existingFile = fileService.getFile(fileId);
+		if(existingFile == null) {
+			throw new FileNotFoundException(fileId);
+		}
+
+		FileOps ops = FileOps.builder()
+			.fileId(fileId)
+			.cities(op.getCities())
+			.build();
+
+		return fileService.updateFile(ops, true, Scope.CITIES);
+	}
+
+	/**
+	 * 更新文件的标签
+	 *
+	 * @param fileId 文件ID
+	 * @param op     更新标签操作对象，包含新标签列表
+	 *
+	 * @return 更新后的文件对象
+	 *
+	 * @throws IllegalArgumentException 当请求体为空、文件ID为空、标签为空或标签总长度超过512字符时抛出
+	 * @throws FileNotFoundException    当指定的文件不存在时抛出
+	 */
+	@PutMapping("/{fileId}/tags")
+	public OpenAIFile updateTags(
+		@PathVariable String fileId,
+		@RequestBody UpdateTagsOps op) {
+		Assert.hasText(fileId, "file_id is required");
+		Assert.notNull(op, "invalid request body");
+		Assert.notNull(op.getTags(), "tags is required");
+
+		// 计算所有tag的总长度（包括分隔符）
+		int totalLength = op.getTags().stream().mapToInt(String::length).sum();
+		Assert.isTrue(totalLength <= 512, "tags total length cannot exceed 512 characters");
+
+		OpenAIFile existingFile = fileService.getFile(fileId);
+		if(existingFile == null) {
+			throw new FileNotFoundException(fileId);
+		}
+
+		FileOps ops = FileOps.builder()
+			.fileId(fileId)
+			.tags(op.getTags())
+			.build();
+
+		return fileService.updateFile(ops, true, Scope.TAGS);
+	}
+
+	/**
+	 * 分页查询文件列表
+	 *
+	 * @param ops 分页查询操作对象，包含空间代码、父目录ID、分页参数等
+	 *
+	 * @return 分页结果，包含文件列表和分页信息
+	 *
+	 * @throws IllegalArgumentException 当请求体为空、分页参数无效、文件类型无效或排序参数无效时抛出
+	 */
+	@PostMapping("/page")
+	public Page<OpenAIFile> pageFiles(@RequestBody PageFileOps ops) {
+		Assert.notNull(ops, "invalid request body");
+
+		// 校验spaceCode和ancestorId至少提供一个
+		boolean hasSpaceCode = !StringUtils.isEmpty(ops.getSpaceCode());
+		boolean hasAncestorId = !StringUtils.isEmpty(ops.getAncestorId());
+		Assert.isTrue(hasSpaceCode || hasAncestorId, "either spaceCode or ancestorId must be provided");
+		Assert.isTrue(ops.getPageNo() >= 1, "pageNo must be greater than 0");
+		Assert.isTrue(ops.getPageSize() >= 1, "pageSize must be greater than 0");
+		Assert.isTrue(ops.getPageSize() <= 1000, "pageSize cannot exceed 1000");
+		Assert.isTrue("desc".equalsIgnoreCase(ops.getOrder()) || "asc".equalsIgnoreCase(ops.getOrder()),
+			"order must be 'desc' or 'asc', but got: " + ops.getOrder());
+
+		return fileService.pageFiles(ops);
+	}
+
+	@GetMapping("/count")
+	public int count(
+		@RequestParam(value = "ancestorId") String ancestorId,
+		@RequestParam(value = "type") String type) {
+		return fileService.count(ancestorId, type);
+	}
+
+	@PostMapping("/batch-count")
+	public List<FileCountInfo> batchCount(@RequestBody BatchCountOps ops) {
+		Assert.notNull(ops, "invalid request body");
+		Assert.notEmpty(ops.getAncestorIds(), "ancestor_ids is required and cannot be empty");
+		Assert.isTrue(ops.getAncestorIds().size() <= 100, "ancestor_ids size cannot exceed 100");
+		Assert.hasText(ops.getSpaceCode(), "space_code is required");
+
+		return fileService.batchCount(ops.getAncestorIds(), ops.getType(), ops.getSpaceCode());
     }
 
-    @GetMapping("/{file_id}/info")
+	@GetMapping("/{file_id}/info")
     public OpenAIFile info(@PathVariable("file_id") String fileId) {
         OpenAIFile file = fileService.getFile(fileId);
         if(file == null) {
-            throw new FileNotFoundException(fileId);
+			throw new FileNotFoundException(fileId);
+		}
+		return fileService.info(fileId);
+	}
+
+	/**
+	 * 移动文件到指定目录
+	 *
+	 * @param op 移动操作对象，包含文件ID列表和目标目录信息
+	 *
+	 * @return 移动后的文件列表
+	 *
+	 * @throws IllegalArgumentException 当请求体为空、文件ID列表为空、文件数量超过限制或目标目录参数无效时抛出
+	 */
+	@PostMapping("/move")
+	public List<OpenAIFile> move(@RequestBody MoveOps op) {
+		Assert.notNull(op, "invalid request body");
+		Assert.notEmpty(op.getFileIds(), "file_ids is required and cannot be empty");
+		Assert.isTrue(op.getFileIds().size() <= 1000, "file_ids size cannot exceed 1000");
+
+		// ancestor_id 和 space_code 不能同时为空
+		Assert.isTrue(StringUtils.isNotEmpty(op.getAncestorId()) || StringUtils.isNotEmpty(op.getSpaceCode()),
+			"either ancestor_id or space_code must be provided");
+
+		// 确定有效的spaceCode
+		String effectiveSpaceCode = determineEffectiveSpaceCode(op);
+
+		// 使用文件锁保证并发安全：对目标目录加锁
+		return executeWithTargetDirectoryLock(op.getAncestorId(), effectiveSpaceCode,
+			() -> fileService.moveFiles(op.getFileIds(), op.getAncestorId(), effectiveSpaceCode));
+	}
+
+	/**
+	 * 确定有效的spaceCode，按照优先级： 1. 如果ancestorId不为空，优先从ancestorId对应的文件获取spaceCode 2. 如果ancestorId为空，使用请求参数中的spaceCode
+	 */
+	private String determineEffectiveSpaceCode(MoveOps op) {
+		// 如果提供了ancestorId，从文件中获取spaceCode
+		if(StringUtils.isNotEmpty(op.getAncestorId())) {
+			OpenAIFile ancestorFile = fileService.getFile(op.getAncestorId());
+			Assert.notNull(ancestorFile, "Target directory not found: " + op.getAncestorId());
+			Assert.isTrue(ancestorFile.getIsDir(), "Target must be a directory: " + op.getAncestorId());
+			return ancestorFile.getSpaceCode();
+		}
+
+		// 如果ancestorId为空，使用请求参数中的spaceCode
+		return op.getSpaceCode();
+	}
+
+	/**
+	 * 为目标目录执行文件锁保护的操作
+	 */
+	private <T> T executeWithTargetDirectoryLock(String ancestorId, String spaceCode, Supplier<T> operation) {
+		try {
+			// 对目标目录加锁，锁定目标目录下的操作
+			// 使用一个虚拟的filename来表示目录级别的锁
+			String lockKey = "__DIRECTORY_MOVE_LOCK__";
+			return fl.executeWithLock(spaceCode, ancestorId, lockKey, FILE_LOCK_TIMEOUT_MS, operation);
+		} catch (IllegalArgumentException e) {
+			throw e;
+		} catch (Exception e) {
+			LOGGER.error("File move failed, ancestor_id: {}, space_code: {}, error: {}",
+				ancestorId, spaceCode, e.getMessage(), e);
+            throw new IllegalStateException("File move failed", e);
         }
-        return fileService.info(fileId);
     }
+
 }

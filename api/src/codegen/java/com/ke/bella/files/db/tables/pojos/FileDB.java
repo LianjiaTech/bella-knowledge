@@ -43,6 +43,9 @@ public class FileDB implements Operator, Serializable {
     private Long          broadcastStatus;
     private String        domTreeFileId;
     private String        pdfFileId;
+	private String description;
+	private String cities;
+	private String tags;
 
     public FileDB() {}
 
@@ -72,6 +75,9 @@ public class FileDB implements Operator, Serializable {
         this.broadcastStatus = value.broadcastStatus;
         this.domTreeFileId = value.domTreeFileId;
         this.pdfFileId = value.pdfFileId;
+		this.description = value.description;
+		this.cities = value.cities;
+		this.tags = value.tags;
     }
 
     public FileDB(
@@ -99,7 +105,10 @@ public class FileDB implements Operator, Serializable {
         String        akCode,
         Long          broadcastStatus,
         String        domTreeFileId,
-        String        pdfFileId
+		String pdfFileId,
+		String description,
+		String cities,
+		String tags
     ) {
         this.id = id;
         this.fileId = fileId;
@@ -126,6 +135,9 @@ public class FileDB implements Operator, Serializable {
         this.broadcastStatus = broadcastStatus;
         this.domTreeFileId = domTreeFileId;
         this.pdfFileId = pdfFileId;
+		this.description = description;
+		this.cities = cities;
+		this.tags = tags;
     }
 
     /**
@@ -478,6 +490,48 @@ public class FileDB implements Operator, Serializable {
         this.pdfFileId = pdfFileId;
     }
 
+	/**
+	 * Getter for <code>file.description</code>. 描述
+	 */
+	public String getDescription() {
+		return this.description;
+	}
+
+	/**
+	 * Setter for <code>file.description</code>. 描述
+	 */
+	public void setDescription(String description) {
+		this.description = description;
+	}
+
+	/**
+	 * Getter for <code>file.cities</code>. 作用城市,示例["北京","上海"]
+	 */
+	public String getCities() {
+		return this.cities;
+	}
+
+	/**
+	 * Setter for <code>file.cities</code>. 作用城市,示例["北京","上海"]
+	 */
+	public void setCities(String cities) {
+		this.cities = cities;
+	}
+
+	/**
+	 * Getter for <code>file.tags</code>. 标签,示例["tag1","tag2"]
+	 */
+	public String getTags() {
+		return this.tags;
+	}
+
+	/**
+	 * Setter for <code>file.tags</code>. 标签,示例["tag1","tag2"]
+	 */
+	public void setTags(String tags) {
+		this.tags = tags;
+	}
+
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder("FileDB (");
@@ -507,6 +561,9 @@ public class FileDB implements Operator, Serializable {
         sb.append(", ").append(broadcastStatus);
         sb.append(", ").append(domTreeFileId);
         sb.append(", ").append(pdfFileId);
+		sb.append(", ").append(description);
+		sb.append(", ").append(cities);
+		sb.append(", ").append(tags);
 
         sb.append(")");
         return sb.toString();

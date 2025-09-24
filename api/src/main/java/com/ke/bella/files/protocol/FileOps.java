@@ -1,5 +1,7 @@
 package com.ke.bella.files.protocol;
 
+import java.util.List;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -23,4 +25,7 @@ public class FileOps {
     private String extension;
     private String path;
     private Long bytes;
+	private String description;
+	private List<String> cities;
+	private List<String> tags;
 }

@@ -5,11 +5,13 @@ import static com.ke.bella.files.db.Tables.FILE_CLOSURE;
 import static com.ke.bella.files.db.Tables.FILE_MAPPING;
 import static com.ke.bella.files.db.Tables.FILE_PROGRESS;
 import static com.ke.bella.files.db.repo.DSLContextHolder.targetTableName;
+import static org.jooq.impl.DSL.count;
 import static org.jooq.impl.DSL.field;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -23,6 +25,8 @@ import org.jooq.DSLContext;
 import org.jooq.InsertSetMoreStep;
 import org.jooq.Record;
 import org.jooq.Record1;
+import org.jooq.Condition;
+import org.jooq.SortField;
 import org.jooq.SelectConditionStep;
 import org.jooq.SelectOrderByStep;
 import org.jooq.UpdateSetMoreStep;
@@ -40,8 +44,12 @@ import com.ke.bella.files.protocol.FileException.FileNotFoundException;
 import com.ke.bella.files.protocol.FileOps;
 import com.ke.bella.files.protocol.FileStatus;
 import com.ke.bella.files.protocol.ListFileOps;
+import com.ke.bella.files.protocol.Page;
+import com.ke.bella.files.protocol.PageFileOps;
+import com.ke.bella.files.protocol.FileCountInfo;
 import com.ke.bella.files.utils.BellaContextHelper;
 import com.ke.bella.files.utils.CustomStringUtils;
+import com.ke.bella.files.utils.JsonUtils;
 
 @Component
 public class FileRepo implements BaseRepo {
@@ -212,6 +220,15 @@ public class FileRepo implements BaseRepo {
         if(op.getBytes() != null) {
             rec.setBytes(op.getBytes());
         }
+		if(op.getDescription() != null) {
+			rec.setDescription(op.getDescription());
+		}
+		if(op.getCities() != null) {
+			rec.setCities(JsonUtils.toJson(op.getCities()));
+		}
+		if(op.getTags() != null) {
+			rec.setTags(JsonUtils.toJson(op.getTags()));
+		}
 
         fillUpdatorInfo(rec);
 
@@ -466,5 +483,429 @@ public class FileRepo implements BaseRepo {
                 .map(record -> record.getValue(FILE_CLOSURE.ANCESTOR_ID))
                 .orElse(null);
 
+	}
+
+	public Page<FileDB> pageFiles(PageFileOps ops) {
+		String shardingKey;
+		if(StringUtils.isNotEmpty(ops.getAncestorId())) {
+			shardingKey = getShardingKeyByFileId(ops.getAncestorId());
+		} else {
+			shardingKey = getShardingKeyBySpaceCode(ops.getSpaceCode());
+		}
+
+		// 共用的 where 条件
+		Condition whereCondition = buildWhereCondition(ops);
+
+		// 数据查询与计数查询共用 from/join 结构
+		SelectConditionStep<Record> baseQuery = db(shardingKey).select(FILE.fields())
+			.from(FILE_CLOSURE)
+			.innerJoin(FILE)
+			.on(FILE_CLOSURE.DESCENDANT_ID.eq(FILE.FILE_ID))
+			.where(whereCondition);
+
+		SelectConditionStep<Record1<Integer>> countQuery = db(shardingKey).select(count())
+			.from(FILE_CLOSURE)
+			.innerJoin(FILE)
+			.on(FILE_CLOSURE.DESCENDANT_ID.eq(FILE.FILE_ID))
+			.where(whereCondition);
+
+		Long totalResult = countQuery.fetchOneInto(Long.class);
+		long total = totalResult != null ? totalResult : 0L;
+
+		boolean isAsc = "asc".equalsIgnoreCase(ops.getOrder());
+		SortField<?> ctimeOrder = isAsc ? FILE.CTIME.asc() : FILE.CTIME.desc();
+
+		List<FileDB> records = baseQuery
+			.orderBy(FILE.IS_DIR.desc(), ctimeOrder)
+			.limit(ops.getPageSize())
+			.offset((ops.getPageNo() - 1) * ops.getPageSize())
+			.fetchInto(FileDB.class);
+
+		long pages = (total + ops.getPageSize() - 1) / ops.getPageSize();
+
+		return Page.<FileDB>builder()
+			.pageNo(ops.getPageNo())
+			.pageSize(ops.getPageSize())
+			.total(total)
+			.pages(pages)
+			.records(records)
+			.build();
+	}
+
+	/**
+	 * 构造分页查询的通用 where 条件，供数据查询与计数查询复用。
+	 */
+	private Condition buildWhereCondition(PageFileOps ops) {
+		Condition condition = FILE.STATUS.eq(FileStatus.NOT_DELETED.getValue());
+
+		// 作用域：ancestorId 指定目录的直系子节点；否则为 spaceCode 根层
+		if(StringUtils.isNotEmpty(ops.getAncestorId())) {
+			condition = condition
+				.and(FILE_CLOSURE.ANCESTOR_ID.eq(ops.getAncestorId()))
+				.and(FILE_CLOSURE.DEPTH.eq(1L));
+		} else {
+			condition = condition
+				.and(FILE.SPACE_CODE.eq(ops.getSpaceCode()))
+				.and(FILE_CLOSURE.SPACE_CODE.eq(ops.getSpaceCode()))
+				.and(FILE_CLOSURE.ROOT_DEPTH.eq(1L));
+		}
+
+		// 基础过滤项
+		if(StringUtils.isNotEmpty(ops.getPurpose())) {
+			condition = condition.and(FILE.PURPOSE.eq(ops.getPurpose()));
+		}
+		if(StringUtils.isNotEmpty(ops.getFilename())) {
+			condition = condition.and(FILE.FILENAME.like(ops.getFilename() + "%"));
+		}
+
+		// 类型过滤
+		if(StringUtils.isNotBlank(ops.getType())) {
+			switch (ops.getType()) {
+			case "directory":
+				condition = condition.and(FILE.IS_DIR.eq(1));
+				break;
+			case "file":
+				condition = condition.and(FILE.IS_DIR.eq(0));
+			default:
+				break;
+			}
+		}
+
+		// 标签过滤（任一匹配）
+		if(!CollectionUtils.isEmpty(ops.getTags())) {
+			condition = condition.and(FILE.TAGS.isNotNull())
+				.and(buildContainsAnyCondition(FILE.TAGS, ops.getTags()));
+		}
+
+		// 城市过滤（任一匹配）
+		if(!CollectionUtils.isEmpty(ops.getCities())) {
+			condition = condition.and(FILE.CITIES.isNotNull())
+				.and(buildContainsAnyCondition(FILE.CITIES, ops.getCities()));
+		}
+
+		// 创建/更新人过滤
+		if(ops.getCuid() != null) {
+			condition = condition.and(FILE.CUID.eq(ops.getCuid()));
+		}
+		if(ops.getMuid() != null) {
+			condition = condition.and(FILE.MUID.eq(ops.getMuid()));
+		}
+
+		return condition;
+	}
+
+	/**
+	 * 构造 JSON/文本字段 contains 任一值的 OR 条件。
+	 */
+	private Condition buildContainsAnyCondition(org.jooq.Field<String> field, List<String> values) {
+		Condition orCondition = null;
+		for (String value : values) {
+			Condition single = field.contains(value);
+			orCondition = (orCondition == null) ? single : orCondition.or(single);
+		}
+		return orCondition;
+	}
+
+	public int countFiles(String ancestorId, String type) {
+		String shardingKey = getShardingKeyByFileId(ancestorId);
+
+		SelectConditionStep<Record1<Integer>> countQuery = db(shardingKey).select(count())
+			.from(FILE_CLOSURE)
+			.innerJoin(FILE)
+			.on(FILE_CLOSURE.DESCENDANT_ID.eq(FILE.FILE_ID))
+			.where(FILE.STATUS.eq(FileStatus.NOT_DELETED.getValue()))
+			.and(FILE_CLOSURE.ANCESTOR_ID.eq(ancestorId))
+			.and(FILE_CLOSURE.DEPTH.eq(1L));
+
+		if(StringUtils.isNotBlank(type)) {
+			switch (type) {
+			case "directory":
+				countQuery = countQuery.and(FILE.IS_DIR.eq(1));
+				break;
+			case "file":
+				countQuery = countQuery.and(FILE.IS_DIR.eq(0));
+			default:
+				break;
+			}
+		}
+		Integer result = countQuery.fetchOneInto(Integer.class);
+		return result != null ? result : 0;
+	}
+
+	public List<FileCountInfo> batchCountFiles(List<String> ancestorIds, String type, String spaceCode) {
+		if(CollectionUtils.isEmpty(ancestorIds)) {
+			return Collections.emptyList();
+		}
+
+		String shardingKey = getShardingKeyBySpaceCode(spaceCode);
+
+		SelectConditionStep<org.jooq.Record2<String, Integer>> countQuery = db(shardingKey)
+			.select(FILE_CLOSURE.ANCESTOR_ID, count().as("file_count"))
+			.from(FILE_CLOSURE)
+			.innerJoin(FILE)
+			.on(FILE_CLOSURE.DESCENDANT_ID.eq(FILE.FILE_ID))
+			.where(FILE.STATUS.eq(FileStatus.NOT_DELETED.getValue()))
+			.and(FILE_CLOSURE.ANCESTOR_ID.in(ancestorIds))
+			.and(FILE_CLOSURE.DEPTH.eq(1L));
+
+		if(StringUtils.isNotBlank(type)) {
+			switch (type) {
+			case "directory":
+				countQuery = countQuery.and(FILE.IS_DIR.eq(1));
+				break;
+			case "file":
+				countQuery = countQuery.and(FILE.IS_DIR.eq(0));
+				break;
+			default:
+				break;
+			}
+		}
+
+		Map<String, Integer> countMap = countQuery
+			.groupBy(FILE_CLOSURE.ANCESTOR_ID)
+			.fetchMap(FILE_CLOSURE.ANCESTOR_ID, field("file_count", Integer.class));
+
+		return ancestorIds.stream()
+			.map(ancestorId -> new FileCountInfo(ancestorId, countMap.getOrDefault(ancestorId, 0)))
+			.collect(Collectors.toList());
+	}
+
+	/**
+	 * 批量检查目标ID是否是指定目录列表中任一目录的后代
+	 *
+	 * @param targetId 目标ID（要检查的节点）
+	 * @param dirIds   目录ID列表（祖先候选列表）
+	 *
+	 * @return 包含targetId作为后代的目录ID集合
+	 */
+	public List<String> batchCheckTargetAsDescendant(String targetId, List<String> dirIds) {
+		if(dirIds.isEmpty() || targetId == null) {
+			return Collections.emptyList();
+		}
+
+		targetId = queryNewFileId(targetId);
+		List<String> normalizedDirIds = dirIds.stream()
+			.map(this::queryNewFileId)
+			.collect(Collectors.toList());
+
+		String shardingKey = getShardingKeyByFileId(targetId);
+
+		return db(shardingKey).select(FILE_CLOSURE.ANCESTOR_ID)
+			.from(FILE_CLOSURE)
+			.where(FILE_CLOSURE.DESCENDANT_ID.eq(targetId))
+			.and(FILE_CLOSURE.ANCESTOR_ID.in(normalizedDirIds))
+			.fetchInto(String.class);
+	}
+
+	/**
+	 * 批量获取文件的直接父目录ID
+	 *
+	 * @param spaceCode 空间编码
+	 * @param fileIds   文件ID列表
+	 *
+	 * @return 文件ID到父目录ID的映射
+	 */
+	public Map<String, String> batchGetDirectAncestorIds(String spaceCode, List<String> fileIds) {
+		if(fileIds.isEmpty()) {
+			return Collections.emptyMap();
+		}
+
+		List<String> normalizedFileIds = fileIds.stream()
+			.map(this::queryNewFileId)
+			.collect(Collectors.toList());
+
+		String shardingKey = getShardingKeyBySpaceCode(spaceCode);
+
+		Map<String, String> result = new HashMap<>();
+
+		db(shardingKey).select(FILE_CLOSURE.DESCENDANT_ID, FILE_CLOSURE.ANCESTOR_ID)
+			.from(FILE_CLOSURE)
+			.where(FILE_CLOSURE.DESCENDANT_ID.in(normalizedFileIds))
+			.and(FILE_CLOSURE.DEPTH.eq(1L))
+			.fetch()
+			.forEach(record -> {
+				String descendantId = record.getValue(FILE_CLOSURE.DESCENDANT_ID);
+				String ancestorId = record.getValue(FILE_CLOSURE.ANCESTOR_ID);
+				result.put(descendantId, ancestorId);
+			});
+
+		return result;
+	}
+
+	/**
+	 * 批量检查目标目录下是否存在指定文件名的文件
+	 *
+	 * @param spaceCode        空间编码
+	 * @param targetAncestorId 目标父目录ID
+	 * @param filenames        要检查的文件名列表
+	 *
+	 * @return 存在的文件名列表
+	 */
+	public List<String> batchCheckExistingFilenames(String spaceCode, String targetAncestorId, List<String> filenames) {
+		if(filenames.isEmpty()) {
+			return Collections.emptyList();
+		}
+
+		String shardingKey = getShardingKeyBySpaceCode(spaceCode);
+
+		SelectConditionStep<Record1<String>> query = db(shardingKey)
+			.select(FILE.FILENAME)
+			.from(FILE_CLOSURE)
+			.innerJoin(FILE)
+			.on(FILE_CLOSURE.DESCENDANT_ID.eq(FILE.FILE_ID))
+			.where(FILE.FILENAME.in(filenames))
+			.and(FILE_CLOSURE.SPACE_CODE.eq(spaceCode))
+			.and(FILE.STATUS.eq(FileStatus.NOT_DELETED.getValue()));
+
+		if(StringUtils.isEmpty(targetAncestorId)) {
+			query.and(FILE_CLOSURE.ROOT_DEPTH.eq(1L));
+		} else {
+			query.and(FILE_CLOSURE.ANCESTOR_ID.eq(targetAncestorId))
+				.and(FILE_CLOSURE.DEPTH.eq(1L));
+		}
+
+		return query.fetchInto(String.class);
+	}
+
+	/**
+	 * 将以fileId为根的子树移动到新的父节点下 该操作通过更新闭包表实现： 1) 删除旧祖先节点到子树中所有后代节点的路径 2) 插入新祖先链到子树中所有后代节点的路径 3) 重新计算子树中所有节点的ROOT_DEPTH
+	 * <p>
+	 * 调用此方法前必须验证以下约束： - newAncestorId为null（移动到根目录）或指向一个目录 - newAncestorId不在fileId的子树内 - 空间编码必须相同
+	 */
+	@Transactional(rollbackFor = Exception.class)
+	public void moveSubtree(String fileId, String newAncestorId) {
+		MoveSubtreeContext context = validateAndPrepareMove(fileId, newAncestorId);
+
+		deleteOldClosureRows(context);
+		insertNewClosureRows(context);
+		updateRootDepths(context);
+	}
+
+	private MoveSubtreeContext validateAndPrepareMove(String fileId, String newAncestorId) {
+		fileId = queryNewFileId(fileId);
+		String shardingKey = getShardingKeyByFileId(fileId);
+		DSLContext dsl = db(shardingKey);
+
+		String targetAncestorId = StringUtils.isEmpty(newAncestorId) ? null : queryNewFileId(newAncestorId);
+
+		FileDB movingFile = dsl.selectFrom(FILE)
+			.where(FILE.FILE_ID.eq(fileId).and(FILE.STATUS.eq(FileStatus.NOT_DELETED.getValue())))
+			.fetchOneInto(FileDB.class);
+		Assert.notNull(movingFile, "file not found: " + fileId);
+		String spaceCode = movingFile.getSpaceCode();
+
+		List<FileClosureRecord> targetAncestorChain = new ArrayList<>();
+		int targetChainLength = 0;
+		if(targetAncestorId != null) {
+			FileDB targetFile = dsl.selectFrom(FILE)
+				.where(FILE.FILE_ID.eq(targetAncestorId).and(FILE.STATUS.eq(FileStatus.NOT_DELETED.getValue())))
+				.fetchOneInto(FileDB.class);
+			Assert.notNull(targetFile, "target ancestor not found: " + targetAncestorId);
+			Assert.isTrue(targetFile.getIsDir() != null && targetFile.getIsDir() == 1, "target must be a directory: " + targetAncestorId);
+			Assert.isTrue(StringUtils.equals(targetFile.getSpaceCode(), spaceCode), "space mismatch");
+
+			targetAncestorChain = dsl.selectFrom(FILE_CLOSURE)
+				.where(FILE_CLOSURE.DESCENDANT_ID.eq(targetAncestorId))
+				.orderBy(FILE_CLOSURE.DEPTH.asc())
+				.fetchInto(FileClosureRecord.class);
+			targetChainLength = targetAncestorChain.size();
+		}
+
+		List<FileClosureRecord> subtree = dsl.selectFrom(FILE_CLOSURE)
+			.where(FILE_CLOSURE.ANCESTOR_ID.eq(fileId))
+			.orderBy(FILE_CLOSURE.DEPTH.asc())
+			.fetchInto(FileClosureRecord.class);
+		Assert.isTrue(!subtree.isEmpty(), "subtree not found in file_closure, ancestor_id: " + fileId);
+
+		List<String> descendantIds = subtree.stream().map(FileClosureRecord::getDescendantId).collect(Collectors.toList());
+
+		return new MoveSubtreeContext(dsl, fileId, targetAncestorId, spaceCode,
+			targetAncestorChain, targetChainLength, subtree, descendantIds);
+	}
+
+	private void deleteOldClosureRows(MoveSubtreeContext context) {
+		context.dsl.delete(FILE_CLOSURE)
+			.where(FILE_CLOSURE.DESCENDANT_ID.in(context.descendantIds))
+			.and(FILE_CLOSURE.ANCESTOR_ID.in(
+				context.dsl.select(FILE_CLOSURE.ANCESTOR_ID)
+					.from(FILE_CLOSURE)
+					.where(FILE_CLOSURE.DESCENDANT_ID.eq(context.fileId)
+						.and(FILE_CLOSURE.DEPTH.gt(0L)))))
+			.execute();
+	}
+
+	private void insertNewClosureRows(MoveSubtreeContext context) {
+		if(context.targetAncestorId == null) {
+			return;
+		}
+
+		List<InsertSetMoreStep<FileClosureRecord>> inserts = new ArrayList<>();
+		for (FileClosureRecord targetAncestor : context.targetAncestorChain) {
+			String ancestor = targetAncestor.getAncestorId();
+			long depthToTarget = targetAncestor.getDepth();
+
+			for (FileClosureRecord sub : context.subtree) {
+				String descendant = sub.getDescendantId();
+				long relDepth = sub.getDepth();
+
+				FileClosureRecord rec = FILE_CLOSURE.newRecord();
+				rec.setSpaceCode(context.spaceCode);
+				rec.setAncestorId(ancestor);
+				rec.setDescendantId(descendant);
+				rec.setDepth(depthToTarget + 1 + relDepth);
+				rec.setRootDepth(-1L);
+				fillCreatorInfo(rec);
+
+				inserts.add(context.dsl.insertInto(FILE_CLOSURE).set(rec));
+			}
+		}
+		if(!inserts.isEmpty()) {
+			int[] results = context.dsl.batch(inserts).execute();
+			if(results.length != inserts.size()) {
+				throw new IllegalStateException("batch insert file_closure failed for move, fileId: " + context.fileId);
+			}
+		}
+	}
+
+	private void updateRootDepths(MoveSubtreeContext context) {
+		List<org.jooq.Query> updates = new ArrayList<>();
+		for (FileClosureRecord sub : context.subtree) {
+			String descendant = sub.getDescendantId();
+			long relDepth = sub.getDepth();
+			long newRootDepth = (long) (context.targetChainLength + 1 + relDepth);
+			updates.add(
+				context.dsl.update(FILE_CLOSURE)
+					.set(FILE_CLOSURE.ROOT_DEPTH, newRootDepth)
+					.where(FILE_CLOSURE.ANCESTOR_ID.eq(descendant)
+						.and(FILE_CLOSURE.DESCENDANT_ID.eq(descendant)))
+			);
+		}
+		if(!updates.isEmpty()) {
+			context.dsl.batch(updates).execute();
+		}
+	}
+
+	private static class MoveSubtreeContext {
+		final DSLContext dsl;
+		final String fileId;
+		final String targetAncestorId;
+		final String spaceCode;
+		final List<FileClosureRecord> targetAncestorChain;
+		final int targetChainLength;
+		final List<FileClosureRecord> subtree;
+		final List<String> descendantIds;
+
+		MoveSubtreeContext(DSLContext dsl, String fileId, String targetAncestorId, String spaceCode,
+			List<FileClosureRecord> targetAncestorChain, int targetChainLength,
+			List<FileClosureRecord> subtree, List<String> descendantIds) {
+			this.dsl = dsl;
+			this.fileId = fileId;
+			this.targetAncestorId = targetAncestorId;
+			this.spaceCode = spaceCode;
+			this.targetAncestorChain = targetAncestorChain;
+			this.targetChainLength = targetChainLength;
+			this.subtree = subtree;
+			this.descendantIds = descendantIds;
+		}
     }
 }

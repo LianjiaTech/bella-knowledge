@@ -28,6 +28,7 @@ public class FileSystemOps {
     public static class MkdirOp {
         private String ancestorId;
         private String name;
+		private String description;
     }
 
     @Data

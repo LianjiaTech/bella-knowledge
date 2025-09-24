@@ -371,6 +371,48 @@ public class FileRecord extends UpdatableRecordImpl<FileRecord> implements Opera
         return (String) get(24);
     }
 
+	/**
+	 * Setter for <code>file.description</code>. 描述
+	 */
+	public void setDescription(String value) {
+		set(25, value);
+	}
+
+	/**
+	 * Getter for <code>file.description</code>. 描述
+	 */
+	public String getDescription() {
+		return (String) get(25);
+	}
+
+	/**
+	 * Setter for <code>file.cities</code>. 作用城市,示例["北京","上海"]
+	 */
+	public void setCities(String value) {
+		set(26, value);
+	}
+
+	/**
+	 * Getter for <code>file.cities</code>. 作用城市,示例["北京","上海"]
+	 */
+	public String getCities() {
+		return (String) get(26);
+	}
+
+	/**
+	 * Setter for <code>file.tags</code>. 标签,示例["tag1","tag2"]
+	 */
+	public void setTags(String value) {
+		set(27, value);
+	}
+
+	/**
+	 * Getter for <code>file.tags</code>. 标签,示例["tag1","tag2"]
+	 */
+	public String getTags() {
+		return (String) get(27);
+	}
+
     // -------------------------------------------------------------------------
     // Primary key information
     // -------------------------------------------------------------------------
@@ -394,7 +436,10 @@ public class FileRecord extends UpdatableRecordImpl<FileRecord> implements Opera
     /**
      * Create a detached, initialised FileRecord
      */
-    public FileRecord(Long id, String fileId, Long version, String filename, Integer isDir, String extension, String mimeType, String type, String bucket, String path, Long bytes, String spaceCode, String purpose, Long cuid, String cuName, LocalDateTime ctime, Long muid, String muName, LocalDateTime mtime, String metaData, Integer status, String akCode, Long broadcastStatus, String domTreeFileId, String pdfFileId) {
+	public FileRecord(Long id, String fileId, Long version, String filename, Integer isDir, String extension, String mimeType, String type,
+		String bucket, String path, Long bytes, String spaceCode, String purpose, Long cuid, String cuName, LocalDateTime ctime, Long muid,
+		String muName, LocalDateTime mtime, String metaData, Integer status, String akCode, Long broadcastStatus, String domTreeFileId,
+		String pdfFileId, String description, String cities, String tags) {
         super(File.FILE);
 
         setId(id);
@@ -422,5 +467,8 @@ public class FileRecord extends UpdatableRecordImpl<FileRecord> implements Opera
         setBroadcastStatus(broadcastStatus);
         setDomTreeFileId(domTreeFileId);
         setPdfFileId(pdfFileId);
+		setDescription(description);
+		setCities(cities);
+		setTags(tags);
     }
 }
