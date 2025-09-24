@@ -519,6 +519,17 @@ public class FileService {
         return result.toBuilder().path(pathBuilder.toString()).build();
     }
 
+    public OpenAIFile getFileWithPath(String fileId, OpenAIFile file) {
+        List<FileDB> pathFiles = fileRepo.getPathFiles(fileId);
+        StringBuilder pathBuilder = new StringBuilder();
+        for (FileDB pathFile : pathFiles) {
+            pathBuilder.append("/");
+            pathBuilder.append(pathFile.getFilename());
+        }
+        
+        return file.toBuilder().path(pathBuilder.toString()).build();
+    }
+
     public String getDirectAncestorId(String fileId) {
         return fileRepo.getDirectAncestorId(fileId);
     }
