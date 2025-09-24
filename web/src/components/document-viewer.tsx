@@ -698,22 +698,20 @@ const KeywordSearch: React.FC<{
 };
 
 export interface DocumentViewerRef {
-  scrollToNode: (path: number[]) => void;
-  highlightNode: (path: number[]) => void;
   scrollToAndHighlightNode: (path: number[]) => void;
 }
 
 interface DocumentViewerProps {
   fileId: string;
-  onClickNode: (node: DocumentNode) => void;
-  onDoubleClickNode?: (node: DocumentNode) => void;
   showOutline?: boolean;
   className?: string;
+  onClickNode?: (node: DocumentNode) => void;
+  onDoubleClickNode?: (node: DocumentNode) => void;
 }
 
 const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
   function DocumentViewer(
-    { fileId, onClickNode, onDoubleClickNode, showOutline = true, className },
+    { fileId, showOutline = true, className, onClickNode, onDoubleClickNode },
     ref,
   ) {
     const [highlightedNode, setHighlightedNode] = useState<DocumentNode | null>(
@@ -731,6 +729,7 @@ const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
     const fileDomData = useRef<{ fileId: string; data: DocumentData }[]>([]);
     const altKeyRef = useRef(false);
     const containerRef = useRef<HTMLDivElement | null>(null);
+    const scrollNode = useRef<number[]>([]);
     const [searchKeyword, setSearchKeyword] = useState("");
     useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
@@ -864,31 +863,30 @@ const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
         setData(data);
         setError(false);
         fileDomData.current.push({ fileId, data });
+        if (scrollNode.current.length > 0) {
+          const path = scrollNode.current;
+          const node = findNodeByPath(data.children || [], path);
+          if (node) {
+            setHighlightedNode(node);
+            setTimeout(() => {
+              const element = nodeRefs.current.get(path.join("-"));
+              if (element) {
+                element.scrollIntoView({
+                  behavior: "smooth",
+                  block: "center",
+                });
+              }
+            }, 100);
+          }
+          scrollNode.current = [];
+        }
       } catch {
         setMessage("获取文档内容失败");
         setError(true);
         setData(null);
       }
     };
-
     useImperativeHandle(ref, () => ({
-      scrollToNode: (path: number[]) => {
-        const element = nodeRefs.current.get(path.join("-"));
-        if (element) {
-          element.scrollIntoView({
-            behavior: "smooth",
-            block: "center",
-          });
-        }
-      },
-      highlightNode: (path: number[]) => {
-        if (data) {
-          const node = findNodeByPath(data.children || [], path);
-          if (node) {
-            setHighlightedNode(node);
-          }
-        }
-      },
       scrollToAndHighlightNode: (path: number[]) => {
         if (data) {
           const node = findNodeByPath(data.children || [], path);
@@ -904,6 +902,8 @@ const DocumentViewer = forwardRef<DocumentViewerRef, DocumentViewerProps>(
               }
             }, 100);
           }
+        } else {
+          scrollNode.current = path;
         }
       },
     }));

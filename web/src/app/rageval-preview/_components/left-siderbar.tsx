@@ -114,6 +114,7 @@ export function LeftSidebar({
                     }`}
                     key={index}
                     onClick={() => {
+                      // console.log(item);
                       setSelectedRagevalData(item);
                     }}
                   >

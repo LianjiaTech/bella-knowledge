@@ -29,12 +29,12 @@ import {
   SelectLabel,
   SelectTrigger,
   SelectValue,
+  SelectGroup,
 } from "@/components/ui/select";
 import { KnowledgeFile } from "@/lib/types/file";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { SelectGroup } from "@radix-ui/react-select";
 
 interface DataTableProps<TValue> {
   columns: ColumnDef<KnowledgeFile, TValue>[];
@@ -45,7 +45,7 @@ interface DataTableProps<TValue> {
 
 export function DataTable<TValue>({
   columns,
-  data,
+  data = [],
   tableLoading,
   onClickRow,
 }: DataTableProps<TValue>) {
@@ -82,6 +82,7 @@ export function DataTable<TValue>({
       columnFilters,
       sorting,
     },
+    enableMultiRowSelection: false,
     onColumnFiltersChange: setColumnFilters,
     getFilteredRowModel: getFilteredRowModel(),
     getCoreRowModel: getCoreRowModel(),
@@ -211,7 +212,8 @@ export function DataTable<TValue>({
                   key={row.id}
                   className="cursor-pointer h-12"
                   data-state={row.getIsSelected() && "selected"}
-                  onClick={() => onClickRow(row.original)}
+                  onClick={() => row.toggleSelected()}
+                  onDoubleClick={() => onClickRow(row.original)}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id} className="text-base">

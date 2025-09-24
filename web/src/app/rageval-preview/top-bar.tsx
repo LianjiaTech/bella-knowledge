@@ -12,7 +12,7 @@ export default function TopBar() {
         <ArrowLeft
           className="cursor-pointer"
           onClick={() => {
-            router.push("/admin?tab=qa");
+            router.push("/admin/files");
           }}
         />
         <div className="flex flex-col">
