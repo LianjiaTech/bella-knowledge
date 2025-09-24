@@ -1,6 +1,9 @@
 package com.ke.bella.files.service;
 
-import static com.ke.bella.files.db.IDGenerator.FILE_ID_GENERATOR;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
 import java.time.ZoneId;
@@ -8,18 +11,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-
 import javax.annotation.PostConstruct;
-
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.util.Assert;
-
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.ke.bella.files.utils.JsonUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-
+import org.springframework.util.Assert;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.ke.bella.files.FileShardingCountUpdator;
 import com.ke.bella.files.TaskExecutor;
 import com.ke.bella.files.configuration.BucketConfig;
@@ -30,6 +28,7 @@ import com.ke.bella.files.enums.FileType;
 import com.ke.bella.files.protocol.BroadcastStatus;
 import com.ke.bella.files.protocol.EventType;
 import com.ke.bella.files.protocol.FileBroadcasting;
+import com.ke.bella.files.protocol.FileCountInfo;
 import com.ke.bella.files.protocol.FileException.FileNotFoundException;
 import com.ke.bella.files.protocol.FileOps;
 import com.ke.bella.files.protocol.FileStatus;
@@ -40,16 +39,13 @@ import com.ke.bella.files.protocol.PageFileOps;
 import com.ke.bella.files.protocol.Progress;
 import com.ke.bella.files.protocol.Scope;
 import com.ke.bella.files.protocol.UpdateProgressRequestData;
-import com.ke.bella.files.protocol.FileCountInfo;
 import com.ke.bella.files.service.broadcast.BroadcastService;
 import com.ke.bella.files.service.storage.StorageService;
 import com.ke.bella.files.utils.BellaContextHelper;
 import com.ke.bella.files.utils.FilePurposeClassifier;
+import com.ke.bella.files.utils.JsonUtils;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.extern.slf4j.Slf4j;
+import static com.ke.bella.files.db.IDGenerator.FILE_ID_GENERATOR;
 
 @Slf4j
 @Component
@@ -526,7 +522,7 @@ public class FileService {
             pathBuilder.append("/");
             pathBuilder.append(pathFile.getFilename());
         }
-        
+
         return file.toBuilder().path(pathBuilder.toString()).build();
     }
 

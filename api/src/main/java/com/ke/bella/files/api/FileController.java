@@ -1,6 +1,9 @@
 package com.ke.bella.files.api;
 
-import static com.ke.bella.files.service.FileService.ONE_DAY_STRING;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
+import okhttp3.MediaType;
 
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
@@ -14,10 +17,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
-
 import javax.imageio.ImageIO;
 import javax.servlet.http.HttpServletResponse;
-
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
@@ -39,12 +40,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
-
 import com.ke.bella.files.annotations.FileAPI;
 import com.ke.bella.files.db.tables.pojos.FileDB;
 import com.ke.bella.files.enums.FilePurpose;
-import com.ke.bella.files.enums.FileType;
+import com.ke.bella.files.protocol.BatchCountOps;
 import com.ke.bella.files.protocol.DomTreeOps.DomTreeUploadOp;
+import com.ke.bella.files.protocol.FileCountInfo;
 import com.ke.bella.files.protocol.FileCropOps;
 import com.ke.bella.files.protocol.FileCropOps.FileCropOp;
 import com.ke.bella.files.protocol.FileException.FileNotFoundException;
@@ -53,6 +54,7 @@ import com.ke.bella.files.protocol.FileOps;
 import com.ke.bella.files.protocol.FileSystemOps.MkdirOp;
 import com.ke.bella.files.protocol.FileUrl;
 import com.ke.bella.files.protocol.ListFileOps;
+import com.ke.bella.files.protocol.MoveOps;
 import com.ke.bella.files.protocol.OpenAIFile;
 import com.ke.bella.files.protocol.OpenapiListResponse;
 import com.ke.bella.files.protocol.Page;
@@ -63,9 +65,6 @@ import com.ke.bella.files.protocol.UpdateCitiesOps;
 import com.ke.bella.files.protocol.UpdateDescriptionOps;
 import com.ke.bella.files.protocol.UpdateProgressRequestData;
 import com.ke.bella.files.protocol.UpdateTagsOps;
-import com.ke.bella.files.protocol.MoveOps;
-import com.ke.bella.files.protocol.FileCountInfo;
-import com.ke.bella.files.protocol.BatchCountOps;
 import com.ke.bella.files.service.FileService;
 import com.ke.bella.files.service.lock.FileUniquenessLock;
 import com.ke.bella.files.utils.BellaContextHelper;
@@ -73,10 +72,7 @@ import com.ke.bella.files.utils.FilePurposeClassifier;
 import com.ke.bella.files.utils.JsonUtils;
 import com.ke.bella.openapi.utils.FileUtils;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.extern.slf4j.Slf4j;
-import okhttp3.MediaType;
+import static com.ke.bella.files.service.FileService.ONE_DAY_STRING;
 
 @FileAPI
 @RestController
