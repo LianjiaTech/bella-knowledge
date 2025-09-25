@@ -4,6 +4,8 @@ import {
   postCreateFolder,
   postRenameFile,
   postUploadFile,
+  deleteFile,
+  updateFileContent,
 } from "@/request/files";
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
@@ -32,6 +34,8 @@ type Action = {
     filename: string,
     ancestorId: string,
   ) => Promise<boolean>;
+  deleteFile: (file: KnowledgeFile, ancestorId: string) => Promise<boolean>;
+  reUploadFile: (fileId: string, file: File, ancestorId: string) => Promise<boolean>;
 };
 export const store = create<State & Action>()((set, get) => ({
   currentDirStack: [
@@ -153,7 +157,15 @@ export const store = create<State & Action>()((set, get) => ({
         const newFiles = {
           ...state.files,
           [ancestorId]: siblingFiles.map((item) =>
-            item.id === file.id ? { ...item, filename: res.filename } : item,
+            item.id === file.id ? {
+              ...item,
+              // 使用后端返回的完整信息更新
+              filename: res.filename,
+              extension: res.extension,
+              // 其他可能变化的字段也同步更新
+              mime_type: res.mime_type || item.mime_type,
+              bytes: res.bytes || item.bytes,
+            } : item,
           ),
         };
         const newCurrentDirStack = state.currentDirStack.map((dir) =>
@@ -162,6 +174,55 @@ export const store = create<State & Action>()((set, get) => ({
         return {
           files: newFiles,
           currentDirStack: newCurrentDirStack,
+        };
+      });
+      return true;
+    }
+    return false;
+  },
+  deleteFile: async (file: KnowledgeFile, ancestorId: string) => {
+    const res = await deleteFile(file.id);
+    if (res) {
+      set((state) => {
+        const siblingFiles = state.files[ancestorId] || [];
+        const newFiles = {
+          ...state.files,
+          [ancestorId]: siblingFiles.filter((item) => item.id !== file.id),
+        };
+        return {
+          files: newFiles,
+        };
+      });
+      return true;
+    }
+    return false;
+  },
+  reUploadFile: async (fileId: string, file: File, ancestorId: string) => {
+    const res = await updateFileContent(fileId, file);
+    if (res) {
+      set((state) => {
+        const siblingFiles = state.files[ancestorId] || [];
+        const newFiles = {
+          ...state.files,
+          [ancestorId]: siblingFiles.map((item) =>
+            item.id === fileId ? {
+              ...item,
+              // 使用后端返回的完整信息更新，特别是文件相关属性
+              filename: res.filename,
+              extension: res.extension,
+              mime_type: res.mime_type,
+              bytes: res.bytes,
+              type: res.type,
+              // 更新时间相关字段
+              created_at: res.created_at || item.created_at,
+              // 其他字段
+              purpose: res.purpose || item.purpose,
+              dom_tree_file_id: res.dom_tree_file_id || item.dom_tree_file_id,
+            } : item,
+          ),
+        };
+        return {
+          files: newFiles,
         };
       });
       return true;

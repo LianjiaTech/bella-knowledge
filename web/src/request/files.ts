@@ -145,3 +145,30 @@ export async function getFilePreviewUrl(fileId: string) {
   }
   return null;
 }
+
+export async function deleteFile(fileId: string) {
+  const res = await webRequest<{ id: string; deleted: boolean }>({
+    path: `/api/files/${fileId}`,
+    method: "DELETE",
+  });
+  if (res.code === 200) {
+    return res.data;
+  }
+  toast.error(res.message || "删除失败");
+  return null;
+}
+
+export async function updateFileContent(fileId: string, file: File) {
+  const res = await webRequestFormData<KnowledgeFile>({
+    path: `/api/files/${fileId}`,
+    data: {
+      file,
+    },
+    method: "PUT",
+  });
+  if (res.code === 200) {
+    return res.data;
+  }
+  toast.error(res.message || "文件更新失败");
+  return null;
+}

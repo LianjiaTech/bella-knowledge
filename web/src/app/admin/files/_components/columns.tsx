@@ -11,6 +11,9 @@ import {
   FileJsonIcon,
   FolderIcon,
   Pencil,
+  MoreHorizontal,
+  Trash2,
+  Upload,
 } from "lucide-react";
 import {
   RiFileExcel2Line,
@@ -22,20 +25,45 @@ import {
 } from "@remixicon/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type GetColumnsOptions = {
   onRename: (file: KnowledgeFile, filename: string) => Promise<boolean>;
+  onDelete: (file: KnowledgeFile) => Promise<boolean>;
+  onReUpload: (file: KnowledgeFile, newFile: File) => Promise<boolean>;
+  siblingFiles?: KnowledgeFile[];
 };
 
 const FilenameCell = ({
   file,
   displayName,
   onRename,
+  onDelete,
+  onReUpload,
+  siblingFiles,
 }: {
   file: KnowledgeFile;
   displayName: string;
   onRename: (file: KnowledgeFile, filename: string) => Promise<boolean>;
+  onDelete: (file: KnowledgeFile) => Promise<boolean>;
+  onReUpload: (file: KnowledgeFile, newFile: File) => Promise<boolean>;
+  siblingFiles?: KnowledgeFile[];
 }) => {
   const isDir = file.is_dir;
   const isImage = file.mime_type.startsWith("image/");
@@ -75,11 +103,26 @@ const FilenameCell = ({
     icon = <RiFilePpt2Line {...props} />;
   }
 
-  const [isHovering, setIsHovering] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [inputValue, setInputValue] = useState(file.filename);
   const [isRenaming, setIsRenaming] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 检测是否存在同名文件
+  const hasNameConflict = useMemo(() => {
+    if (!isEditing || !inputValue.trim() || inputValue === file.filename) {
+      return false;
+    }
+    return siblingFiles?.some(
+      (sibling) => 
+        sibling.id !== file.id && 
+        sibling.filename.toLowerCase() === inputValue.trim().toLowerCase()
+    ) || false;
+  }, [isEditing, inputValue, file.filename, file.id, siblingFiles]);
 
   useEffect(() => {
     setInputValue(file.filename);
@@ -106,6 +149,12 @@ const FilenameCell = ({
       setIsEditing(false);
       return;
     }
+    
+    // 前端校验：检测同名冲突
+    if (hasNameConflict) {
+      return; // 不允许提交，保持编辑状态
+    }
+    
     setIsRenaming(true);
     const success = await onRename(file, trimmedValue);
     setIsRenaming(false);
@@ -120,63 +169,181 @@ const FilenameCell = ({
     }
   };
 
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    const success = await onDelete(file);
+    setIsDeleting(false);
+    if (success) {
+      setShowDeleteDialog(false);
+    }
+  };
+
+  const handleReUpload = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile) {
+      setIsUploading(true);
+      await onReUpload(file, selectedFile);
+      setIsUploading(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
   return (
-    <div
-      className="flex items-center gap-2"
-      onMouseEnter={() => setIsHovering(true)}
-      onMouseLeave={() => {
-        if (!isEditing) {
-          setIsHovering(false);
-        }
-      }}
-    >
-      {icon}
-      {isEditing ? (
-        <Input
-          ref={inputRef}
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          onBlur={handleRename}
-          onClick={(e) => e.stopPropagation()}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              handleRename();
-            }
-            if (e.key === "Escape") {
-              e.preventDefault();
-              setInputValue(file.filename);
-              setIsEditing(false);
-            }
-          }}
-          className="h-8 w-[240px]"
-        />
-      ) : (
-        <span className="flex max-w-[240px] items-center truncate" title={displayName}>
-          {displayName}
-        </span>
-      )}
-      <div className="flex h-9 w-9 items-center justify-center">
-        {(isHovering || isEditing) && (
+    <>
+      <div className="group flex items-center gap-2 min-w-0 flex-1">
+        {icon}
+        {isEditing ? (
+          <div className="flex flex-col flex-1 min-w-0">
+            <Input
+              ref={inputRef}
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onBlur={handleRename}
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  if (!hasNameConflict) {
+                    handleRename();
+                  }
+                }
+                if (e.key === "Escape") {
+                  e.preventDefault();
+                  setInputValue(file.filename);
+                  setIsEditing(false);
+                }
+              }}
+              className={`h-8 ${
+                hasNameConflict 
+                  ? "border-red-500 focus:border-red-500 focus:ring-red-500" 
+                  : ""
+              }`}
+            />
+            {hasNameConflict && (
+              <span className="text-xs text-red-500 mt-1">
+                文件名已存在
+              </span>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center min-w-0 flex-1">
+            <span 
+              className="truncate mr-2 cursor-pointer hover:text-blue-600" 
+              title={displayName}
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsEditing(true);
+              }}
+            >
+              {displayName}
+            </span>
+          </div>
+        )}
+        
+        {/* 操作按钮区域 - 始终占位，透明度控制显示 */}
+        <div className="flex items-center gap-1 flex-shrink-0">
           <Button
             size="icon"
             variant="ghost"
             onClick={(e) => {
               e.stopPropagation();
               setIsEditing(true);
-              setIsHovering(true);
             }}
             disabled={isRenaming}
+            className={`h-8 w-8 transition-opacity duration-200 ${
+              isEditing ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+            }`}
           >
-            <Pencil size={16} />
+            <Pencil size={14} />
           </Button>
+          
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={(e) => e.stopPropagation()}
+                className={`h-8 w-8 transition-opacity duration-200 ${
+                  isEditing ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                }`}
+              >
+                <MoreHorizontal size={14} />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent 
+              align="end" 
+              className="w-48"
+            >
+              {!isDir && (
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleReUpload();
+                  }}
+                  disabled={isUploading}
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  {isUploading ? "上传中..." : "重新上传"}
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowDeleteDialog(true);
+                }}
+                className="text-red-600 focus:text-red-600"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                删除
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+        
+        {!isDir && (
+          <input
+            ref={fileInputRef}
+            type="file"
+            onChange={handleFileChange}
+            style={{ display: 'none' }}
+          />
         )}
       </div>
-    </div>
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要删除 &ldquo;{file.filename}&rdquo; 吗？此操作不可撤销。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setShowDeleteDialog(false)}>
+              取消
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isDeleting ? "删除中..." : "删除"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 };
 
-export const getColumns = ({ onRename }: GetColumnsOptions): ColumnDef<KnowledgeFile>[] => [
+export const getColumns = ({ onRename, onDelete, onReUpload, siblingFiles }: GetColumnsOptions): ColumnDef<KnowledgeFile>[] => [
   {
     accessorKey: "filename",
     header: "名称",
@@ -185,6 +352,9 @@ export const getColumns = ({ onRename }: GetColumnsOptions): ColumnDef<Knowledge
         file={row.original}
         displayName={row.getValue("filename") as string}
         onRename={onRename}
+        onDelete={onDelete}
+        onReUpload={onReUpload}
+        siblingFiles={siblingFiles}
       />
     ),
   },
