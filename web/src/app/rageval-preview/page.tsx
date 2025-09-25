@@ -71,6 +71,26 @@ function RagEvalPreview() {
         <RagevalViewer
           data={selectedRagevalData}
           width={ragevalViewerWidth}
+          isFirstQuestion={selectedRagevalData === ragevalData[0]}
+          isLastQuestion={
+            selectedRagevalData === ragevalData[ragevalData.length - 1]
+          }
+          onClickNextQuestion={() => {
+            const index = ragevalData.findIndex(
+              (item) => item === selectedRagevalData,
+            );
+            if (index < ragevalData.length - 1) {
+              setSelectedRagevalData(ragevalData[index + 1]);
+            }
+          }}
+          onClickPreviousQuestion={() => {
+            const index = ragevalData.findIndex(
+              (item) => item === selectedRagevalData,
+            );
+            if (index > 0) {
+              setSelectedRagevalData(ragevalData[index - 1]);
+            }
+          }}
           onClickReference={onClickReference}
         />
         {selectedRagevalData && (

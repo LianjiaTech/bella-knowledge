@@ -3,15 +3,25 @@ import { FileText, CheckCircle, AlertCircle } from "lucide-react";
 import React from "react";
 import { ScrollArea } from "./ui/scroll-area";
 import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
+import { cn } from "@/lib/utils";
 
 interface RagevalViewerProps {
   data: RagevalData | null;
   width?: number;
+  isFirstQuestion?: boolean;
+  isLastQuestion?: boolean;
+  onClickPreviousQuestion: () => void;
+  onClickNextQuestion: () => void;
   onClickReference?: (reference: { file_id: string; path: string }) => void;
 }
 const RagevalViewer = ({
   data,
   width = 50,
+  isFirstQuestion = false,
+  isLastQuestion = false,
+  onClickPreviousQuestion,
+  onClickNextQuestion,
   onClickReference,
 }: RagevalViewerProps) => {
   return data ? (
@@ -22,19 +32,31 @@ const RagevalViewer = ({
       }}
     >
       <div className="bg-white rounded-xl p-6 border">
-        <div className="flex items-center mb-4 gap-2">
+        <div className="flex justify-between mb-4">
+          <div className="flex items-center gap-2">
           <FileText className="h-4 w-4" />
           <div className="font-semibold">原始问题</div>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              disabled={isFirstQuestion}
+              onClick={onClickPreviousQuestion}
+            >
+              上一题
+            </Button>
+            <Button disabled={isLastQuestion} onClick={onClickNextQuestion}>
+              下一题
+            </Button>
+          </div>
         </div>
         <div className="border bg-gray-50 p-3 text-sm">{data.question}</div>
       </div>
       <div className="bg-white rounded-xl p-6 border flex flex-col overflow-hidden min-h-128">
-        <div className="font-semibold mb-4">召回对比</div>
         <div className="flex gap-4 overflow-hidden">
           <div className="flex flex-1 flex-col">
             <div className="flex items-center gap-2 mb-3">
               <CheckCircle className="h-4 w-4 text-green-500" />
-              <span className="text-sm font-medium">
+              <span className="text-base font-semibold">
                 期望召回 ({data.gb_references.length}个)
               </span>
             </div>
@@ -77,8 +99,11 @@ const RagevalViewer = ({
           </div>
           <div className="flex flex-1 flex-col">
             <div className="flex items-center gap-2 mb-3">
-              <AlertCircle className="h-4 w-4 text-blue-500" />
-              <span className="text-sm font-medium">
+              <AlertCircle
+                size={16}
+                className="h-4 w-4 text-blue-500 flex-shrink-0"
+              />
+              <span className="text-base font-semibold">
                 实际召回 ({data.reference.length}个，召回率{" "}
                 {(data.eval_recall * 100).toFixed(2)}
                 %，精确率 {(data.eval_precision * 100).toFixed(2)}%)
@@ -166,9 +191,25 @@ const RagevalViewer = ({
             {data.groundtruth || ""}
           </div>
         </div>
-        <div className="flex-1 bg-white rounded-xl p-6 border">
+        <div
+          className={cn(
+            "flex-1 rounded-xl p-6 border",
+            !data.eval_result && "bg-white",
+            data.eval_result === "正确" && "bg-green-50",
+            data.eval_result === "错误" && "bg-red-50",
+            data.eval_result === "部分正确" && "bg-yellow-50",
+          )}
+        >
           <div className="flex items-center gap-2 mb-4">
-            <AlertCircle className="h-4 w-4 text-blue-500" />
+            <AlertCircle
+              className={cn(
+                "h-4 w-4",
+                !data.eval_result && "text-blue-500",
+                data.eval_result === "正确" && "text-green-500",
+                data.eval_result === "错误" && "text-red-500",
+                data.eval_result === "部分正确" && "text-yellow-500",
+              )}
+            />
             <div className="font-semibold text-base">实际答案</div>
           </div>
           <div className="text-sm whitespace-pre-wrap">{data?.response || ""}</div>
