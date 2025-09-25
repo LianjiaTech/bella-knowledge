@@ -1,8 +1,12 @@
 import { KnowledgeFile } from "@/lib/types/file";
-import { findFiles, postCreateFolder, postUploadFile } from "@/request/files";
+import {
+  findFiles,
+  postCreateFolder,
+  postRenameFile,
+  postUploadFile,
+} from "@/request/files";
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
-import { useUserStore } from "@/store/user";
 
 // 需要设计文件夹的栈
 // 并且需要存每个文件夹下有哪些文件
@@ -23,6 +27,11 @@ type Action = {
   jumpFolder: (id: string, spaceCode?: string) => Promise<void>;
   backFolder: () => void;
   uploadFile: (file: File, ancestor_id: string) => Promise<boolean>;
+  renameFile: (
+    file: KnowledgeFile,
+    filename: string,
+    ancestorId: string,
+  ) => Promise<boolean>;
 };
 export const store = create<State & Action>()((set, get) => ({
   currentDirStack: [
@@ -132,6 +141,29 @@ export const store = create<State & Action>()((set, get) => ({
         [ancestor_id]: [res, ...get().files[ancestor_id]],
       };
       set({ files: newFiles });
+      return true;
+    }
+    return false;
+  },
+  renameFile: async (file: KnowledgeFile, filename: string, ancestorId: string) => {
+    const res = await postRenameFile(file.id, filename);
+    if (res) {
+      set((state) => {
+        const siblingFiles = state.files[ancestorId] || [];
+        const newFiles = {
+          ...state.files,
+          [ancestorId]: siblingFiles.map((item) =>
+            item.id === file.id ? { ...item, filename: res.filename } : item,
+          ),
+        };
+        const newCurrentDirStack = state.currentDirStack.map((dir) =>
+          dir.id === file.id ? { ...dir, name: res.filename } : dir,
+        );
+        return {
+          files: newFiles,
+          currentDirStack: newCurrentDirStack,
+        };
+      });
       return true;
     }
     return false;

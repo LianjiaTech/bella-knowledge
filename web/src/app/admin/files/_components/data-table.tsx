@@ -93,7 +93,7 @@ export function DataTable<TValue>({
 
   useEffect(() => {
     table.resetColumnFilters();
-  }, [data]);
+  }, [data, table]);
 
   const onClickSelectItem = (
     e: React.MouseEvent<HTMLDivElement>,

@@ -5,7 +5,6 @@ import { DocumentSection } from "./document-section";
 import { DocumentViewerRef } from "@/components/document-viewer";
 import UploadDialog from "@/components/upload-dialog";
 import { useDocumentPreviewStore } from "../model";
-import { toast } from "sonner";
 import { ReferenceSectionRef } from "./reference-section";
 
 interface RightDocumentSectionProps {
