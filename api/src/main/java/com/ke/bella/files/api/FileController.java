@@ -892,7 +892,7 @@ public class FileController {
         validateDirectoryName(op.getName());
         validateDescription(op.getDescription());
 
-		String spaceCode = BellaContextHelper.getOperateSpaceCode();
+        String spaceCode = BellaContextHelper.getOperateSpaceCode();
 
         return fl.executeWithLock(spaceCode, op.getAncestorId(), op.getName(), FILE_LOCK_TIMEOUT_MS, () -> {
             if(fileService.exists(spaceCode, op.getAncestorId(), op.getName())) {
