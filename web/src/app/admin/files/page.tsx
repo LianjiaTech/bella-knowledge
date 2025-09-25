@@ -60,6 +60,8 @@ const Page = () => {
     backFolder,
     uploadFile,
     renameFile,
+    deleteFile,
+    reUploadFile,
   } = useModel();
   const currentDir = currentDirStack[currentDirStack.length - 1];
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
@@ -123,11 +125,36 @@ const Page = () => {
     [renameFile, currentDir.id],
   );
 
+  const handleDelete = useCallback(
+    async (file: KnowledgeFile) => {
+      const success = await deleteFile(file, currentDir.id);
+      if (success) {
+        toast.success("删除成功");
+      }
+      return success;
+    },
+    [deleteFile, currentDir.id],
+  );
+
+  const handleReUpload = useCallback(
+    async (file: KnowledgeFile, newFile: File) => {
+      const success = await reUploadFile(file.id, newFile, currentDir.id);
+      if (success) {
+        toast.success("文件更新成功");
+      }
+      return success;
+    },
+    [reUploadFile, currentDir.id],
+  );
+
   const columns = useMemo(() => {
     return getColumns({
       onRename: handleRename,
+      onDelete: handleDelete,
+      onReUpload: handleReUpload,
+      siblingFiles: files[currentDir.id] || [],
     });
-  }, [handleRename]);
+  }, [handleRename, handleDelete, handleReUpload, files, currentDir.id]);
   const handleCreateFolder = async (
     values: z.infer<typeof createFolderFormSchema>,
   ) => {

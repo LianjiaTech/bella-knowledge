@@ -7,7 +7,7 @@ export async function backendRequest(
   req: NextRequest,
   params: {
     url: string;
-    method: "GET" | "POST";
+    method: "GET" | "POST" | "DELETE";
     query?: Record<string, string>;
     body?: Record<string, unknown>;
   },
@@ -76,6 +76,7 @@ export async function backendRequest(
   }
 }
 
+
 export async function backendRequestFormData(
   req: NextRequest,
   params: {
@@ -102,7 +103,7 @@ export async function backendRequestFormData(
     method,
   });
   if (response.status === 500) {
-    logRequestErrorFormData(req, { url, method: "POST", body: data }, response);
+    logRequestErrorFormData(req, { url, method, body: data }, response);
     return NextResponse.json({
       code: 500,
       message: "服务器错误",
@@ -121,25 +122,41 @@ export async function backendRequestFormData(
   }
 
   if (response.status !== 200) {
-    const resBody = await response.json();
-    logRequestErrorFormData(req, { url, method: "POST", body: data }, response);
+    logRequestErrorFormData(req, { url, method, body: data }, response);
+    try {
+      const resBody = await response.json();
+      return NextResponse.json({
+        code: response.status,
+        message: resBody.error?.message || resBody.message || "请求失败",
+      });
+    } catch (error) {
+      return NextResponse.json({
+        code: response.status,
+        message: `请求失败 (${response.status})`,
+      });
+    }
+  }
+  
+  try {
+    const responseData = await response.json();
     return NextResponse.json({
-      code: response.status,
-      message: resBody.error.message,
+      code: 200,
+      data: responseData,
+    });
+  } catch (error) {
+    LogUtils.error(`JSON解析失败: ${error}`);
+    return NextResponse.json({
+      code: 500,
+      message: "响应格式错误",
     });
   }
-  const responseData = await response.json();
-  return NextResponse.json({
-    code: 200,
-    data: responseData,
-  });
 }
 
 const logRequestError = (
   req: NextRequest,
   params: {
     url: string;
-    method: "GET" | "POST";
+    method: "GET" | "POST" | "DELETE";
     query?: Record<string, string>;
     body?: Record<string, unknown>;
   },
@@ -168,7 +185,7 @@ const logRequestErrorFormData = (
   req: NextRequest,
   params: {
     url: string;
-    method: "GET" | "POST";
+    method: "GET" | "POST" | "PUT";
     query?: Record<string, string>;
     body?: Record<string, unknown>;
   },

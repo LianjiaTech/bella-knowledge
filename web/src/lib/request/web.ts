@@ -40,11 +40,20 @@ export async function webRequest<T>(
       data.data.redirectUrl + encodeURIComponent(window.location.href);
   }
   if (data.code === 500) {
-    toast.error(data.message);
+    const errorMessage = data.error?.message || data.message;
+    toast.error(errorMessage);
     return {
       code: 500,
       data: null,
-      message: data.message,
+      message: errorMessage,
+    } as WebResponse<T>;
+  }
+  if (data.code !== 200) {
+    const errorMessage = data.error?.message || data.message;
+    return {
+      code: data.code,
+      data: null,
+      message: errorMessage,
     } as WebResponse<T>;
   }
   return data as WebResponse<T>;
@@ -53,19 +62,24 @@ export async function webRequest<T>(
 export async function webRequestFormData<T>(params: {
   path: string;
   data: Record<string, unknown>;
+  method?: "POST" | "PUT";
   headers?: Record<string, string>;
 }): Promise<WebResponse<T>> {
-  const { path, data, headers } = params;
+  const { path, data, method = "POST", headers } = params;
   const formData = new FormData();
   Object.entries(data).forEach(([key, value]) => {
-    formData.append(key, value as string);
+    if (value instanceof File || value instanceof Blob) {
+      formData.append(key, value);
+    } else {
+      formData.append(key, value as string);
+    }
   });
   const currentWorkspace = JSON.parse(
     localStorage.getItem("current_workspace") || "{}",
   );
   const response = await fetch(path, {
     credentials: "same-origin",
-    method: "POST",
+    method,
     body: formData,
     headers: {
       "X-USER-ID": localStorage.getItem("user_id") || "",
@@ -80,15 +94,16 @@ export async function webRequestFormData<T>(params: {
     return {
       code: 401,
       data: null,
-      message: responseData.message,
+      message: responseData.error?.message || responseData.message,
     } as WebResponse<T>;
   }
   if (responseData.code !== 200) {
-    toast.error(responseData.message);
+    const errorMessage = responseData.error?.message || responseData.message;
+    toast.error(errorMessage);
     return {
       code: responseData.code,
       data: null,
-      message: responseData.message,
+      message: errorMessage,
     } as WebResponse<T>;
   }
   return responseData as WebResponse<T>;
