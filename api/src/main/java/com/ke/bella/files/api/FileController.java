@@ -103,10 +103,10 @@ public class FileController {
             @RequestParam(value = "get_url", required = false, defaultValue = "false") boolean getUrl,
             @RequestParam(value = "expires", required = false, defaultValue = ONE_DAY_STRING) long expires,
             @RequestParam(value = "ancestor_id", required = false) String ancestorId,
-        @RequestParam(value = "overwrite", required = false, defaultValue = "false") boolean overwrite,
-        @RequestParam(value = "description", required = false, defaultValue = "") String description,
-        @RequestParam(value = "cities", required = false) List<String> cities,
-        @RequestParam(value = "tags", required = false) List<String> tags) throws IOException {
+            @RequestParam(value = "overwrite", required = false, defaultValue = "false") boolean overwrite,
+            @RequestParam(value = "description", required = false, defaultValue = "") String description,
+            @RequestParam(value = "cities", required = false) List<String> cities,
+            @RequestParam(value = "tags", required = false) List<String> tags) throws IOException {
 
         validateDescription(description);
         validateCitiesJson(cities);
@@ -146,7 +146,7 @@ public class FileController {
 
                 return fileService.uploadWithUrl(finalTmpFileInfo.getTmpFile(), finalTmpFileInfo.getType(), finalTmpFileInfo.getMimeType(),
                         finalTmpFileInfo.getExtension(), finalTmpFileInfo.getCharset(), finalPurpose, metadata, getUrl, expires, ancestorId,
-                    filename, description, cities, tags);
+                        filename, description, cities, tags);
             });
         } catch (IllegalArgumentException e) {
             throw e;
@@ -163,8 +163,8 @@ public class FileController {
     private static void validateDescription(String description) {
         if(description != null) {
             Assert.isTrue(description.length() <= MAX_DESCRIPTION_LENGTH,
-                String.format("Description too long: %d characters (max %d)",
-                    description.length(), MAX_DESCRIPTION_LENGTH));
+                    String.format("Description too long: %d characters (max %d)",
+                            description.length(), MAX_DESCRIPTION_LENGTH));
         }
     }
 
@@ -955,8 +955,8 @@ public class FileController {
 
     @PutMapping("/{fileId}/description")
     public OpenAIFile updateDescription(
-        @PathVariable String fileId,
-        @RequestBody UpdateDescriptionOps op) {
+            @PathVariable String fileId,
+            @RequestBody UpdateDescriptionOps op) {
         Assert.hasText(fileId, "file_id is required");
         Assert.notNull(op, "invalid request body");
         Assert.notNull(op.getDescription(), "description is required");
@@ -969,9 +969,9 @@ public class FileController {
         }
 
         FileOps ops = FileOps.builder()
-            .fileId(fileId)
-            .description(op.getDescription())
-            .build();
+                .fileId(fileId)
+                .description(op.getDescription())
+                .build();
 
         return fileService.updateFile(ops, false, Scope.DESCRIPTION);
     }
@@ -989,8 +989,8 @@ public class FileController {
      */
     @PutMapping("/{fileId}/cities")
     public OpenAIFile updateCities(
-        @PathVariable String fileId,
-        @RequestBody UpdateCitiesOps op) {
+            @PathVariable String fileId,
+            @RequestBody UpdateCitiesOps op) {
         Assert.hasText(fileId, "file_id is required");
         Assert.notNull(op, "invalid request body");
         Assert.notNull(op.getCities(), "cities is required");
@@ -1003,9 +1003,9 @@ public class FileController {
         }
 
         FileOps ops = FileOps.builder()
-            .fileId(fileId)
-            .cities(op.getCities())
-            .build();
+                .fileId(fileId)
+                .cities(op.getCities())
+                .build();
 
         return fileService.updateFile(ops, true, Scope.CITIES);
     }
@@ -1023,8 +1023,8 @@ public class FileController {
      */
     @PutMapping("/{fileId}/tags")
     public OpenAIFile updateTags(
-        @PathVariable String fileId,
-        @RequestBody UpdateTagsOps op) {
+            @PathVariable String fileId,
+            @RequestBody UpdateTagsOps op) {
         Assert.hasText(fileId, "file_id is required");
         Assert.notNull(op, "invalid request body");
         Assert.notNull(op.getTags(), "tags is required");
@@ -1037,9 +1037,9 @@ public class FileController {
         }
 
         FileOps ops = FileOps.builder()
-            .fileId(fileId)
-            .tags(op.getTags())
-            .build();
+                .fileId(fileId)
+                .tags(op.getTags())
+                .build();
 
         return fileService.updateFile(ops, true, Scope.TAGS);
     }

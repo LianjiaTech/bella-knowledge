@@ -105,20 +105,16 @@ public class FileService {
                 .metadata(fileDB.getMetaData())
                 .cuid(fileDB.getCuid())
                 .cuName(fileDB.getCuName())
-            .muid(fileDB.getMuid())
-            .muName(fileDB.getMuName())
-            .mtime(fileDB.getMtime()
-                .toInstant(ZoneId.systemDefault().getRules().getOffset(fileDB.getMtime()))
-                .toEpochMilli())
-            .description(fileDB.getDescription())
-            .cities(StringUtils.isNotEmpty(fileDB.getCities()) ?
-                JsonUtils.fromJson(fileDB.getCities(), new TypeReference<List<String>>() {
-                }) :
-                new ArrayList<>())
-            .tags(StringUtils.isNotEmpty(fileDB.getTags()) ?
-                JsonUtils.fromJson(fileDB.getTags(), new TypeReference<List<String>>() {
-                }) :
-                new ArrayList<>())
+                .muid(fileDB.getMuid())
+                .muName(fileDB.getMuName())
+                .mtime(fileDB.getMtime()
+                        .toInstant(ZoneId.systemDefault().getRules().getOffset(fileDB.getMtime()))
+                        .toEpochMilli())
+                .description(fileDB.getDescription())
+                .cities(StringUtils.isNotEmpty(fileDB.getCities()) ? JsonUtils.fromJson(fileDB.getCities(), new TypeReference<List<String>>() {
+                }) : new ArrayList<>())
+                .tags(StringUtils.isNotEmpty(fileDB.getTags()) ? JsonUtils.fromJson(fileDB.getTags(), new TypeReference<List<String>>() {
+                }) : new ArrayList<>())
                 .build();
     }
 
@@ -167,9 +163,9 @@ public class FileService {
 
     @Transactional(rollbackFor = Exception.class)
     public OpenAIFile uploadWithUrl(File file, String type, String mimeType, String extension, String charset, String purpose, String metadata,
-        boolean getUrl, long expires, String ancestorId, String filename, String description, List<String> cities, List<String> tags) {
+            boolean getUrl, long expires, String ancestorId, String filename, String description, List<String> cities, List<String> tags) {
         OpenAIFile openaiFile = upload(file, filename, purpose, metadata,
-            mimeType, type, extension, charset, ancestorId, description, cities, tags);
+                mimeType, type, extension, charset, ancestorId, description, cities, tags);
 
         if(getUrl) {
             String url = getUrl(openaiFile.getId(), expires);
@@ -192,32 +188,32 @@ public class FileService {
 
     @Transactional(rollbackFor = Exception.class)
     public OpenAIFile upload(
-        File file,
-        String filename,
-        String purpose,
-        String metadata,
-        String mimeType,
-        String type,
-        String extension,
-        String charset,
-        String ancestorId) {
+            File file,
+            String filename,
+            String purpose,
+            String metadata,
+            String mimeType,
+            String type,
+            String extension,
+            String charset,
+            String ancestorId) {
         return upload(file, filename, purpose, metadata, mimeType, type, extension, charset, ancestorId, null, null, null);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public OpenAIFile upload(
-        File file,
-        String filename,
-        String purpose,
-        String metadata,
-        String mimeType,
-        String type,
-        String extension,
-        String charset,
-        String ancestorId,
-        String description,
-        List<String> cities,
-        List<String> tags) {
+            File file,
+            String filename,
+            String purpose,
+            String metadata,
+            String mimeType,
+            String type,
+            String extension,
+            String charset,
+            String ancestorId,
+            String description,
+            List<String> cities,
+            List<String> tags) {
         String spaceCode = BellaContextHelper.getOperateSpaceCode();
         FileType fileType = FilePurposeClassifier.classify(purpose);
         String fileId = FILE_ID_GENERATOR.generateWithType(fileType);

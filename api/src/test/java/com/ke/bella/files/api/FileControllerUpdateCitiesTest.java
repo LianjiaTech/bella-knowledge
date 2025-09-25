@@ -42,10 +42,10 @@ public class FileControllerUpdateCitiesTest {
         ReflectionTestUtils.setField(fileController, "fl", fileUniquenessLock);
 
         mockMvc = MockMvcBuilders
-            .standaloneSetup(fileController)
-            .setControllerAdvice(new FileApiResponseAdvice())
-            .setMessageConverters(new MappingJackson2HttpMessageConverter(new ObjectMapper()))
-            .build();
+                .standaloneSetup(fileController)
+                .setControllerAdvice(new FileApiResponseAdvice())
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(new ObjectMapper()))
+                .build();
     }
 
     @Test
@@ -55,28 +55,28 @@ public class FileControllerUpdateCitiesTest {
         String citiesJson = "[\"北京\", \"上海\", \"深圳\"]";
 
         OpenAIFile existingFile = OpenAIFile.builder()
-            .id(fileId)
-            .filename("test.txt")
-            .cities(Arrays.asList("广州"))
-            .build();
+                .id(fileId)
+                .filename("test.txt")
+                .cities(Arrays.asList("广州"))
+                .build();
 
         OpenAIFile updatedFile = existingFile.toBuilder()
-            .cities(Arrays.asList("北京", "上海", "深圳"))
-            .build();
+                .cities(Arrays.asList("北京", "上海", "深圳"))
+                .build();
 
         when(fileService.getFile(fileId)).thenReturn(existingFile);
         when(fileService.updateFile(any(FileOps.class), eq(true), eq(Scope.CITIES)))
-            .thenReturn(updatedFile);
+                .thenReturn(updatedFile);
 
         // When & Then
         mockMvc.perform(put("/v1/files/{fileId}/cities", fileId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(String.format("{\"cities\": %s}", citiesJson)))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.id").value(fileId))
-            .andExpect(jsonPath("$.cities[0]").value("北京"))
-            .andExpect(jsonPath("$.cities[1]").value("上海"))
-            .andExpect(jsonPath("$.cities[2]").value("深圳"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(fileId))
+                .andExpect(jsonPath("$.cities[0]").value("北京"))
+                .andExpect(jsonPath("$.cities[1]").value("上海"))
+                .andExpect(jsonPath("$.cities[2]").value("深圳"));
 
         // Verify service calls
         verify(fileService).getFile(fileId);
@@ -95,8 +95,8 @@ public class FileControllerUpdateCitiesTest {
         mockMvc.perform(put("/v1/files/{fileId}/cities", fileId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(String.format("{\"cities\": %s}", citiesJson)))
-            .andExpect(status().isNotFound())
-            .andExpect(jsonPath("$.error.message").exists());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.message").exists());
 
         verify(fileService).getFile(fileId);
     }
@@ -110,7 +110,7 @@ public class FileControllerUpdateCitiesTest {
         mockMvc.perform(put("/v1/files/{fileId}/cities", "")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(String.format("{\"cities\": %s}", citiesJson)))
-            .andExpect(status().isMethodNotAllowed());
+                .andExpect(status().isMethodNotAllowed());
     }
 
     @Test
@@ -121,7 +121,7 @@ public class FileControllerUpdateCitiesTest {
         // When & Then
         mockMvc.perform(put("/v1/files/{fileId}/cities", fileId)
                 .contentType(MediaType.APPLICATION_JSON))
-            .andExpect(status().isInternalServerError());
+                .andExpect(status().isInternalServerError());
     }
 
     @Test
@@ -133,8 +133,8 @@ public class FileControllerUpdateCitiesTest {
         mockMvc.perform(put("/v1/files/{fileId}/cities", fileId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.error.message").exists());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.message").exists());
     }
 
     @Test
@@ -143,24 +143,24 @@ public class FileControllerUpdateCitiesTest {
         String fileId = "test-file-id";
 
         OpenAIFile existingFile = OpenAIFile.builder()
-            .id(fileId)
-            .filename("test.txt")
-            .build();
+                .id(fileId)
+                .filename("test.txt")
+                .build();
 
         OpenAIFile updatedFile = existingFile.toBuilder()
-            .cities(Collections.emptyList())
-            .build();
+                .cities(Collections.emptyList())
+                .build();
 
         when(fileService.getFile(fileId)).thenReturn(existingFile);
         when(fileService.updateFile(any(FileOps.class), eq(true), eq(Scope.CITIES)))
-            .thenReturn(updatedFile);
+                .thenReturn(updatedFile);
 
         // When & Then
         mockMvc.perform(put("/v1/files/{fileId}/cities", fileId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"cities\": []}"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.cities").isEmpty());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.cities").isEmpty());
     }
 
     @Test
@@ -172,9 +172,9 @@ public class FileControllerUpdateCitiesTest {
         String citiesJson = "[\"" + longCity + "\", \"" + longCity + "\"]";
 
         OpenAIFile existingFile = OpenAIFile.builder()
-            .id(fileId)
-            .filename("test.txt")
-            .build();
+                .id(fileId)
+                .filename("test.txt")
+                .build();
 
         when(fileService.getFile(fileId)).thenReturn(existingFile);
 
@@ -182,8 +182,8 @@ public class FileControllerUpdateCitiesTest {
         mockMvc.perform(put("/v1/files/{fileId}/cities", fileId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(String.format("{\"cities\": %s}", citiesJson)))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.error.message").value("cities total length cannot exceed 512 characters"));
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.message").value("cities total length cannot exceed 512 characters"));
     }
 
     @Test
@@ -196,25 +196,25 @@ public class FileControllerUpdateCitiesTest {
         String citiesJson = "[\"" + city1 + "\", \"" + city2 + "\"]";
 
         OpenAIFile existingFile = OpenAIFile.builder()
-            .id(fileId)
-            .filename("test.txt")
-            .build();
+                .id(fileId)
+                .filename("test.txt")
+                .build();
 
         OpenAIFile updatedFile = existingFile.toBuilder()
-            .cities(Arrays.asList(city1, city2))
-            .build();
+                .cities(Arrays.asList(city1, city2))
+                .build();
 
         when(fileService.getFile(fileId)).thenReturn(existingFile);
         when(fileService.updateFile(any(FileOps.class), eq(true), eq(Scope.CITIES)))
-            .thenReturn(updatedFile);
+                .thenReturn(updatedFile);
 
         // When & Then
         mockMvc.perform(put("/v1/files/{fileId}/cities", fileId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(String.format("{\"cities\": %s}", citiesJson)))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.cities[0]").value(city1))
-            .andExpect(jsonPath("$.cities[1]").value(city2));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.cities[0]").value(city1))
+                .andExpect(jsonPath("$.cities[1]").value(city2));
     }
 
     @Test
@@ -224,27 +224,27 @@ public class FileControllerUpdateCitiesTest {
         String citiesJson = "[\"北京市\", \"São Paulo\", \"New York City\", \"東京\"]";
 
         OpenAIFile existingFile = OpenAIFile.builder()
-            .id(fileId)
-            .filename("test.txt")
-            .build();
+                .id(fileId)
+                .filename("test.txt")
+                .build();
 
         OpenAIFile updatedFile = existingFile.toBuilder()
-            .cities(Arrays.asList("北京市", "São Paulo", "New York City", "東京"))
-            .build();
+                .cities(Arrays.asList("北京市", "São Paulo", "New York City", "東京"))
+                .build();
 
         when(fileService.getFile(fileId)).thenReturn(existingFile);
         when(fileService.updateFile(any(FileOps.class), eq(true), eq(Scope.CITIES)))
-            .thenReturn(updatedFile);
+                .thenReturn(updatedFile);
 
         // When & Then
         mockMvc.perform(put("/v1/files/{fileId}/cities", fileId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(String.format("{\"cities\": %s}", citiesJson)))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.cities[0]").value("北京市"))
-            .andExpect(jsonPath("$.cities[1]").value("São Paulo"))
-            .andExpect(jsonPath("$.cities[2]").value("New York City"))
-            .andExpect(jsonPath("$.cities[3]").value("東京"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.cities[0]").value("北京市"))
+                .andExpect(jsonPath("$.cities[1]").value("São Paulo"))
+                .andExpect(jsonPath("$.cities[2]").value("New York City"))
+                .andExpect(jsonPath("$.cities[3]").value("東京"));
     }
 
     @Test
@@ -254,19 +254,19 @@ public class FileControllerUpdateCitiesTest {
         String citiesJson = "[\"北京\"]";
 
         OpenAIFile existingFile = OpenAIFile.builder()
-            .id(fileId)
-            .filename("test.txt")
-            .build();
+                .id(fileId)
+                .filename("test.txt")
+                .build();
 
         when(fileService.getFile(fileId)).thenReturn(existingFile);
         when(fileService.updateFile(any(FileOps.class), eq(true), eq(Scope.CITIES)))
-            .thenThrow(new RuntimeException("Database error"));
+                .thenThrow(new RuntimeException("Database error"));
 
         // When & Then
         mockMvc.perform(put("/v1/files/{fileId}/cities", fileId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(String.format("{\"cities\": %s}", citiesJson)))
-            .andExpect(status().isInternalServerError());
+                .andExpect(status().isInternalServerError());
     }
 
     @Test
@@ -276,31 +276,29 @@ public class FileControllerUpdateCitiesTest {
         String citiesJson = "[\"测试城市1\", \"测试城市2\"]";
 
         OpenAIFile existingFile = OpenAIFile.builder()
-            .id(fileId)
-            .filename("test.txt")
-            .build();
+                .id(fileId)
+                .filename("test.txt")
+                .build();
 
         OpenAIFile updatedFile = existingFile.toBuilder()
-            .cities(Arrays.asList("测试城市1", "测试城市2"))
-            .build();
+                .cities(Arrays.asList("测试城市1", "测试城市2"))
+                .build();
 
         when(fileService.getFile(fileId)).thenReturn(existingFile);
         when(fileService.updateFile(any(FileOps.class), eq(true), eq(Scope.CITIES)))
-            .thenReturn(updatedFile);
+                .thenReturn(updatedFile);
 
         // When
         mockMvc.perform(put("/v1/files/{fileId}/cities", fileId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(String.format("{\"cities\": %s}", citiesJson)))
-            .andExpect(status().isOk());
+                .andExpect(status().isOk());
 
         // Then - 验证传递给service的FileOps参数
-        verify(fileService).updateFile(argThat(ops ->
-            ops.getFileId().equals(fileId) &&
+        verify(fileService).updateFile(argThat(ops -> ops.getFileId().equals(fileId) &&
                 ops.getCities() != null &&
                 ops.getCities().size() == 2 &&
                 ops.getCities().contains("测试城市1") &&
-                ops.getCities().contains("测试城市2")
-        ), eq(true), eq(Scope.CITIES));
+                ops.getCities().contains("测试城市2")), eq(true), eq(Scope.CITIES));
     }
 }

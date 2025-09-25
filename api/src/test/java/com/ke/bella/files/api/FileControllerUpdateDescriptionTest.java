@@ -40,10 +40,10 @@ public class FileControllerUpdateDescriptionTest {
         ReflectionTestUtils.setField(fileController, "fl", fileUniquenessLock);
 
         mockMvc = MockMvcBuilders
-            .standaloneSetup(fileController)
-            .setControllerAdvice(new FileApiResponseAdvice())
-            .setMessageConverters(new MappingJackson2HttpMessageConverter(new ObjectMapper()))
-            .build();
+                .standaloneSetup(fileController)
+                .setControllerAdvice(new FileApiResponseAdvice())
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(new ObjectMapper()))
+                .build();
     }
 
     @Test
@@ -53,26 +53,26 @@ public class FileControllerUpdateDescriptionTest {
         String description = "Updated description";
 
         OpenAIFile existingFile = OpenAIFile.builder()
-            .id(fileId)
-            .filename("test.txt")
-            .description("Old description")
-            .build();
+                .id(fileId)
+                .filename("test.txt")
+                .description("Old description")
+                .build();
 
         OpenAIFile updatedFile = existingFile.toBuilder()
-            .description(description)
-            .build();
+                .description(description)
+                .build();
 
         when(fileService.getFile(fileId)).thenReturn(existingFile);
         when(fileService.updateFile(any(FileOps.class), eq(false), eq(Scope.DESCRIPTION)))
-            .thenReturn(updatedFile);
+                .thenReturn(updatedFile);
 
         // When & Then
         mockMvc.perform(put("/v1/files/{fileId}/description", fileId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"description\": \"" + description + "\"}"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.id").value(fileId))
-            .andExpect(jsonPath("$.description").value(description));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(fileId))
+                .andExpect(jsonPath("$.description").value(description));
 
         // Verify service calls
         verify(fileService).getFile(fileId);
@@ -91,8 +91,8 @@ public class FileControllerUpdateDescriptionTest {
         mockMvc.perform(put("/v1/files/{fileId}/description", fileId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"description\": \"" + description + "\"}"))
-            .andExpect(status().isNotFound()) // FileNotFoundException会返回404
-            .andExpect(jsonPath("$.error.message").exists());
+                .andExpect(status().isNotFound()) // FileNotFoundException会返回404
+                .andExpect(jsonPath("$.error.message").exists());
 
         verify(fileService).getFile(fileId);
     }
@@ -106,7 +106,8 @@ public class FileControllerUpdateDescriptionTest {
         mockMvc.perform(put("/v1/files/{fileId}/description", "")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"description\": \"" + description + "\"}"))
-            .andExpect(status().isMethodNotAllowed()); // 空路径参数会导致405 Method Not Allowed
+                .andExpect(status().isMethodNotAllowed()); // 空路径参数会导致405 Method
+                                                           // Not Allowed
     }
 
     @Test
@@ -117,7 +118,7 @@ public class FileControllerUpdateDescriptionTest {
         // When & Then
         mockMvc.perform(put("/v1/files/{fileId}/description", fileId)
                 .contentType(MediaType.APPLICATION_JSON))
-            .andExpect(status().isInternalServerError()); // 缺少请求体会导致500
+                .andExpect(status().isInternalServerError()); // 缺少请求体会导致500
     }
 
     @Test
@@ -129,8 +130,8 @@ public class FileControllerUpdateDescriptionTest {
         mockMvc.perform(put("/v1/files/{fileId}/description", fileId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.error.message").exists());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.message").exists());
     }
 
     @Test
@@ -140,24 +141,24 @@ public class FileControllerUpdateDescriptionTest {
         String description = "";
 
         OpenAIFile existingFile = OpenAIFile.builder()
-            .id(fileId)
-            .filename("test.txt")
-            .build();
+                .id(fileId)
+                .filename("test.txt")
+                .build();
 
         OpenAIFile updatedFile = existingFile.toBuilder()
-            .description(description)
-            .build();
+                .description(description)
+                .build();
 
         when(fileService.getFile(fileId)).thenReturn(existingFile);
         when(fileService.updateFile(any(FileOps.class), eq(false), eq(Scope.DESCRIPTION)))
-            .thenReturn(updatedFile);
+                .thenReturn(updatedFile);
 
         // When & Then
         mockMvc.perform(put("/v1/files/{fileId}/description", fileId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"description\": \"\"}"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.description").value(""));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.description").value(""));
     }
 
     @Test
@@ -167,9 +168,9 @@ public class FileControllerUpdateDescriptionTest {
         String longDescription = new String(new char[257]).replace('\0', 'x'); // 257字符
 
         OpenAIFile existingFile = OpenAIFile.builder()
-            .id(fileId)
-            .filename("test.txt")
-            .build();
+                .id(fileId)
+                .filename("test.txt")
+                .build();
 
         when(fileService.getFile(fileId)).thenReturn(existingFile);
 
@@ -177,8 +178,8 @@ public class FileControllerUpdateDescriptionTest {
         mockMvc.perform(put("/v1/files/{fileId}/description", fileId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"description\": \"" + longDescription + "\"}"))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.error.message").exists());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.message").exists());
     }
 
     @Test
@@ -188,24 +189,24 @@ public class FileControllerUpdateDescriptionTest {
         String maxDescription = new String(new char[256]).replace('\0', 'x'); // 256字符
 
         OpenAIFile existingFile = OpenAIFile.builder()
-            .id(fileId)
-            .filename("test.txt")
-            .build();
+                .id(fileId)
+                .filename("test.txt")
+                .build();
 
         OpenAIFile updatedFile = existingFile.toBuilder()
-            .description(maxDescription)
-            .build();
+                .description(maxDescription)
+                .build();
 
         when(fileService.getFile(fileId)).thenReturn(existingFile);
         when(fileService.updateFile(any(FileOps.class), eq(false), eq(Scope.DESCRIPTION)))
-            .thenReturn(updatedFile);
+                .thenReturn(updatedFile);
 
         // When & Then
         mockMvc.perform(put("/v1/files/{fileId}/description", fileId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"description\": \"" + maxDescription + "\"}"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.description").value(maxDescription));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.description").value(maxDescription));
     }
 
     @Test
@@ -215,24 +216,24 @@ public class FileControllerUpdateDescriptionTest {
         String specialDescription = "测试描述 with special chars @#$%";
 
         OpenAIFile existingFile = OpenAIFile.builder()
-            .id(fileId)
-            .filename("test.txt")
-            .build();
+                .id(fileId)
+                .filename("test.txt")
+                .build();
 
         OpenAIFile updatedFile = existingFile.toBuilder()
-            .description(specialDescription)
-            .build();
+                .description(specialDescription)
+                .build();
 
         when(fileService.getFile(fileId)).thenReturn(existingFile);
         when(fileService.updateFile(any(FileOps.class), eq(false), eq(Scope.DESCRIPTION)))
-            .thenReturn(updatedFile);
+                .thenReturn(updatedFile);
 
         // When & Then
         mockMvc.perform(put("/v1/files/{fileId}/description", fileId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"description\": \"" + specialDescription + "\"}"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.description").value(specialDescription));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.description").value(specialDescription));
     }
 
     @Test
@@ -242,19 +243,19 @@ public class FileControllerUpdateDescriptionTest {
         String description = "New description";
 
         OpenAIFile existingFile = OpenAIFile.builder()
-            .id(fileId)
-            .filename("test.txt")
-            .build();
+                .id(fileId)
+                .filename("test.txt")
+                .build();
 
         when(fileService.getFile(fileId)).thenReturn(existingFile);
         when(fileService.updateFile(any(FileOps.class), eq(false), eq(Scope.DESCRIPTION)))
-            .thenThrow(new RuntimeException("Database error"));
+                .thenThrow(new RuntimeException("Database error"));
 
         // When & Then
         mockMvc.perform(put("/v1/files/{fileId}/description", fileId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"description\": \"" + description + "\"}"))
-            .andExpect(status().isInternalServerError());
+                .andExpect(status().isInternalServerError());
     }
 
     @Test
@@ -264,28 +265,26 @@ public class FileControllerUpdateDescriptionTest {
         String description = "Test description";
 
         OpenAIFile existingFile = OpenAIFile.builder()
-            .id(fileId)
-            .filename("test.txt")
-            .build();
+                .id(fileId)
+                .filename("test.txt")
+                .build();
 
         OpenAIFile updatedFile = existingFile.toBuilder()
-            .description(description)
-            .build();
+                .description(description)
+                .build();
 
         when(fileService.getFile(fileId)).thenReturn(existingFile);
         when(fileService.updateFile(any(FileOps.class), eq(false), eq(Scope.DESCRIPTION)))
-            .thenReturn(updatedFile);
+                .thenReturn(updatedFile);
 
         // When
         mockMvc.perform(put("/v1/files/{fileId}/description", fileId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"description\": \"" + description + "\"}"))
-            .andExpect(status().isOk());
+                .andExpect(status().isOk());
 
         // Then - 验证传递给service的FileOps参数
-        verify(fileService).updateFile(argThat(ops ->
-            ops.getFileId().equals(fileId) &&
-                ops.getDescription().equals(description)
-        ), eq(false), eq(Scope.DESCRIPTION));
+        verify(fileService).updateFile(argThat(ops -> ops.getFileId().equals(fileId) &&
+                ops.getDescription().equals(description)), eq(false), eq(Scope.DESCRIPTION));
     }
 }

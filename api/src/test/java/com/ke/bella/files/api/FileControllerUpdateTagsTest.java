@@ -42,10 +42,10 @@ public class FileControllerUpdateTagsTest {
         ReflectionTestUtils.setField(fileController, "fl", fileUniquenessLock);
 
         mockMvc = MockMvcBuilders
-            .standaloneSetup(fileController)
-            .setControllerAdvice(new FileApiResponseAdvice())
-            .setMessageConverters(new MappingJackson2HttpMessageConverter(new ObjectMapper()))
-            .build();
+                .standaloneSetup(fileController)
+                .setControllerAdvice(new FileApiResponseAdvice())
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(new ObjectMapper()))
+                .build();
     }
 
     @Test
@@ -55,28 +55,28 @@ public class FileControllerUpdateTagsTest {
         String tagsJson = "[\"重要\", \"项目资料\", \"2024\"]";
 
         OpenAIFile existingFile = OpenAIFile.builder()
-            .id(fileId)
-            .filename("test.txt")
-            .tags(Arrays.asList("旧标签"))
-            .build();
+                .id(fileId)
+                .filename("test.txt")
+                .tags(Arrays.asList("旧标签"))
+                .build();
 
         OpenAIFile updatedFile = existingFile.toBuilder()
-            .tags(Arrays.asList("重要", "项目资料", "2024"))
-            .build();
+                .tags(Arrays.asList("重要", "项目资料", "2024"))
+                .build();
 
         when(fileService.getFile(fileId)).thenReturn(existingFile);
         when(fileService.updateFile(any(FileOps.class), eq(true), eq(Scope.TAGS)))
-            .thenReturn(updatedFile);
+                .thenReturn(updatedFile);
 
         // When & Then
         mockMvc.perform(put("/v1/files/{fileId}/tags", fileId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(String.format("{\"tags\": %s}", tagsJson)))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.id").value(fileId))
-            .andExpect(jsonPath("$.tags[0]").value("重要"))
-            .andExpect(jsonPath("$.tags[1]").value("项目资料"))
-            .andExpect(jsonPath("$.tags[2]").value("2024"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(fileId))
+                .andExpect(jsonPath("$.tags[0]").value("重要"))
+                .andExpect(jsonPath("$.tags[1]").value("项目资料"))
+                .andExpect(jsonPath("$.tags[2]").value("2024"));
 
         // Verify service calls
         verify(fileService).getFile(fileId);
@@ -95,8 +95,8 @@ public class FileControllerUpdateTagsTest {
         mockMvc.perform(put("/v1/files/{fileId}/tags", fileId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(String.format("{\"tags\": %s}", tagsJson)))
-            .andExpect(status().isNotFound())
-            .andExpect(jsonPath("$.error.message").exists());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.message").exists());
 
         verify(fileService).getFile(fileId);
     }
@@ -110,7 +110,7 @@ public class FileControllerUpdateTagsTest {
         mockMvc.perform(put("/v1/files/{fileId}/tags", "")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(String.format("{\"tags\": %s}", tagsJson)))
-            .andExpect(status().isMethodNotAllowed());
+                .andExpect(status().isMethodNotAllowed());
     }
 
     @Test
@@ -121,7 +121,7 @@ public class FileControllerUpdateTagsTest {
         // When & Then
         mockMvc.perform(put("/v1/files/{fileId}/tags", fileId)
                 .contentType(MediaType.APPLICATION_JSON))
-            .andExpect(status().isInternalServerError());
+                .andExpect(status().isInternalServerError());
     }
 
     @Test
@@ -133,8 +133,8 @@ public class FileControllerUpdateTagsTest {
         mockMvc.perform(put("/v1/files/{fileId}/tags", fileId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.error.message").exists());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.message").exists());
     }
 
     @Test
@@ -143,24 +143,24 @@ public class FileControllerUpdateTagsTest {
         String fileId = "test-file-id";
 
         OpenAIFile existingFile = OpenAIFile.builder()
-            .id(fileId)
-            .filename("test.txt")
-            .build();
+                .id(fileId)
+                .filename("test.txt")
+                .build();
 
         OpenAIFile updatedFile = existingFile.toBuilder()
-            .tags(Collections.emptyList())
-            .build();
+                .tags(Collections.emptyList())
+                .build();
 
         when(fileService.getFile(fileId)).thenReturn(existingFile);
         when(fileService.updateFile(any(FileOps.class), eq(true), eq(Scope.TAGS)))
-            .thenReturn(updatedFile);
+                .thenReturn(updatedFile);
 
         // When & Then
         mockMvc.perform(put("/v1/files/{fileId}/tags", fileId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"tags\": []}"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.tags").isEmpty());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tags").isEmpty());
     }
 
     @Test
@@ -172,9 +172,9 @@ public class FileControllerUpdateTagsTest {
         String tagsJson = "[\"" + longTag + "\", \"" + longTag + "\"]";
 
         OpenAIFile existingFile = OpenAIFile.builder()
-            .id(fileId)
-            .filename("test.txt")
-            .build();
+                .id(fileId)
+                .filename("test.txt")
+                .build();
 
         when(fileService.getFile(fileId)).thenReturn(existingFile);
 
@@ -182,8 +182,8 @@ public class FileControllerUpdateTagsTest {
         mockMvc.perform(put("/v1/files/{fileId}/tags", fileId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(String.format("{\"tags\": %s}", tagsJson)))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.error.message").value("tags total length cannot exceed 512 characters"));
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.message").value("tags total length cannot exceed 512 characters"));
     }
 
     @Test
@@ -196,25 +196,25 @@ public class FileControllerUpdateTagsTest {
         String tagsJson = "[\"" + tag1 + "\", \"" + tag2 + "\"]";
 
         OpenAIFile existingFile = OpenAIFile.builder()
-            .id(fileId)
-            .filename("test.txt")
-            .build();
+                .id(fileId)
+                .filename("test.txt")
+                .build();
 
         OpenAIFile updatedFile = existingFile.toBuilder()
-            .tags(Arrays.asList(tag1, tag2))
-            .build();
+                .tags(Arrays.asList(tag1, tag2))
+                .build();
 
         when(fileService.getFile(fileId)).thenReturn(existingFile);
         when(fileService.updateFile(any(FileOps.class), eq(true), eq(Scope.TAGS)))
-            .thenReturn(updatedFile);
+                .thenReturn(updatedFile);
 
         // When & Then
         mockMvc.perform(put("/v1/files/{fileId}/tags", fileId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(String.format("{\"tags\": %s}", tagsJson)))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.tags[0]").value(tag1))
-            .andExpect(jsonPath("$.tags[1]").value(tag2));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tags[0]").value(tag1))
+                .andExpect(jsonPath("$.tags[1]").value(tag2));
     }
 
     @Test
@@ -224,27 +224,27 @@ public class FileControllerUpdateTagsTest {
         String tagsJson = "[\"重要文档\", \"@priority\", \"#project-2024\", \"🔥热门\"]";
 
         OpenAIFile existingFile = OpenAIFile.builder()
-            .id(fileId)
-            .filename("test.txt")
-            .build();
+                .id(fileId)
+                .filename("test.txt")
+                .build();
 
         OpenAIFile updatedFile = existingFile.toBuilder()
-            .tags(Arrays.asList("重要文档", "@priority", "#project-2024", "🔥热门"))
-            .build();
+                .tags(Arrays.asList("重要文档", "@priority", "#project-2024", "🔥热门"))
+                .build();
 
         when(fileService.getFile(fileId)).thenReturn(existingFile);
         when(fileService.updateFile(any(FileOps.class), eq(true), eq(Scope.TAGS)))
-            .thenReturn(updatedFile);
+                .thenReturn(updatedFile);
 
         // When & Then
         mockMvc.perform(put("/v1/files/{fileId}/tags", fileId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(String.format("{\"tags\": %s}", tagsJson)))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.tags[0]").value("重要文档"))
-            .andExpect(jsonPath("$.tags[1]").value("@priority"))
-            .andExpect(jsonPath("$.tags[2]").value("#project-2024"))
-            .andExpect(jsonPath("$.tags[3]").value("🔥热门"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tags[0]").value("重要文档"))
+                .andExpect(jsonPath("$.tags[1]").value("@priority"))
+                .andExpect(jsonPath("$.tags[2]").value("#project-2024"))
+                .andExpect(jsonPath("$.tags[3]").value("🔥热门"));
     }
 
     @Test
@@ -254,19 +254,19 @@ public class FileControllerUpdateTagsTest {
         String tagsJson = "[\"测试标签\"]";
 
         OpenAIFile existingFile = OpenAIFile.builder()
-            .id(fileId)
-            .filename("test.txt")
-            .build();
+                .id(fileId)
+                .filename("test.txt")
+                .build();
 
         when(fileService.getFile(fileId)).thenReturn(existingFile);
         when(fileService.updateFile(any(FileOps.class), eq(true), eq(Scope.TAGS)))
-            .thenThrow(new RuntimeException("Database error"));
+                .thenThrow(new RuntimeException("Database error"));
 
         // When & Then
         mockMvc.perform(put("/v1/files/{fileId}/tags", fileId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(String.format("{\"tags\": %s}", tagsJson)))
-            .andExpect(status().isInternalServerError());
+                .andExpect(status().isInternalServerError());
     }
 
     @Test
@@ -276,31 +276,29 @@ public class FileControllerUpdateTagsTest {
         String tagsJson = "[\"测试标签1\", \"测试标签2\"]";
 
         OpenAIFile existingFile = OpenAIFile.builder()
-            .id(fileId)
-            .filename("test.txt")
-            .build();
+                .id(fileId)
+                .filename("test.txt")
+                .build();
 
         OpenAIFile updatedFile = existingFile.toBuilder()
-            .tags(Arrays.asList("测试标签1", "测试标签2"))
-            .build();
+                .tags(Arrays.asList("测试标签1", "测试标签2"))
+                .build();
 
         when(fileService.getFile(fileId)).thenReturn(existingFile);
         when(fileService.updateFile(any(FileOps.class), eq(true), eq(Scope.TAGS)))
-            .thenReturn(updatedFile);
+                .thenReturn(updatedFile);
 
         // When
         mockMvc.perform(put("/v1/files/{fileId}/tags", fileId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(String.format("{\"tags\": %s}", tagsJson)))
-            .andExpect(status().isOk());
+                .andExpect(status().isOk());
 
         // Then - 验证传递给service的FileOps参数
-        verify(fileService).updateFile(argThat(ops ->
-            ops.getFileId().equals(fileId) &&
+        verify(fileService).updateFile(argThat(ops -> ops.getFileId().equals(fileId) &&
                 ops.getTags() != null &&
                 ops.getTags().size() == 2 &&
                 ops.getTags().contains("测试标签1") &&
-                ops.getTags().contains("测试标签2")
-        ), eq(true), eq(Scope.TAGS));
+                ops.getTags().contains("测试标签2")), eq(true), eq(Scope.TAGS));
     }
 }
