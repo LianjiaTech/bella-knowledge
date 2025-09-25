@@ -6,7 +6,7 @@ import {
   BreadcrumbList,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useModel } from "./model";
 import { ArrowLeftIcon } from "lucide-react";
 import { KnowledgeFile } from "@/lib/types/file";
@@ -21,9 +21,9 @@ import {
   DialogContent,
   DialogFooter,
   DialogHeader,
+  DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { DialogTitle } from "@radix-ui/react-dialog";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -38,6 +38,7 @@ import { getFilePreviewUrl } from "@/request/files";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
 import { useUserStore } from "@/store/user";
+import { useRouter } from "next/navigation";
 
 const FileViewer = dynamic(() => import("@/components/file-viewer"), {
   ssr: false,
@@ -58,6 +59,7 @@ const Page = () => {
     createFolder,
     backFolder,
     uploadFile,
+    renameFile,
   } = useModel();
   const currentDir = currentDirStack[currentDirStack.length - 1];
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
@@ -71,12 +73,16 @@ const Page = () => {
     },
   });
   const previewFile = useRef<KnowledgeFile | null>(null);
-
+  const router = useRouter();
   const onClickFile = useThrottleFn(
     (file: KnowledgeFile) => {
       if (file.is_dir) {
         enterFolder(file, currentWorkspace?.spaceCode);
       } else {
+        if (file.extension === "rageval") {
+          router.push(`/rageval-preview?fileId=${file.id}`);
+          return;
+        }
         setPreviewModalOpen(true);
         previewFile.current = file;
         getFilePreviewUrl(file.id).then((res) => {
@@ -106,9 +112,22 @@ const Page = () => {
     };
     input.click();
   };
+  const handleRename = useCallback(
+    async (file: KnowledgeFile, filename: string) => {
+      const success = await renameFile(file, filename, currentDir.id);
+      if (success) {
+        toast.success("重命名成功");
+      }
+      return success;
+    },
+    [renameFile, currentDir.id],
+  );
+
   const columns = useMemo(() => {
-    return getColumns();
-  }, []);
+    return getColumns({
+      onRename: handleRename,
+    });
+  }, [handleRename]);
   const handleCreateFolder = async (
     values: z.infer<typeof createFolderFormSchema>,
   ) => {
@@ -123,7 +142,7 @@ const Page = () => {
     if (currentWorkspace) {
       initPage(currentWorkspace.spaceCode);
     }
-  }, [currentWorkspace]);
+  }, [currentWorkspace, initPage]);
   return (
     <>
       <div className="flex items-center justify-between">

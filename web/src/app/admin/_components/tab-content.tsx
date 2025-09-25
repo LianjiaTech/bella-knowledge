@@ -6,7 +6,6 @@ import { getColumns } from "./columns";
 import { useUserStore } from "@/store/user";
 import { useAdminStore } from "../model";
 import CreateDatasetSheet from "../_components/create-dataset-sheet";
-import { requestUpdateDatasetRemark } from "@/request/dataset";
 interface TabContentProps {
   type: "qa" | "document";
 }
@@ -32,7 +31,7 @@ const TabContent = ({ type }: TabContentProps) => {
       },
       type,
     );
-  }, [getDatasetList, type]);
+  }, [getDatasetList, type, updateDatasetRemark]);
   const [open, setOpen] = useState(false);
 
   return (

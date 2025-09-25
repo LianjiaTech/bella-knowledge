@@ -3,7 +3,7 @@
 import { ColumnDef, Row } from "@tanstack/react-table";
 import dayjs from "dayjs";
 import { Edit, EditIcon, Import, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
@@ -150,6 +150,65 @@ const CreateRowActions = (
   );
 };
 
+const RemarkCell = ({
+  dataset,
+  onChangeRemark,
+}: {
+  dataset: Dataset;
+  onChangeRemark: (datasetId: string, remark: string) => void;
+}) => {
+  const [isHovering, setIsHovering] = useState(false);
+  const [isInputing, setIsInputing] = useState(false);
+  const [inputValue, setInputValue] = useState(dataset.remark);
+
+  useEffect(() => {
+    setInputValue(dataset.remark);
+  }, [dataset.remark]);
+
+  const handleBlur = () => {
+    setIsInputing(false);
+    onChangeRemark(dataset.dataset_id, inputValue);
+  };
+
+  return (
+    <div
+      className="min-w-6 flex items-center gap-1"
+      onMouseEnter={() => setIsHovering(true)}
+      onMouseLeave={() => setIsHovering(false)}
+    >
+      {isInputing ? (
+        <Input
+          autoFocus
+          value={inputValue}
+          onChange={(e) => {
+            setInputValue(e.target.value);
+          }}
+          onBlur={handleBlur}
+          onClick={(e) => e.stopPropagation()}
+        />
+      ) : dataset.remark ? (
+        dataset.remark
+      ) : (
+        "-"
+      )}
+      <div className="size-9">
+        {(isHovering || isInputing) && (
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsInputing(true);
+            }}
+          >
+            <EditIcon size={16} />
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+};
+
 export const getColumns = (
   onChangeRemark: (datasetId: string, remark: string) => void,
   onDelete: () => void,
@@ -162,47 +221,9 @@ export const getColumns = (
   {
     accessorKey: "remark",
     header: "描述",
-    cell({ row }) {
-      const [isHovering, setIsHovering] = useState(false);
-      const [isInputing, setIsInputing] = useState(false);
-      const [inputValue, setInputValue] = useState(row.original.remark);
-      return (
-        <div
-          className="min-w-6 flex items-center gap-1"
-          onMouseEnter={() => setIsHovering(true)}
-          onMouseLeave={() => setIsHovering(false)}
-        >
-          {isInputing ? (
-            <Input
-              autoFocus
-              value={inputValue}
-              onChange={(e) => {
-                setInputValue(e.target.value);
-              }}
-              onBlur={() => {
-                setIsInputing(false);
-                onChangeRemark(row.original.dataset_id, inputValue);
-              }}
-            />
-          ) : row.original.remark ? (
-            row.original.remark
-          ) : (
-            "-"
-          )}
-          <div className="size-9">
-            {isHovering && (
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => setIsInputing(true)}
-              >
-                <EditIcon size={16} />
-              </Button>
-            )}
-          </div>
-        </div>
-      );
-    },
+    cell: ({ row }) => (
+      <RemarkCell dataset={row.original} onChangeRemark={onChangeRemark} />
+    ),
   },
   {
     accessorFn(row) {

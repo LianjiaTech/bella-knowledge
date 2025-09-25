@@ -1,6 +1,6 @@
 import { webRequest, webRequestFormData } from "@/lib/request/web";
 import { KnowledgeFile } from "@/lib/types/file";
-import { anOldHope } from "react-syntax-highlighter/dist/esm/styles/hljs";
+import { toast } from "sonner";
 
 export async function getFileList() {
   const res = await webRequest<{ data: KnowledgeFile[] }>({
@@ -74,6 +74,21 @@ export async function postUploadFile(data: {
   if (res.code === 200) {
     return res.data;
   }
+  return null;
+}
+
+export async function postRenameFile(fileId: string, filename: string) {
+  const res = await webRequest<KnowledgeFile>({
+    path: `/api/files/${fileId}/rename`,
+    method: "POST",
+    query: {
+      filename,
+    },
+  });
+  if (res.code === 200) {
+    return res.data;
+  }
+  toast.error(res.message || "重命名失败");
   return null;
 }
 
