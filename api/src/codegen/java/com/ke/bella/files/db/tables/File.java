@@ -175,6 +175,21 @@ public class File extends TableImpl<FileRecord> {
      */
     public final TableField<FileRecord, String> PDF_FILE_ID = createField(DSL.name("pdf_file_id"), SQLDataType.VARCHAR(256).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "PDF的文件ID");
 
+    /**
+     * The column <code>file.description</code>. 描述
+     */
+    public final TableField<FileRecord, String> DESCRIPTION = createField(DSL.name("description"), SQLDataType.VARCHAR(256).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "描述");
+
+    /**
+     * The column <code>file.cities</code>. 作用城市,示例["北京","上海"]
+     */
+    public final TableField<FileRecord, String> CITIES = createField(DSL.name("cities"), SQLDataType.VARCHAR(512).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "作用城市,示例[\"北京\",\"上海\"]");
+
+    /**
+     * The column <code>file.tags</code>. 标签,示例["tag1","tag2"]
+     */
+    public final TableField<FileRecord, String> TAGS = createField(DSL.name("tags"), SQLDataType.VARCHAR(512).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "标签,示例[\"tag1\",\"tag2\"]");
+
     private File(Name alias, Table<FileRecord> aliased) {
         this(alias, aliased, null);
     }

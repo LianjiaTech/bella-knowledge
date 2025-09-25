@@ -5,6 +5,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 
+import java.util.List;
+
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
@@ -23,4 +25,7 @@ public class FileOps {
     private String extension;
     private String path;
     private Long bytes;
+    private String description;
+    private List<String> cities;
+    private List<String> tags;
 }

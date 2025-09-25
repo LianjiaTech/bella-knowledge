@@ -8,6 +8,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 
+import java.util.List;
+
 @SuperBuilder(toBuilder = true)
 @AllArgsConstructor
 @NoArgsConstructor
@@ -55,4 +57,10 @@ public class OpenAIFile {
     private Long cuid;
     private String cuName;
     private String path;
+    private Long muid;
+    private String muName;
+    private Long mtime;
+    private String description;
+    private List<String> cities;
+    private List<String> tags;
 }
