@@ -70,6 +70,7 @@ export interface RagevalData {
    * 实际回答
    */
   response: string;
+  eval_result?: "正确" | "错误" | "部分正确";
   retrieval_time: number;
   timestamp: string;
 }
