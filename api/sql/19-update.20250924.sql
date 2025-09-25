@@ -82,3 +82,13 @@ ALTER TABLE `file_15`
     ADD COLUMN `description` varchar(256) NOT NULL DEFAULT '' COMMENT '描述',
     ADD COLUMN `cities` varchar(512) NOT NULL DEFAULT '' COMMENT '作用城市,示例["北京","上海"]',
     ADD COLUMN `tags` varchar(512) NOT NULL DEFAULT '' COMMENT '标签,示例["tag1","tag2"]';
+
+ALTER TABLE `file_temp`
+    ADD COLUMN `description` varchar(256) NOT NULL DEFAULT '' COMMENT '描述',
+    ADD COLUMN `cities` varchar(512) NOT NULL DEFAULT '' COMMENT '作用城市,示例["北京","上海"]',
+    ADD COLUMN `tags` varchar(512) NOT NULL DEFAULT '' COMMENT '标签,示例["tag1","tag2"]';
+
+ALTER TABLE `file_system`
+    ADD COLUMN `description` varchar(256) NOT NULL DEFAULT '' COMMENT '描述',
+    ADD COLUMN `cities` varchar(512) NOT NULL DEFAULT '' COMMENT '作用城市,示例["北京","上海"]',
+    ADD COLUMN `tags` varchar(512) NOT NULL DEFAULT '' COMMENT '标签,示例["tag1","tag2"]';
