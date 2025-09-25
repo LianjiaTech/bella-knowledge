@@ -260,10 +260,10 @@ public class FileRepo implements BaseRepo {
             rec.setDescription(op.getDescription());
         }
         if(op.getCities() != null) {
-            rec.setCities(JsonUtils.toJson(op.getCities()));
+            rec.setCities(CollectionUtils.isEmpty(op.getCities()) ? "" : JsonUtils.toJson(op.getCities()));
         }
         if(op.getTags() != null) {
-            rec.setTags(JsonUtils.toJson(op.getTags()));
+            rec.setTags(CollectionUtils.isEmpty(op.getTags()) ? "" : JsonUtils.toJson(op.getTags()));
         }
 
         fillUpdatorInfo(rec);

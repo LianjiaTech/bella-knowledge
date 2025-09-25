@@ -226,9 +226,9 @@ public class FileService {
 
         String akCode = BellaContextHelper.getOperatorAkCode();
 
-        // 序列化 cities/tags 并校验 JSON 长度
-        String citiesJson = (cities == null || cities.isEmpty()) ? "[]" : JsonUtils.toJson(cities);
-        String tagsJson = (tags == null || tags.isEmpty()) ? "[]" : JsonUtils.toJson(tags);
+        // 序列化 cities/tags 并校验 JSON 长度（空数组存空串）
+        String citiesJson = (cities == null || cities.isEmpty()) ? "" : JsonUtils.toJson(cities);
+        String tagsJson = (tags == null || tags.isEmpty()) ? "" : JsonUtils.toJson(tags);
 
         // 保存文件信息到数据库
         FileDB fileDB = new FileDB();
@@ -443,6 +443,8 @@ public class FileService {
         fileDB.setAkCode(akCode);
         fileDB.setIsDir(1);
         fileDB.setDescription(description == null ? "" : description);
+        fileDB.setCities("");
+        fileDB.setTags("");
 
         fileRepo.addFile(fileDB, ancestorId, fileType);
 
