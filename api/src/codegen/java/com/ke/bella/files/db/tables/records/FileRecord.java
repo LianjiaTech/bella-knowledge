@@ -3,14 +3,11 @@
  */
 package com.ke.bella.files.db.tables.records;
 
-
-import com.ke.bella.files.db.repo.Operator;
-import com.ke.bella.files.db.tables.File;
-
 import java.time.LocalDateTime;
-
 import org.jooq.Record1;
 import org.jooq.impl.UpdatableRecordImpl;
+import com.ke.bella.files.db.repo.Operator;
+import com.ke.bella.files.db.tables.File;
 
 
 /**
@@ -436,7 +433,10 @@ public class FileRecord extends UpdatableRecordImpl<FileRecord> implements Opera
     /**
      * Create a detached, initialised FileRecord
      */
-    public FileRecord(Long id, String fileId, Long version, String filename, Integer isDir, String extension, String mimeType, String type, String bucket, String path, Long bytes, String spaceCode, String purpose, Long cuid, String cuName, LocalDateTime ctime, Long muid, String muName, LocalDateTime mtime, String metaData, Integer status, String akCode, Long broadcastStatus, String domTreeFileId, String pdfFileId, String description, String cities, String tags) {
+    public FileRecord(Long id, String fileId, Long version, String filename, Integer isDir, String extension, String mimeType, String type,
+        String bucket, String path, Long bytes, String spaceCode, String purpose, Long cuid, String cuName, LocalDateTime ctime, Long muid,
+        String muName, LocalDateTime mtime, String metaData, Integer status, String akCode, Long broadcastStatus, String domTreeFileId,
+        String pdfFileId, String description, String cities, String tags) {
         super(File.FILE);
 
         setId(id);

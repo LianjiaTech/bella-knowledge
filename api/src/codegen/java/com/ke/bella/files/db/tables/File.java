@@ -3,16 +3,9 @@
  */
 package com.ke.bella.files.db.tables;
 
-
-import com.ke.bella.files.db.DefaultSchema;
-import com.ke.bella.files.db.Indexes;
-import com.ke.bella.files.db.Keys;
-import com.ke.bella.files.db.tables.records.FileRecord;
-
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
-
 import org.jooq.Field;
 import org.jooq.ForeignKey;
 import org.jooq.Identity;
@@ -27,6 +20,10 @@ import org.jooq.UniqueKey;
 import org.jooq.impl.DSL;
 import org.jooq.impl.SQLDataType;
 import org.jooq.impl.TableImpl;
+import com.ke.bella.files.db.DefaultSchema;
+import com.ke.bella.files.db.Indexes;
+import com.ke.bella.files.db.Keys;
+import com.ke.bella.files.db.tables.records.FileRecord;
 
 
 /**
@@ -178,17 +175,20 @@ public class File extends TableImpl<FileRecord> {
     /**
      * The column <code>file.description</code>. 描述
      */
-    public final TableField<FileRecord, String> DESCRIPTION = createField(DSL.name("description"), SQLDataType.VARCHAR(256).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "描述");
+    public final TableField<FileRecord, String> DESCRIPTION = createField(DSL.name("description"),
+        SQLDataType.VARCHAR(256).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "描述");
 
     /**
      * The column <code>file.cities</code>. 作用城市,示例["北京","上海"]
      */
-    public final TableField<FileRecord, String> CITIES = createField(DSL.name("cities"), SQLDataType.VARCHAR(512).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "作用城市,示例[\"北京\",\"上海\"]");
+    public final TableField<FileRecord, String> CITIES = createField(DSL.name("cities"),
+        SQLDataType.VARCHAR(512).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "作用城市,示例[\"北京\",\"上海\"]");
 
     /**
      * The column <code>file.tags</code>. 标签,示例["tag1","tag2"]
      */
-    public final TableField<FileRecord, String> TAGS = createField(DSL.name("tags"), SQLDataType.VARCHAR(512).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "标签,示例[\"tag1\",\"tag2\"]");
+    public final TableField<FileRecord, String> TAGS = createField(DSL.name("tags"),
+        SQLDataType.VARCHAR(512).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "标签,示例[\"tag1\",\"tag2\"]");
 
     private File(Name alias, Table<FileRecord> aliased) {
         this(alias, aliased, null);

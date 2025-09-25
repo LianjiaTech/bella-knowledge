@@ -1,6 +1,9 @@
 package com.ke.bella.files.api;
 
-import static com.ke.bella.files.service.FileService.ONE_DAY_STRING;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
+import okhttp3.MediaType;
 
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
@@ -13,10 +16,8 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
-
 import javax.imageio.ImageIO;
 import javax.servlet.http.HttpServletResponse;
-
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
@@ -38,7 +39,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
-
 import com.ke.bella.files.annotations.FileAPI;
 import com.ke.bella.files.db.tables.pojos.FileDB;
 import com.ke.bella.files.enums.FilePurpose;
@@ -66,10 +66,7 @@ import com.ke.bella.files.utils.FilePurposeClassifier;
 import com.ke.bella.files.utils.JsonUtils;
 import com.ke.bella.openapi.utils.FileUtils;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.extern.slf4j.Slf4j;
-import okhttp3.MediaType;
+import static com.ke.bella.files.service.FileService.ONE_DAY_STRING;
 
 @FileAPI
 @RestController
@@ -106,10 +103,10 @@ public class FileController {
             @RequestParam(value = "get_url", required = false, defaultValue = "false") boolean getUrl,
             @RequestParam(value = "expires", required = false, defaultValue = ONE_DAY_STRING) long expires,
             @RequestParam(value = "ancestor_id", required = false) String ancestorId,
-            @RequestParam(value = "overwrite", required = false, defaultValue = "false") boolean overwrite,
-			@RequestParam(value = "description", required = false, defaultValue = "") String description,
-			@RequestParam(value = "cities", required = false) List<String> cities,
-			@RequestParam(value = "tags", required = false) List<String> tags) throws IOException {
+        @RequestParam(value = "overwrite", required = false, defaultValue = "false") boolean overwrite,
+        @RequestParam(value = "description", required = false, defaultValue = "") String description,
+        @RequestParam(value = "cities", required = false) List<String> cities,
+        @RequestParam(value = "tags", required = false) List<String> tags) throws IOException {
 
         validateDescription(description);
         validateCitiesJson(cities);
@@ -147,9 +144,9 @@ public class FileController {
                     }
                 }
 
-				return fileService.uploadWithUrl(finalTmpFileInfo.getTmpFile(), finalTmpFileInfo.getType(), finalTmpFileInfo.getMimeType(),
+                return fileService.uploadWithUrl(finalTmpFileInfo.getTmpFile(), finalTmpFileInfo.getType(), finalTmpFileInfo.getMimeType(),
                         finalTmpFileInfo.getExtension(), finalTmpFileInfo.getCharset(), finalPurpose, metadata, getUrl, expires, ancestorId,
-                        filename, description, cities, tags);
+                    filename, description, cities, tags);
             });
         } catch (IllegalArgumentException e) {
             throw e;

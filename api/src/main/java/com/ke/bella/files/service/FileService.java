@@ -1,20 +1,20 @@
 package com.ke.bella.files.service;
 
-import static com.ke.bella.files.db.IDGenerator.FILE_ID_GENERATOR;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
-
 import javax.annotation.PostConstruct;
-
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.ke.bella.files.FileShardingCountUpdator;
 import com.ke.bella.files.TaskExecutor;
@@ -40,10 +40,7 @@ import com.ke.bella.files.utils.BellaContextHelper;
 import com.ke.bella.files.utils.FilePurposeClassifier;
 import com.ke.bella.files.utils.JsonUtils;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.extern.slf4j.Slf4j;
+import static com.ke.bella.files.db.IDGenerator.FILE_ID_GENERATOR;
 
 @Slf4j
 @Component
@@ -108,20 +105,20 @@ public class FileService {
                 .metadata(fileDB.getMetaData())
                 .cuid(fileDB.getCuid())
                 .cuName(fileDB.getCuName())
-                .muid(fileDB.getMuid())
-                .muName(fileDB.getMuName())
-                .mtime(fileDB.getMtime()
-                    .toInstant(ZoneId.systemDefault().getRules().getOffset(fileDB.getMtime()))
-                    .toEpochMilli())
-                .description(fileDB.getDescription())
-                .cities(StringUtils.isNotEmpty(fileDB.getCities()) ?
-                    JsonUtils.fromJson(fileDB.getCities(), new TypeReference<List<String>>() {
-                    }) :
-                    new ArrayList<>())
-                .tags(StringUtils.isNotEmpty(fileDB.getTags()) ?
-                    JsonUtils.fromJson(fileDB.getTags(), new TypeReference<List<String>>() {
-                    }) :
-                    new ArrayList<>())
+            .muid(fileDB.getMuid())
+            .muName(fileDB.getMuName())
+            .mtime(fileDB.getMtime()
+                .toInstant(ZoneId.systemDefault().getRules().getOffset(fileDB.getMtime()))
+                .toEpochMilli())
+            .description(fileDB.getDescription())
+            .cities(StringUtils.isNotEmpty(fileDB.getCities()) ?
+                JsonUtils.fromJson(fileDB.getCities(), new TypeReference<List<String>>() {
+                }) :
+                new ArrayList<>())
+            .tags(StringUtils.isNotEmpty(fileDB.getTags()) ?
+                JsonUtils.fromJson(fileDB.getTags(), new TypeReference<List<String>>() {
+                }) :
+                new ArrayList<>())
                 .build();
     }
 
@@ -170,9 +167,9 @@ public class FileService {
 
     @Transactional(rollbackFor = Exception.class)
     public OpenAIFile uploadWithUrl(File file, String type, String mimeType, String extension, String charset, String purpose, String metadata,
-            boolean getUrl, long expires, String ancestorId, String filename, String description, List<String> cities, List<String> tags) {
+        boolean getUrl, long expires, String ancestorId, String filename, String description, List<String> cities, List<String> tags) {
         OpenAIFile openaiFile = upload(file, filename, purpose, metadata,
-                mimeType, type, extension, charset, ancestorId, description, cities, tags);
+            mimeType, type, extension, charset, ancestorId, description, cities, tags);
 
         if(getUrl) {
             String url = getUrl(openaiFile.getId(), expires);
@@ -209,18 +206,18 @@ public class FileService {
 
     @Transactional(rollbackFor = Exception.class)
     public OpenAIFile upload(
-            File file,
-            String filename,
-            String purpose,
-            String metadata,
-            String mimeType,
-            String type,
-            String extension,
-            String charset,
-            String ancestorId,
-            String description,
-            List<String> cities,
-            List<String> tags) {
+        File file,
+        String filename,
+        String purpose,
+        String metadata,
+        String mimeType,
+        String type,
+        String extension,
+        String charset,
+        String ancestorId,
+        String description,
+        List<String> cities,
+        List<String> tags) {
         String spaceCode = BellaContextHelper.getOperateSpaceCode();
         FileType fileType = FilePurposeClassifier.classify(purpose);
         String fileId = FILE_ID_GENERATOR.generateWithType(fileType);
@@ -277,8 +274,6 @@ public class FileService {
                 () -> updateBroadcastStatus(fileId, BroadcastStatus.FAILED));
         return openAIFile;
     }
-
-
 
     public List<OpenAIFile> list(
             String purpose,
