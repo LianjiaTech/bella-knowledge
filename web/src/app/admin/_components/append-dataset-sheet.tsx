@@ -76,8 +76,20 @@ export function AppendDatasetSheet({
     try {
       setIsUploading(true);
 
+      // Add UUID to filename for dataset import
+      const uuid = crypto.randomUUID();
+      const lastDotIndex = selectedFile.name.lastIndexOf('.');
+      const newFilename = lastDotIndex === -1 
+        ? `${selectedFile.name}(${uuid})`
+        : `${selectedFile.name.substring(0, lastDotIndex)}(${uuid})${selectedFile.name.substring(lastDotIndex)}`;
+      
+      const fileWithUUID = new File([selectedFile], newFilename, {
+        type: selectedFile.type,
+        lastModified: selectedFile.lastModified,
+      });
+
       const data = await postUploadFile({
-        file: selectedFile,
+        file: fileWithUUID,
         purpose: "datasets_import",
       });
       if (data) {

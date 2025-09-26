@@ -65,8 +65,20 @@ export function CreateDatasetForm({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileUpload = async (files: FileList) => {
-    const file = files[0];
-    if (!file) return;
+    const originalFile = files[0];
+    if (!originalFile) return;
+
+    // Add UUID to filename for dataset import
+    const uuid = crypto.randomUUID();
+    const lastDotIndex = originalFile.name.lastIndexOf('.');
+    const newFilename = lastDotIndex === -1 
+      ? `${originalFile.name}(${uuid})`
+      : `${originalFile.name.substring(0, lastDotIndex)}(${uuid})${originalFile.name.substring(lastDotIndex)}`;
+    
+    const file = new File([originalFile], newFilename, {
+      type: originalFile.type,
+      lastModified: originalFile.lastModified,
+    });
 
     setUploading(true);
     try {
