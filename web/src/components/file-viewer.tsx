@@ -7,6 +7,7 @@ import { X, ZoomIn, ZoomOutIcon } from "lucide-react";
 import * as ExcelJS from "exceljs";
 import { Spinner } from "./ui/spinner";
 import { ScrollArea } from "./ui/scroll-area";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 
 interface ImageViewerProps {
   url: string;
@@ -88,10 +89,12 @@ const ImageViewer = ({ url, onCancel }: ImageViewerProps) => {
 
 interface TextViewerProps {
   url: string;
+  open: boolean;
+  isJson?: boolean;
   onCancel: () => void;
 }
 
-const TextViewer = ({ url, onCancel }: TextViewerProps) => {
+const TextViewer = ({ url, onCancel, isJson, open }: TextViewerProps) => {
   const [content, setContent] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -123,47 +126,38 @@ const TextViewer = ({ url, onCancel }: TextViewerProps) => {
     setContent("");
     onCancel();
   };
-  return createPortal(
-    <div
-      className="fixed inset-0 flex items-center justify-center bg-black/80 z-[10]"
-      onClick={(e) => e.stopPropagation()}
-      tabIndex={-1}
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) {
+          onClickCancel();
+        }
+      }}
     >
-      <div className="bg-white rounded-lg shadow-lg w-[90vw] h-[90vh] max-w-4xl flex flex-col">
-        {/* 头部工具栏 */}
-        <div className="flex items-center justify-between p-4 border-b">
-          <h3 className="text-lg font-semibold">文本预览</h3>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" onClick={onClickCancel}>
-                <X className="w-4 h-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>关闭</TooltipContent>
-          </Tooltip>
-        </div>
-
-        {/* 内容区域 */}
-        <div className="flex-1 p-4 overflow-hidden">
-          {isLoading ? (
-            <div className="flex justify-center items-center h-full">
-              <Spinner className="h-full" />
-            </div>
-          ) : error ? (
-            <div className="flex justify-center items-center h-full">
-              <p className="text-red-500">加载失败: {error}</p>
-            </div>
-          ) : (
-            <ScrollArea className="h-full">
-              <pre className="whitespace-pre-wrap break-all font-mono text-sm leading-relaxed">
-                {content}
-              </pre>
-            </ScrollArea>
-          )}
-        </div>
-      </div>
-    </div>,
-    document.body,
+      <DialogContent className="h-200 w-200 !max-w-none flex flex-col">
+        <DialogHeader>
+          <DialogTitle>文本预览</DialogTitle>
+        </DialogHeader>
+        {isLoading ? (
+          <div className="flex justify-center items-center h-full">
+            <Spinner className="h-full" />
+          </div>
+        ) : error ? (
+          <div className="flex justify-center items-center h-full">
+            <p className="text-red-500">加载失败: {error}</p>
+          </div>
+        ) : (
+          <ScrollArea className="flex-1 h-0">
+            <pre className="whitespace-pre-wrap break-all font-mono text-sm leading-relaxed">
+              {isJson && content
+                ? JSON.stringify(JSON.parse(content), null, 2)
+                : content}
+            </pre>
+          </ScrollArea>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 };
 
@@ -403,22 +397,33 @@ interface FileViewerProps {
   extension: string;
   mimeType: string;
   url: string;
+  open: boolean;
   onCancel: () => void;
 }
 const FileViewer = ({
   extension,
   mimeType,
   url,
+  open,
   onCancel,
 }: FileViewerProps) => {
   const isImage = mimeType.startsWith("image/");
   if (extension === "pdf" || extension === "docx" || extension === "doc") {
+    if (!open) {
+      return null;
+    }
     return <PdfViewer url={url} onCancel={onCancel}></PdfViewer>;
   }
   if (isImage) {
+    if (!open) {
+      return null;
+    }
     return <ImageViewer url={url} onCancel={onCancel}></ImageViewer>;
   }
   if (extension === "xlsx" || extension === "xls" || extension === "csv") {
+    if (!open) {
+      return null;
+    }
     return (
       <ExcelViewer
         extension={extension}
@@ -427,7 +432,14 @@ const FileViewer = ({
       ></ExcelViewer>
     );
   }
-  return <TextViewer url={url} onCancel={onCancel}></TextViewer>;
+  return (
+    <TextViewer
+      url={url}
+      onCancel={onCancel}
+      open={open}
+      isJson={extension === "json"}
+    ></TextViewer>
+  );
 };
 
 export default FileViewer;
