@@ -34,8 +34,8 @@ const RagevalViewer = ({
       <div className="bg-white rounded-xl p-6 border">
         <div className="flex justify-between mb-4">
           <div className="flex items-center gap-2">
-          <FileText className="h-4 w-4" />
-          <div className="font-semibold">原始问题</div>
+            <FileText className="h-4 w-4" />
+            <div className="font-semibold">原始问题</div>
           </div>
           <div className="flex gap-2">
             <Button
@@ -63,6 +63,10 @@ const RagevalViewer = ({
             <ScrollArea className="flex-1 overflow-hidden">
               <div className="space-y-3">
                 {data.gb_references.map((item, index) => {
+                  const isMissed = data.eval_missed_references.some(
+                    (ref) =>
+                      ref.file_id === item.file_id && ref.path === item.path,
+                  );
                   const isRecall = data.reference.some(
                     (ref) =>
                       ref.metadata.file_id === item.file_id &&
@@ -74,12 +78,20 @@ const RagevalViewer = ({
                       className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer hover:bg-gray-50 transition-colors ${
                         isRecall
                           ? "border-green-200 bg-green-50"
-                          : "border-red-300 bg-red-50"
+                          : isMissed
+                            ? "border-red-300 bg-red-50"
+                            : "border-yellow-300 bg-yellow-50"
                       }`}
                       onClick={() => onClickReference?.(item)}
                     >
                       <div
-                        className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${isRecall ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"}`}
+                        className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
+                          isRecall
+                            ? "bg-green-100 text-green-600"
+                            : isMissed
+                              ? "bg-red-100 text-red-600"
+                              : "bg-yellow-100 text-yellow-600"
+                        }`}
                       >
                         {index + 1}
                       </div>
@@ -212,7 +224,9 @@ const RagevalViewer = ({
             />
             <div className="font-semibold text-base">实际答案</div>
           </div>
-          <div className="text-sm whitespace-pre-wrap">{data?.response || ""}</div>
+          <div className="text-sm whitespace-pre-wrap">
+            {data?.response || ""}
+          </div>
         </div>
       </div>
     </div>
