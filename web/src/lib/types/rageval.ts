@@ -73,4 +73,5 @@ export interface RagevalData {
   eval_result?: "正确" | "错误" | "部分正确";
   retrieval_time: number;
   timestamp: string;
+  answer_evaluation: Object;
 }

@@ -258,17 +258,16 @@ const Page = () => {
           onClickRow={(file) => onClickFile.run(file)}
         />
       </div>
-      {previewModalOpen && (
-        <FileViewer
-          extension={previewFile?.current?.extension || ""}
-          mimeType={previewFile?.current?.mime_type || ""}
-          url={previewFileUrl || ""}
-          onCancel={() => {
-            setPreviewModalOpen(false);
-            setPreviewFileUrl(null);
-          }}
-        />
-      )}
+      <FileViewer
+        extension={previewFile?.current?.extension || ""}
+        mimeType={previewFile?.current?.mime_type || ""}
+        url={previewFileUrl || ""}
+        open={previewModalOpen}
+        onCancel={() => {
+          setPreviewModalOpen(false);
+          setPreviewFileUrl(null);
+        }}
+      />
     </>
   );
 };
