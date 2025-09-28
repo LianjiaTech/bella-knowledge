@@ -1,7 +1,15 @@
 package com.ke.bella.files.api;
 
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 import java.util.Arrays;
 import java.util.Collections;
+
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
@@ -10,6 +18,7 @@ import org.springframework.http.converter.json.MappingJackson2HttpMessageConvert
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ke.bella.files.api.interceptor.FileApiResponseAdvice;
 import com.ke.bella.files.protocol.FileOps;
@@ -17,15 +26,6 @@ import com.ke.bella.files.protocol.OpenAIFile;
 import com.ke.bella.files.protocol.Scope;
 import com.ke.bella.files.service.FileService;
 import com.ke.bella.files.service.lock.FileUniquenessLock;
-
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 public class FileControllerUpdateTagsTest {
 

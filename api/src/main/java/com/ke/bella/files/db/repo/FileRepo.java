@@ -1,5 +1,9 @@
 package com.ke.bella.files.db.repo;
 
+import static com.ke.bella.files.db.Tables.*;
+import static com.ke.bella.files.db.repo.DSLContextHolder.targetTableName;
+import static org.jooq.impl.DSL.field;
+
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -7,21 +11,18 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+
 import javax.annotation.Nullable;
 import javax.annotation.Resource;
+
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
-import org.jooq.DSLContext;
-import org.jooq.InsertSetMoreStep;
-import org.jooq.Record;
-import org.jooq.Record1;
-import org.jooq.SelectConditionStep;
-import org.jooq.SelectOrderByStep;
-import org.jooq.UpdateSetMoreStep;
+import org.jooq.*;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
+
 import com.ke.bella.files.db.FileIdGenerator;
 import com.ke.bella.files.db.tables.pojos.FileDB;
 import com.ke.bella.files.db.tables.pojos.FileProgressDB;
@@ -38,14 +39,6 @@ import com.ke.bella.files.protocol.ListFileOps;
 import com.ke.bella.files.utils.BellaContextHelper;
 import com.ke.bella.files.utils.CustomStringUtils;
 import com.ke.bella.files.utils.JsonUtils;
-
-import static com.ke.bella.files.db.Tables.FILE;
-import static com.ke.bella.files.db.Tables.FILE_CLOSURE;
-import static com.ke.bella.files.db.Tables.FILE_MAPPING;
-import static com.ke.bella.files.db.Tables.FILE_PROGRESS;
-import static com.ke.bella.files.db.Tables.FILE_SHARDING;
-import static com.ke.bella.files.db.repo.DSLContextHolder.targetTableName;
-import static org.jooq.impl.DSL.field;
 
 @Component
 public class FileRepo implements BaseRepo {
