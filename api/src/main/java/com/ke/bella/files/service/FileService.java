@@ -112,9 +112,9 @@ public class FileService {
                         .toEpochMilli())
                 .description(fileDB.getDescription())
                 .cities(StringUtils.isNotEmpty(fileDB.getCities()) ? JsonUtils.fromJson(fileDB.getCities(), new TypeReference<List<String>>() {
-                }) : new ArrayList<>())
+                }) : null)
                 .tags(StringUtils.isNotEmpty(fileDB.getTags()) ? JsonUtils.fromJson(fileDB.getTags(), new TypeReference<List<String>>() {
-                }) : new ArrayList<>())
+                }) : null)
                 .build();
     }
 
