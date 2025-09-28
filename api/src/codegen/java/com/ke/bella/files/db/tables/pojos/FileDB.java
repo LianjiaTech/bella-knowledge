@@ -3,9 +3,11 @@
  */
 package com.ke.bella.files.db.tables.pojos;
 
+
+import com.ke.bella.files.db.repo.Operator;
+
 import java.io.Serializable;
 import java.time.LocalDateTime;
-import com.ke.bella.files.db.repo.Operator;
 
 
 /**
@@ -41,9 +43,9 @@ public class FileDB implements Operator, Serializable {
     private Long          broadcastStatus;
     private String        domTreeFileId;
     private String        pdfFileId;
-    private String description;
-    private String cities;
-    private String tags;
+    private String        description;
+    private String        cities;
+    private String        tags;
 
     public FileDB() {}
 
@@ -103,10 +105,10 @@ public class FileDB implements Operator, Serializable {
         String        akCode,
         Long          broadcastStatus,
         String        domTreeFileId,
-        String pdfFileId,
-        String description,
-        String cities,
-        String tags
+        String        pdfFileId,
+        String        description,
+        String        cities,
+        String        tags
     ) {
         this.id = id;
         this.fileId = fileId;
