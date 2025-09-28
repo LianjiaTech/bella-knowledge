@@ -114,10 +114,10 @@ public class FileService {
                         .toInstant(ZoneId.systemDefault().getRules().getOffset(fileDB.getMtime()))
                         .toEpochMilli())
                 .description(fileDB.getDescription())
-                .cities(StringUtils.isNotEmpty(fileDB.getCities()) ? JsonUtils.fromJson(fileDB.getCities(), new TypeReference<List<String>>() {
-                }) : null)
-                .tags(StringUtils.isNotEmpty(fileDB.getTags()) ? JsonUtils.fromJson(fileDB.getTags(), new TypeReference<List<String>>() {
-                }) : null)
+                .cities(JsonUtils.fromJson(fileDB.getCities(), new TypeReference<List<String>>() {
+                }))
+                .tags(JsonUtils.fromJson(fileDB.getTags(), new TypeReference<List<String>>() {
+                }))
                 .build();
     }
 
@@ -229,9 +229,8 @@ public class FileService {
 
         String akCode = BellaContextHelper.getOperatorAkCode();
 
-        // 序列化 cities/tags 并校验 JSON 长度（空数组存空串）
-        String citiesJson = (cities == null || cities.isEmpty()) ? "" : JsonUtils.toJson(cities);
-        String tagsJson = (tags == null || tags.isEmpty()) ? "" : JsonUtils.toJson(tags);
+        String citiesJson = (cities == null) ? "" : JsonUtils.toJson(cities);
+        String tagsJson = (tags == null) ? "" : JsonUtils.toJson(tags);
 
         // 保存文件信息到数据库
         FileDB fileDB = new FileDB();
