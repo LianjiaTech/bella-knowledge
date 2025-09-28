@@ -1,6 +1,10 @@
 package com.ke.bella.files.db.repo;
 
-import static com.ke.bella.files.db.Tables.*;
+import static com.ke.bella.files.db.Tables.FILE;
+import static com.ke.bella.files.db.Tables.FILE_CLOSURE;
+import static com.ke.bella.files.db.Tables.FILE_MAPPING;
+import static com.ke.bella.files.db.Tables.FILE_PROGRESS;
+import static com.ke.bella.files.db.Tables.FILE_SHARDING;
 import static com.ke.bella.files.db.repo.DSLContextHolder.targetTableName;
 import static org.jooq.impl.DSL.field;
 
@@ -17,7 +21,13 @@ import javax.annotation.Resource;
 
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
-import org.jooq.*;
+import org.jooq.DSLContext;
+import org.jooq.InsertSetMoreStep;
+import org.jooq.Record;
+import org.jooq.Record1;
+import org.jooq.SelectConditionStep;
+import org.jooq.SelectOrderByStep;
+import org.jooq.UpdateSetMoreStep;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.Assert;
