@@ -229,8 +229,8 @@ public class FileService {
 
         String akCode = BellaContextHelper.getOperatorAkCode();
 
-        String citiesJson = (cities == null) ? "" : JsonUtils.toJson(cities);
-        String tagsJson = (tags == null) ? "" : JsonUtils.toJson(tags);
+        String citiesJson = cities == null ? "" : JsonUtils.toJson(cities);
+        String tagsJson = tags == null ? "" : JsonUtils.toJson(tags);
 
         // 保存文件信息到数据库
         FileDB fileDB = new FileDB();
