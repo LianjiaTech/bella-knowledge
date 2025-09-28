@@ -48,6 +48,7 @@ import com.ke.bella.files.protocol.FileStatus;
 import com.ke.bella.files.protocol.ListFileOps;
 import com.ke.bella.files.utils.BellaContextHelper;
 import com.ke.bella.files.utils.CustomStringUtils;
+import com.ke.bella.files.utils.JsonUtils;
 
 @Component
 public class FileRepo implements BaseRepo {
@@ -257,6 +258,15 @@ public class FileRepo implements BaseRepo {
         }
         if(op.getBytes() != null) {
             rec.setBytes(op.getBytes());
+        }
+        if(op.getDescription() != null) {
+            rec.setDescription(op.getDescription());
+        }
+        if(op.getCities() != null) {
+            rec.setCities(JsonUtils.toJson(op.getCities()));
+        }
+        if(op.getTags() != null) {
+            rec.setTags(JsonUtils.toJson(op.getTags()));
         }
 
         fillUpdatorInfo(rec);

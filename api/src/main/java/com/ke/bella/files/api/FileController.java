@@ -42,7 +42,6 @@ import org.springframework.web.multipart.MultipartFile;
 import com.ke.bella.files.annotations.FileAPI;
 import com.ke.bella.files.db.tables.pojos.FileDB;
 import com.ke.bella.files.enums.FilePurpose;
-import com.ke.bella.files.enums.FileType;
 import com.ke.bella.files.protocol.DomTreeOps.DomTreeUploadOp;
 import com.ke.bella.files.protocol.FileCropOps;
 import com.ke.bella.files.protocol.FileCropOps.FileCropOp;
@@ -56,7 +55,10 @@ import com.ke.bella.files.protocol.OpenAIFile;
 import com.ke.bella.files.protocol.OpenapiListResponse;
 import com.ke.bella.files.protocol.Progress;
 import com.ke.bella.files.protocol.Scope;
+import com.ke.bella.files.protocol.UpdateCitiesOps;
+import com.ke.bella.files.protocol.UpdateDescriptionOps;
 import com.ke.bella.files.protocol.UpdateProgressRequestData;
+import com.ke.bella.files.protocol.UpdateTagsOps;
 import com.ke.bella.files.service.FileService;
 import com.ke.bella.files.service.lock.FileUniquenessLock;
 import com.ke.bella.files.utils.BellaContextHelper;
@@ -79,6 +81,12 @@ public class FileController {
 
     private static final int MAX_DIRECTORY_NAME_LENGTH = 255;
 
+    private static final int MAX_DESCRIPTION_LENGTH = 256;
+
+    private static final int MAX_CITIES_JSON_LENGTH = 512;
+
+    private static final int MAX_TAGS_JSON_LENGTH = 512;
+
     private static final Pattern WINDOWS_INVALID_CHARS = Pattern.compile("[<>:\"|?*\\\\]|[\\x00-\\x1f]");
 
     private static final Pattern UNIX_INVALID_CHARS = Pattern.compile("[\\x00/]");
@@ -98,7 +106,15 @@ public class FileController {
             @RequestParam(value = "get_url", required = false, defaultValue = "false") boolean getUrl,
             @RequestParam(value = "expires", required = false, defaultValue = ONE_DAY_STRING) long expires,
             @RequestParam(value = "ancestor_id", required = false) String ancestorId,
-            @RequestParam(value = "overwrite", required = false, defaultValue = "false") boolean overwrite) throws IOException {
+            @RequestParam(value = "overwrite", required = false, defaultValue = "false") boolean overwrite,
+            @RequestParam(value = "description", required = false, defaultValue = "") String description,
+            @RequestParam(value = "cities", required = false) List<String> cities,
+            @RequestParam(value = "tags", required = false) List<String> tags) throws IOException {
+
+        validateDescription(description);
+        validateCitiesJson(cities);
+        validateTagsJson(tags);
+
         String spaceCode = BellaContextHelper.getOperateSpaceCode();
         String filename = file.getOriginalFilename();
 
@@ -133,7 +149,7 @@ public class FileController {
 
                 return fileService.uploadWithUrl(finalTmpFileInfo.getTmpFile(), finalTmpFileInfo.getType(), finalTmpFileInfo.getMimeType(),
                         finalTmpFileInfo.getExtension(), finalTmpFileInfo.getCharset(), finalPurpose, metadata, getUrl, expires, ancestorId,
-                        filename);
+                        filename, description, cities, tags);
             });
         } catch (IllegalArgumentException e) {
             throw e;
@@ -145,6 +161,30 @@ public class FileController {
                 tmpFileInfo.close();
             }
         }
+    }
+
+    private static void validateDescription(String description) {
+        if(description != null) {
+            Assert.isTrue(description.length() <= MAX_DESCRIPTION_LENGTH,
+                    String.format("Description too long: %d characters (max %d)",
+                            description.length(), MAX_DESCRIPTION_LENGTH));
+        }
+    }
+
+    private static void validateCitiesJson(List<String> cities) {
+        if(CollectionUtils.isEmpty(cities)) {
+            return;
+        }
+        String citiesJson = JsonUtils.toJson(cities);
+        Assert.isTrue(citiesJson.length() <= MAX_CITIES_JSON_LENGTH, "cities total length cannot exceed 512 characters");
+    }
+
+    private static void validateTagsJson(List<String> tags) {
+        if(CollectionUtils.isEmpty(tags)) {
+            return;
+        }
+        String tagsJson = JsonUtils.toJson(tags);
+        Assert.isTrue(tagsJson.length() <= MAX_TAGS_JSON_LENGTH, "tags total length cannot exceed 512 characters");
     }
 
     private TmpFileInfo createTempFile(MultipartFile file) throws IOException {
@@ -868,6 +908,7 @@ public class FileController {
         Assert.hasText(op.getName(), "name is required");
 
         validateDirectoryName(op.getName());
+        validateDescription(op.getDescription());
 
         String spaceCode = BellaContextHelper.getOperateSpaceCode();
 
@@ -877,7 +918,7 @@ public class FileController {
                         String.format("Directory '%s' already exists in current directory, ancestor_id: '%s'", op.getName(), op.getAncestorId()));
             }
 
-            return fileService.mkdir(op.getName(), op.getAncestorId());
+            return fileService.mkdir(op.getName(), op.getAncestorId(), op.getDescription());
         });
     }
 
@@ -920,4 +961,96 @@ public class FileController {
         }
         return fileService.info(fileId);
     }
+
+    @PutMapping("/{fileId}/description")
+    public OpenAIFile updateDescription(
+            @PathVariable String fileId,
+            @RequestBody UpdateDescriptionOps op) {
+        Assert.hasText(fileId, "file_id is required");
+        Assert.notNull(op, "invalid request body");
+        Assert.notNull(op.getDescription(), "description is required");
+
+        validateDescription(op.getDescription());
+
+        OpenAIFile existingFile = fileService.getFile(fileId);
+        if(existingFile == null) {
+            throw new FileNotFoundException(fileId);
+        }
+
+        FileOps ops = FileOps.builder()
+                .fileId(fileId)
+                .description(op.getDescription())
+                .build();
+
+        return fileService.updateFile(ops, false, Scope.DESCRIPTION);
+    }
+
+    /**
+     * 更新城市信息
+     *
+     * @param fileId 文件ID
+     * @param op     更新城市操作对象，包含新城市列表
+     *
+     * @return 更新后的文件对象
+     *
+     * @throws IllegalArgumentException 当请求体为空、文件ID为空、城市列表为空或城市总长度超过512字符时抛出
+     * @throws FileNotFoundException    当指定的文件不存在时抛出
+     */
+    @PutMapping("/{fileId}/cities")
+    public OpenAIFile updateCities(
+            @PathVariable String fileId,
+            @RequestBody UpdateCitiesOps op) {
+        Assert.hasText(fileId, "file_id is required");
+        Assert.notNull(op, "invalid request body");
+        Assert.notNull(op.getCities(), "cities is required");
+
+        validateCitiesJson(op.getCities());
+
+        OpenAIFile existingFile = fileService.getFile(fileId);
+        if(existingFile == null) {
+            throw new FileNotFoundException(fileId);
+        }
+
+        FileOps ops = FileOps.builder()
+                .fileId(fileId)
+                .cities(op.getCities())
+                .build();
+
+        return fileService.updateFile(ops, true, Scope.CITIES);
+    }
+
+    /**
+     * 更新标签
+     *
+     * @param fileId 文件ID
+     * @param op     更新标签操作对象，包含新标签列表
+     *
+     * @return 更新后的文件对象
+     *
+     * @throws IllegalArgumentException 当请求体为空、文件ID为空、标签为空或标签总长度超过512字符时抛出
+     * @throws FileNotFoundException    当指定的文件不存在时抛出
+     */
+    @PutMapping("/{fileId}/tags")
+    public OpenAIFile updateTags(
+            @PathVariable String fileId,
+            @RequestBody UpdateTagsOps op) {
+        Assert.hasText(fileId, "file_id is required");
+        Assert.notNull(op, "invalid request body");
+        Assert.notNull(op.getTags(), "tags is required");
+
+        validateTagsJson(op.getTags());
+
+        OpenAIFile existingFile = fileService.getFile(fileId);
+        if(existingFile == null) {
+            throw new FileNotFoundException(fileId);
+        }
+
+        FileOps ops = FileOps.builder()
+                .fileId(fileId)
+                .tags(op.getTags())
+                .build();
+
+        return fileService.updateFile(ops, true, Scope.TAGS);
+    }
+
 }

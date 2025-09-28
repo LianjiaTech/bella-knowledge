@@ -10,7 +10,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.experimental.SuperBuilder;
 
 public class FileSystemOps {
 
@@ -28,6 +27,7 @@ public class FileSystemOps {
     public static class MkdirOp {
         private String ancestorId;
         private String name;
+        private String description;
     }
 
     @Data

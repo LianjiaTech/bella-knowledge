@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.ke.bella.files.FileShardingCountUpdator;
 import com.ke.bella.files.TaskExecutor;
 import com.ke.bella.files.configuration.BucketConfig;
@@ -37,6 +38,7 @@ import com.ke.bella.files.service.broadcast.BroadcastService;
 import com.ke.bella.files.service.storage.StorageService;
 import com.ke.bella.files.utils.BellaContextHelper;
 import com.ke.bella.files.utils.FilePurposeClassifier;
+import com.ke.bella.files.utils.JsonUtils;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -106,6 +108,16 @@ public class FileService {
                 .metadata(fileDB.getMetaData())
                 .cuid(fileDB.getCuid())
                 .cuName(fileDB.getCuName())
+                .muid(fileDB.getMuid())
+                .muName(fileDB.getMuName())
+                .mtime(fileDB.getMtime()
+                        .toInstant(ZoneId.systemDefault().getRules().getOffset(fileDB.getMtime()))
+                        .toEpochMilli())
+                .description(fileDB.getDescription())
+                .cities(JsonUtils.fromJson(fileDB.getCities(), new TypeReference<List<String>>() {
+                }))
+                .tags(JsonUtils.fromJson(fileDB.getTags(), new TypeReference<List<String>>() {
+                }))
                 .build();
     }
 
@@ -154,9 +166,9 @@ public class FileService {
 
     @Transactional(rollbackFor = Exception.class)
     public OpenAIFile uploadWithUrl(File file, String type, String mimeType, String extension, String charset, String purpose, String metadata,
-            boolean getUrl, long expires, String ancestorId, String filename) {
+            boolean getUrl, long expires, String ancestorId, String filename, String description, List<String> cities, List<String> tags) {
         OpenAIFile openaiFile = upload(file, filename, purpose, metadata,
-                mimeType, type, extension, charset, ancestorId);
+                mimeType, type, extension, charset, ancestorId, description, cities, tags);
 
         if(getUrl) {
             String url = getUrl(openaiFile.getId(), expires);
@@ -188,6 +200,23 @@ public class FileService {
             String extension,
             String charset,
             String ancestorId) {
+        return upload(file, filename, purpose, metadata, mimeType, type, extension, charset, ancestorId, null, null, null);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public OpenAIFile upload(
+            File file,
+            String filename,
+            String purpose,
+            String metadata,
+            String mimeType,
+            String type,
+            String extension,
+            String charset,
+            String ancestorId,
+            String description,
+            List<String> cities,
+            List<String> tags) {
         String spaceCode = BellaContextHelper.getOperateSpaceCode();
         FileType fileType = FilePurposeClassifier.classify(purpose);
         String fileId = FILE_ID_GENERATOR.generateWithType(fileType);
@@ -199,6 +228,9 @@ public class FileService {
         storageService.putObject(bucketName, keyName, mimeType, file, filename, charset);
 
         String akCode = BellaContextHelper.getOperatorAkCode();
+
+        String citiesJson = cities == null ? "" : JsonUtils.toJson(cities);
+        String tagsJson = tags == null ? "" : JsonUtils.toJson(tags);
 
         // 保存文件信息到数据库
         FileDB fileDB = new FileDB();
@@ -214,6 +246,9 @@ public class FileService {
         fileDB.setPurpose(purpose);
         fileDB.setMetaData(metadata);
         fileDB.setAkCode(akCode);
+        fileDB.setDescription(StringUtils.isNotEmpty(description) ? description : "");
+        fileDB.setCities(citiesJson);
+        fileDB.setTags(tagsJson);
         String shardingKey = fileRepo.addFile(fileDB, ancestorId, fileType);
         if(fileType.notUsersType()) {
             fileShardingCountUpdator.increase(shardingKey, fileType.getType());
@@ -388,7 +423,7 @@ public class FileService {
         }
     }
 
-    public OpenAIFile mkdir(String name, String ancestorId) {
+    public OpenAIFile mkdir(String name, String ancestorId, String description) {
         String spaceCode = BellaContextHelper.getOperateSpaceCode();
 
         FileType fileType = FileType.DIRECTORY;
@@ -409,6 +444,9 @@ public class FileService {
         fileDB.setMetaData("{}");
         fileDB.setAkCode(akCode);
         fileDB.setIsDir(1);
+        fileDB.setDescription(description == null ? "" : description);
+        fileDB.setCities("");
+        fileDB.setTags("");
 
         fileRepo.addFile(fileDB, ancestorId, fileType);
 

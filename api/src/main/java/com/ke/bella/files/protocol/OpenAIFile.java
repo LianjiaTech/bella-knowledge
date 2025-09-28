@@ -1,5 +1,7 @@
 package com.ke.bella.files.protocol;
 
+import java.util.List;
+
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import lombok.AllArgsConstructor;
@@ -55,4 +57,10 @@ public class OpenAIFile {
     private Long cuid;
     private String cuName;
     private String path;
+    private Long muid;
+    private String muName;
+    private Long mtime;
+    private String description;
+    private List<String> cities;
+    private List<String> tags;
 }
