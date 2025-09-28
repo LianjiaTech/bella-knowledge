@@ -169,7 +169,7 @@ public class FileController {
     }
 
     private static void validateCitiesJson(List<String> cities) {
-        if (CollectionUtils.isEmpty(cities)) {
+        if(CollectionUtils.isEmpty(cities)) {
             return;
         }
         String citiesJson = JsonUtils.toJson(cities);
@@ -177,7 +177,7 @@ public class FileController {
     }
 
     private static void validateTagsJson(List<String> tags) {
-        if (CollectionUtils.isEmpty(tags)) {
+        if(CollectionUtils.isEmpty(tags)) {
             return;
         }
         String tagsJson = JsonUtils.toJson(tags);
