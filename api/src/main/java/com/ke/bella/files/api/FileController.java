@@ -169,12 +169,18 @@ public class FileController {
     }
 
     private static void validateCitiesJson(List<String> cities) {
-        String citiesJson = CollectionUtils.isEmpty(cities) ? "" : JsonUtils.toJson(cities);
+        if (CollectionUtils.isEmpty(cities)) {
+            return;
+        }
+        String citiesJson = JsonUtils.toJson(cities);
         Assert.isTrue(citiesJson.length() <= MAX_CITIES_JSON_LENGTH, "cities total length cannot exceed 512 characters");
     }
 
     private static void validateTagsJson(List<String> tags) {
-        String tagsJson = CollectionUtils.isEmpty(tags) ? "" : JsonUtils.toJson(tags);
+        if (CollectionUtils.isEmpty(tags)) {
+            return;
+        }
+        String tagsJson = JsonUtils.toJson(tags);
         Assert.isTrue(tagsJson.length() <= MAX_TAGS_JSON_LENGTH, "tags total length cannot exceed 512 characters");
     }
 
