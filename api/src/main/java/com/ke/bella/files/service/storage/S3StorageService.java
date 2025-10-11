@@ -1,87 +1,114 @@
 package com.ke.bella.files.service.storage;
 
+import com.google.common.base.Throwables;
+import com.ke.bella.files.service.FileService;
+import com.ke.bella.files.service.storage.config.S3StorageConfig;
+import lombok.extern.slf4j.Slf4j;
+import okhttp3.MediaType;
+import org.apache.commons.lang3.NotImplementedException;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.web.util.UriUtils;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3AsyncClient;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.S3Configuration;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectResponse;
+import software.amazon.awssdk.services.s3.model.GetUrlRequest;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
+import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
+import software.amazon.awssdk.transfer.s3.S3TransferManager;
+import software.amazon.awssdk.transfer.s3.model.CompletedFileUpload;
+import software.amazon.awssdk.transfer.s3.model.FileUpload;
+import software.amazon.awssdk.transfer.s3.model.UploadFileRequest;
+
 import java.io.File;
-import java.io.InputStream;
+import java.net.URI;
 import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.util.Date;
+import java.time.Duration;
 import java.util.Optional;
-
-import org.apache.commons.lang3.NotImplementedException;
-import org.apache.commons.lang3.StringUtils;
-import org.springframework.web.util.UriUtils;
-
-import com.amazonaws.auth.AWSStaticCredentialsProvider;
-import com.amazonaws.auth.BasicAWSCredentials;
-import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration;
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.AmazonS3ClientBuilder;
-import com.amazonaws.services.s3.model.ObjectMetadata;
-import com.amazonaws.services.s3.model.PutObjectRequest;
-import com.google.common.base.Throwables;
-import com.ke.bella.files.service.FileService;
-import com.ke.bella.files.service.storage.config.S3StorageConfig;
-
-import lombok.extern.slf4j.Slf4j;
-import okhttp3.MediaType;
 
 @Slf4j
 public class S3StorageService implements StorageService {
-    protected final AmazonS3 client;
-    protected final AWSStaticCredentialsProvider provider;
-
-    private static final Integer S3_MAX_FILE_SIZE_BYTES = 512 * 1024 * 1024;
+    protected final S3Client s3Client;
+    protected final S3TransferManager transferManager;
+    protected final S3Presigner presigner;
+    protected final StaticCredentialsProvider credentialsProvider;
 
     public S3StorageService(S3StorageConfig config) {
-        BasicAWSCredentials credentials = new BasicAWSCredentials(config.getAk(), config.getSk());
-        this.provider = new AWSStaticCredentialsProvider(credentials);
-        this.client = AmazonS3ClientBuilder.standard()
-                .withCredentials(provider)
-                .withEndpointConfiguration(new EndpointConfiguration(config.getEndpoint(), config.getRegion()))
-                .withPathStyleAccessEnabled(true)
+        AwsBasicCredentials credentials = AwsBasicCredentials.create(config.getAk(), config.getSk());
+        this.credentialsProvider = StaticCredentialsProvider.create(credentials);
+
+        this.s3Client = S3Client.builder()
+                .credentialsProvider(credentialsProvider)
+                .region(Region.of(config.getRegion()))
+                .endpointOverride(URI.create(config.getEndpoint()))
+                .forcePathStyle(true)
+                .build();
+
+        S3AsyncClient s3AsyncClient = S3AsyncClient.builder()
+                .credentialsProvider(credentialsProvider)
+                .region(Region.of(config.getRegion()))
+                .endpointOverride(URI.create(config.getEndpoint()))
+                .forcePathStyle(true)
+                .build();
+
+        this.transferManager = S3TransferManager.builder()
+                .s3Client(s3AsyncClient)
+                .build();
+
+        this.presigner = S3Presigner.builder()
+                .credentialsProvider(credentialsProvider)
+                .region(Region.of(config.getRegion()))
+                .endpointOverride(URI.create(config.getEndpoint()))
+                .serviceConfiguration(S3Configuration.builder()
+                        .pathStyleAccessEnabled(true)
+                        .build())
                 .build();
     }
 
     @Override
     public String putObject(String bucketName, String fileKey, String mimeType, File file, String filename, String charset) {
-        InputStream inputStream = null;
         try {
-
-            String contentType = null;
+            String contentType;
             if(StringUtils.isNotEmpty(mimeType)) {
                 contentType = mimeType + (StringUtils.isNotEmpty(charset) ? "; charset=" + charset : "");
+            } else {
+                contentType = null;
             }
-
-            ObjectMetadata metadata = new ObjectMetadata();
-            metadata.setContentType(contentType);
-            metadata.setContentLength(Files.size(file.toPath()));
 
             String filenameEncoded = UriUtils.encodeFragment(filename, StandardCharsets.UTF_8);
             String disposition = getContentDispositionType(mimeType);
-            metadata.setContentDisposition(disposition + "; filename=" + filenameEncoded);
+            String contentDisposition = disposition + "; filename=" + filenameEncoded;
+            long size = Files.size(file.toPath());
 
-            inputStream = Files.newInputStream(file.toPath());
-            PutObjectRequest putObjectRequest = new PutObjectRequest(bucketName, fileKey, inputStream, metadata);
-            putObjectRequest.getRequestClientOptions().setReadLimit(S3_MAX_FILE_SIZE_BYTES);
+            UploadFileRequest uploadFileRequest = UploadFileRequest.builder()
+                    .putObjectRequest(req -> req
+                            .bucket(bucketName)
+                            .key(fileKey)
+                            .contentType(contentType)
+                            .contentDisposition(contentDisposition)
+                            .contentLength(size))
+                    .source(file.toPath())
+                    .build();
 
-            client.putObject(putObjectRequest);
+            FileUpload fileUpload = transferManager.uploadFile(uploadFileRequest);
+            CompletedFileUpload completedUpload = fileUpload.completionFuture().join();
+
+            LOGGER.info("Successfully uploaded file to S3, bucket: {}, key: {}, eTag: {}",
+                    bucketName, fileKey, completedUpload.response().eTag());
+
         } catch (Exception e) {
             String errMsg = String.format("failed to upload file to s3, bucketName: %s, fileKey: %s, mimeType: %s, filename: %s, e: %s", bucketName,
                     fileKey, mimeType, filename, Throwables.getStackTraceAsString(e));
             LOGGER.error(errMsg);
             throw new IllegalStateException(errMsg);
-        } finally {
-            if(inputStream != null) {
-                try {
-                    inputStream.close();
-                } catch (Exception e) {
-                    LOGGER.error("failed to close inputStream", e);
-                }
-            }
         }
         return fileKey;
     }
@@ -109,15 +136,42 @@ public class S3StorageService implements StorageService {
 
     @Override
     public String getPresignedUrl(String bucketName, String fileKey, long expirationSeconds) {
-        Date expirationDate = Date.from(LocalDateTime.now().plusSeconds(expirationSeconds).atZone(ZoneId.systemDefault()).toInstant());
-        URL singedUrl = client.generatePresignedUrl(bucketName, fileKey, expirationDate);
-        return singedUrl.toString();
+        try {
+            GetObjectRequest getObjectRequest = GetObjectRequest.builder()
+                    .bucket(bucketName)
+                    .key(fileKey)
+                    .build();
+
+            GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
+                    .signatureDuration(Duration.ofSeconds(expirationSeconds))
+                    .getObjectRequest(getObjectRequest)
+                    .build();
+
+            PresignedGetObjectRequest presignedRequest = presigner.presignGetObject(presignRequest);
+            return presignedRequest.url().toString();
+        } catch (Exception e) {
+            String errMsg = String.format("failed to generate presigned url, bucketName: %s, fileKey: %s, e: %s",
+                    bucketName, fileKey, Throwables.getStackTraceAsString(e));
+            LOGGER.error(errMsg);
+            throw new IllegalStateException(errMsg);
+        }
     }
 
     @Override
     public String getPublicUrl(String bucketName, String fileKey) {
-        URL unsignUrl = client.getUrl(bucketName, fileKey);
-        return unsignUrl.toString();
+        try {
+            GetUrlRequest request = GetUrlRequest.builder()
+                    .bucket(bucketName)
+                    .key(fileKey)
+                    .build();
+            URL url = s3Client.utilities().getUrl(request);
+            return url.toString();
+        } catch (Exception e) {
+            String errMsg = String.format("failed to get public url, bucketName: %s, fileKey: %s, e: %s",
+                    bucketName, fileKey, Throwables.getStackTraceAsString(e));
+            LOGGER.error(errMsg);
+            throw new IllegalStateException(errMsg);
+        }
     }
 
     @Override
@@ -127,15 +181,30 @@ public class S3StorageService implements StorageService {
 
     @Override
     public FileService.InputStreamWithCharset getObjectInputStream(String bucketName, String fileKey) {
-        com.amazonaws.services.s3.model.S3Object s3Object = client.getObject(bucketName, fileKey);
-        if(s3Object != null) {
-            MediaType parse = MediaType.parse(s3Object.getObjectMetadata().getContentType());
+        try {
+            GetObjectRequest getObjectRequest = GetObjectRequest.builder()
+                    .bucket(bucketName)
+                    .key(fileKey)
+                    .build();
+
+            software.amazon.awssdk.core.ResponseInputStream<GetObjectResponse> responseInputStream =
+                    s3Client.getObject(getObjectRequest);
+
+            GetObjectResponse response = responseInputStream.response();
+            String contentType = response.contentType();
+
+            MediaType parse = MediaType.parse(contentType);
             String charset = null;
             if(parse != null) {
                 charset = Optional.ofNullable(parse.charset()).map(Charset::name).orElse(null);
             }
-            return new FileService.InputStreamWithCharset(s3Object.getObjectContent(), charset);
+
+            return new FileService.InputStreamWithCharset(responseInputStream, charset);
+        } catch (Exception e) {
+            String errMsg = String.format("failed to get object input stream, bucketName: %s, fileKey: %s, e: %s",
+                    bucketName, fileKey, Throwables.getStackTraceAsString(e));
+            LOGGER.error(errMsg);
+            throw new IllegalArgumentException("object not found, file_key : " + fileKey, e);
         }
-        throw new IllegalArgumentException("object not found, file_key : " + fileKey);
     }
 }
