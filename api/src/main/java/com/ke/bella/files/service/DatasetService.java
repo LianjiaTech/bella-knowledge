@@ -231,6 +231,8 @@ public class DatasetService {
             int similarQ2Index = -1;
             int similarQ3Index = -1;
             int answerIndex = -1;
+            int reasoningIndex = -1;
+            int scoringCriteriaIndex = -1;
             int referencesIndex = -1;
 
             int lastCellNum = headerRow.getLastCellNum();
@@ -253,6 +255,12 @@ public class DatasetService {
                         break;
                     case "answer":
                         answerIndex = i;
+                        break;
+                    case "reasoning":
+                        reasoningIndex = i;
+                        break;
+                    case "scoring_criteria":
+                        scoringCriteriaIndex = i;
                         break;
                     case "references":
                         referencesIndex = i;
@@ -337,6 +345,28 @@ public class DatasetService {
                         String answer = getCellValueAsString(answerCell).trim();
                         if(!answer.isEmpty()) {
                             qaBuilder.answer(answer);
+                        }
+                    }
+                }
+
+                // Set reasoning field (optional)
+                if(reasoningIndex >= 0) {
+                    Cell reasoningCell = row.getCell(reasoningIndex);
+                    if(reasoningCell != null) {
+                        String reasoning = getCellValueAsString(reasoningCell).trim();
+                        if(!reasoning.isEmpty()) {
+                            qaBuilder.reasoning(reasoning);
+                        }
+                    }
+                }
+
+                // Set scoring_criteria field (optional)
+                if(scoringCriteriaIndex >= 0) {
+                    Cell scoringCriteriaCell = row.getCell(scoringCriteriaIndex);
+                    if(scoringCriteriaCell != null) {
+                        String scoringCriteria = getCellValueAsString(scoringCriteriaCell).trim();
+                        if(!scoringCriteria.isEmpty()) {
+                            qaBuilder.scoringCriteria(scoringCriteria);
                         }
                     }
                 }
@@ -464,6 +494,12 @@ public class DatasetService {
             }
             if(record.isMapped("answer")) {
                 qaBuilder.answer(record.get("answer"));
+            }
+            if(record.isMapped("reasoning")) {
+                qaBuilder.reasoning(record.get("reasoning"));
+            }
+            if(record.isMapped("scoring_criteria")) {
+                qaBuilder.scoringCriteria(record.get("scoring_criteria"));
             }
             if(record.isMapped("references") && !record.get("references").isEmpty()) {
                 String referencesStr = record.get("references");
