@@ -47,6 +47,7 @@ import com.ke.bella.files.protocol.FileCropOps;
 import com.ke.bella.files.protocol.FileCropOps.FileCropOp;
 import com.ke.bella.files.protocol.FileException.FileNotFoundException;
 import com.ke.bella.files.protocol.FileException.ProgressNotFoundException;
+import com.ke.bella.files.protocol.FileExists;
 import com.ke.bella.files.protocol.FileOps;
 import com.ke.bella.files.protocol.FileSystemOps.MkdirOp;
 import com.ke.bella.files.protocol.FileUrl;
@@ -1053,4 +1054,15 @@ public class FileController {
         return fileService.updateFile(ops, true, Scope.TAGS);
     }
 
+    @GetMapping("/exists")
+    public FileExists exists(
+            @RequestParam(value = "space_code", required = false) String spaceCode,
+            @RequestParam(value = "ancestor_id", required = false) String ancestorId,
+            @RequestParam(value = "filename") String filename) {
+
+        String finalSpaceCode = StringUtils.isNotEmpty(spaceCode) ? spaceCode : BellaContextHelper.getOperateSpaceCode();
+
+        boolean exists = fileService.exists(finalSpaceCode, ancestorId, filename);
+        return FileExists.builder().exists(exists).build();
+    }
 }
