@@ -12,7 +12,8 @@ public enum Scope {
     PDF("pdf"),
     DESCRIPTION("description"),
     CITIES("cities"),
-    TAGS("tags");
+    TAGS("tags"),
+    LOCATION("location");
 
     private final String value;
 }

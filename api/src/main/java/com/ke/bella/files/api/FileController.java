@@ -48,6 +48,7 @@ import com.ke.bella.files.protocol.FileCropOps.FileCropOp;
 import com.ke.bella.files.protocol.FileException.FileNotFoundException;
 import com.ke.bella.files.protocol.FileException.ProgressNotFoundException;
 import com.ke.bella.files.protocol.FileExists;
+import com.ke.bella.files.protocol.FileMoveOps;
 import com.ke.bella.files.protocol.FileOps;
 import com.ke.bella.files.protocol.FileSystemOps.MkdirOp;
 import com.ke.bella.files.protocol.FileUrl;
@@ -1064,5 +1065,50 @@ public class FileController {
 
         boolean exists = fileService.exists(finalSpaceCode, ancestorId, filename);
         return FileExists.builder().exists(exists).build();
+    }
+
+    @PostMapping("/move")
+    public OpenAIFile move(@RequestBody FileMoveOps op) {
+        Assert.notNull(op, "invalid request body");
+
+        String fileId = op.getFileId();
+        String targetAncestorId = op.getAncestorId();
+
+        Assert.hasText(fileId, "file_id is required and cannot be empty");
+        Assert.hasText(targetAncestorId, "ancestor_id is required and cannot be empty");
+
+        // validate and get ancestor (target directory)
+        FileDB ancestor = fileService.getFile0(targetAncestorId);
+        if(ancestor == null) {
+            throw new FileNotFoundException(targetAncestorId);
+        }
+        Assert.isTrue(ancestor.getIsDir() == 1, "ancestor_id must refer to a directory");
+        Assert.isTrue(StringUtils.equals(BellaContextHelper.getOperateSpaceCode(), ancestor.getSpaceCode()),
+                "space_code mismatch between context and ancestor_id");
+
+        // validate file to move
+        FileDB file = fileService.getFile0(fileId);
+        if(file == null) {
+            throw new FileNotFoundException(fileId);
+        }
+        Assert.isTrue(StringUtils.equals(ancestor.getSpaceCode(), file.getSpaceCode()), "space mismatch for file_id and ancestor_id");
+        Assert.isTrue(file.getIsDir() == 0, "file_id must be refer to a file");
+
+        // validate no duplicate names and not same directory
+        String currentAncestorId = fileService.getDirectAncestorId(fileId);
+        Assert.isTrue(!StringUtils.equals(currentAncestorId, targetAncestorId), "file already in target directory");
+
+        boolean exists = fileService.exists(ancestor.getSpaceCode(), targetAncestorId, file.getFilename());
+        Assert.isTrue(!exists, "filename already exists");
+
+        try {
+            return fl.executeWithLock(ancestor.getSpaceCode(), targetAncestorId, file.getFilename(), FILE_LOCK_TIMEOUT_MS,
+                    () -> fileService.moveFile(fileId, targetAncestorId));
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception e) {
+            LOGGER.error("move file failed, file_id: {}, ancestor_id: {}, error: {}", fileId, targetAncestorId, e.getMessage(), e);
+            throw new IllegalStateException("move file failed", e);
+        }
     }
 }
