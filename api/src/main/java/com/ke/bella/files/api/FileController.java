@@ -35,7 +35,6 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -100,9 +99,13 @@ public class FileController {
     @Value("${bella.file-api.file.tmp-file-dir}")
     private String tmpFileDir;
 
+    /**
+     * 文件上传接口
+     * 优化策略： 1. socketBuffer: 1MB - 减少系统调用次数 2. file-size-threshold: 4MB - 减少磁盘写入 3. 直接流式上传到S3
+     */
     @PostMapping
     public OpenAIFile upload(
-            @RequestPart(value = "file") MultipartFile file,
+            @RequestParam(value = "file") MultipartFile file,
             @RequestParam(value = "purpose", required = false) String purpose,
             @RequestParam(value = "metadata", required = false) String metadata,
             @RequestParam(value = "get_url", required = false, defaultValue = "false") boolean getUrl,
@@ -116,10 +119,6 @@ public class FileController {
         validateDescription(description);
         validateCitiesJson(cities);
         validateTagsJson(tags);
-
-        String spaceCode = BellaContextHelper.getOperateSpaceCode();
-        String filename = file.getOriginalFilename();
-
         // Validate purpose: only allow USER_PURPOSES and TEMP_PURPOSES,
         // otherwise force to temp
         if(!FilePurposeClassifier.allowedPurposes().contains(purpose)) {
@@ -128,40 +127,77 @@ public class FileController {
         }
 
         TmpFileInfo tmpFileInfo = null;
-        try {
-            tmpFileInfo = createTempFile(file);
-            final TmpFileInfo finalTmpFileInfo = tmpFileInfo;
+        final String spaceCode = BellaContextHelper.getOperateSpaceCode();
+        final String filename = file.getOriginalFilename();
 
+        // 提取文件元数据
+        MediaType mimeTypeSource = Optional.ofNullable(file.getContentType()).map(MediaType::parse).orElse(null);
+        final String type;
+        final String mimeType;
+        final String charset;
+        if(mimeTypeSource != null) {
+            type = FileUtils.getType(mimeTypeSource);
+            mimeType = FileUtils.extraPureMediaType(mimeTypeSource);
+            charset = Optional.ofNullable(mimeTypeSource.charset()).map(Charset::name).orElse(null);
+        } else {
+            type = "";
+            mimeType = "";
+            charset = "";
+        }
+        final String extension = FileUtils.getFileExtension(filename);
+        final long contentLength = file.getSize();
+
+        // 直接流式上传到S3
+        try {
             String finalPurpose = purpose;
             return fl.executeWithLock(spaceCode, ancestorId, filename, FILE_LOCK_TIMEOUT_MS, () -> {
                 if(fileService.exists(spaceCode, ancestorId, filename)) {
                     if(overwrite) {
                         OpenAIFile existingFile = fileService.getFile(spaceCode, ancestorId, filename);
                         if(existingFile != null) {
-                            return updateFile(existingFile.getId(), finalTmpFileInfo.getTmpFile(), filename,
-                                    finalTmpFileInfo.getType(), finalTmpFileInfo.getMimeType(),
-                                    finalTmpFileInfo.getExtension(), finalTmpFileInfo.getCharset(), metadata, finalPurpose);
+                            try (InputStream inputStream = file.getInputStream()) {
+                                return updateFileFromStream(existingFile.getId(), inputStream, contentLength,
+                                        filename, type, mimeType, extension, charset, metadata, finalPurpose);
+                            } catch (IOException e) {
+                                throw new IllegalStateException("Failed to update file from stream", e);
+                            }
                         }
                     } else {
-                        // fixme: may lead to unnecessary create temp file
                         throw new IllegalArgumentException(
                                 String.format("File '%s' already exists in current directory, ancestor_id: '%s'", filename, ancestorId));
                     }
                 }
+                try (InputStream inputStream = file.getInputStream()) {
+                    OpenAIFile openAIFile = fileService.uploadFromStream(
+                            inputStream,
+                            contentLength,
+                            filename,
+                            finalPurpose,
+                            metadata,
+                            mimeType,
+                            type,
+                            extension,
+                            charset,
+                            ancestorId,
+                            description,
+                            cities,
+                            tags
+                    );
 
-                return fileService.uploadWithUrl(finalTmpFileInfo.getTmpFile(), finalTmpFileInfo.getType(), finalTmpFileInfo.getMimeType(),
-                        finalTmpFileInfo.getExtension(), finalTmpFileInfo.getCharset(), finalPurpose, metadata, getUrl, expires, ancestorId,
-                        filename, description, cities, tags);
+                    if(getUrl) {
+                        String url = fileService.getUrl(openAIFile.getId(), expires);
+                        openAIFile.setUrl(url);
+                    }
+                    return openAIFile;
+                } catch (IOException e) {
+                    throw new IllegalStateException("Failed to upload file from stream", e);
+                }
             });
         } catch (IllegalArgumentException e) {
             throw e;
         } catch (Exception e) {
             LOGGER.error("File upload failed, filename: {}, error: {}", filename, e.getMessage(), e);
             throw new IllegalStateException("File upload failed", e);
-        } finally {
-            if(tmpFileInfo != null) {
-                tmpFileInfo.close();
-            }
         }
     }
 
@@ -236,6 +272,39 @@ public class FileController {
             OpenAIFile uploaded = fileService.upload(tmpFileInfo.getTmpFile(), filename, "dom_tree", null,
                     tmpFileInfo.getMimeType(), tmpFileInfo.getType(), tmpFileInfo.getExtension(),
                     tmpFileInfo.getCharset());
+
+            FileOps bindOp = FileOps.builder()
+                    .fileId(sourceFileId)
+                    .domTreeFileId(uploaded.getId())
+                    .build();
+
+            fileService.updateFile(bindOp, true, Scope.DOM_TREE);
+
+            return uploaded;
+        }
+    }
+
+    private OpenAIFile uploadDomTreeFromStream(String sourceFileId, String filename, String spaceCode,
+            InputStream inputStream, long contentLength,
+            String type, String mimeType, String charset) {
+        if(fileService.exists(spaceCode, null, filename)) {
+            OpenAIFile existingFile = fileService.getFile(spaceCode, null, filename);
+
+            return updateFileFromStream(existingFile.getId(), inputStream, contentLength, filename,
+                    type, mimeType, "json", charset, null, "dom_tree");
+        } else {
+            OpenAIFile uploaded = fileService.uploadFromStream(
+                    inputStream,
+                    contentLength,
+                    filename,
+                    "dom_tree",
+                    null,
+                    mimeType,
+                    type,
+                    "json",
+                    charset,
+                    null
+            );
 
             FileOps bindOp = FileOps.builder()
                     .fileId(sourceFileId)
@@ -439,13 +508,10 @@ public class FileController {
 
     @PutMapping
     public OpenAIFile updateFileContent(
-            @RequestPart(value = "file", required = false) MultipartFile file0,
-            @RequestParam(value = "file_id") String fileId) {
+            @RequestParam(value = "file", required = false) MultipartFile file,
+            @RequestParam(value = "file_id") String fileId) throws Exception {
         if(StringUtils.isEmpty(fileId)) {
             throw new IllegalArgumentException("file_id is required, but not provided");
-        }
-        if(file0 == null) {
-            throw new IllegalArgumentException("file is required, but not provided");
         }
 
         OpenAIFile existingFile = fileService.getFile(fileId);
@@ -453,20 +519,25 @@ public class FileController {
             throw new FileNotFoundException(fileId);
         }
 
-        TmpFileInfo tmpFileInfo = null;
-        try {
-            tmpFileInfo = createTempFile(file0);
-            return updateFile(fileId, tmpFileInfo.getTmpFile(), existingFile.getFilename(),
-                    tmpFileInfo.getType(), tmpFileInfo.getMimeType(),
-                    tmpFileInfo.getExtension(), tmpFileInfo.getCharset(), existingFile.getMetadata(), existingFile.getPurpose());
+        // 提取文件元数据
+        MediaType mimeTypeSource = Optional.ofNullable(file.getContentType()).map(MediaType::parse).orElse(null);
+        String type = "";
+        String mimeType = "";
+        String charset = "";
+        if(mimeTypeSource != null) {
+            type = FileUtils.getType(mimeTypeSource);
+            mimeType = FileUtils.extraPureMediaType(mimeTypeSource);
+            charset = Optional.ofNullable(mimeTypeSource.charset()).map(Charset::name).orElse(null);
+        }
+        String filename = file.getOriginalFilename();
+        String extension = FileUtils.getFileExtension(filename);
 
+        try (InputStream inputStream = file.getInputStream()) {
+            return updateFileFromStream(fileId, inputStream, file.getSize(), existingFile.getFilename(),
+                    type, mimeType, extension, charset, existingFile.getMetadata(), existingFile.getPurpose());
         } catch (Exception e) {
             LOGGER.error("File update failed, file_id: {}, error: {}", fileId, e.getMessage(), e);
             throw new IllegalStateException("File update failed", e);
-        } finally {
-            if(tmpFileInfo != null) {
-                tmpFileInfo.close();
-            }
         }
     }
 
@@ -490,33 +561,59 @@ public class FileController {
         return fileService.updateFile(ops, true, Scope.CONTENT);
     }
 
+    private OpenAIFile updateFileFromStream(String fileId, InputStream inputStream, long contentLength, String filename,
+            String type, String mimeType, String extension, String charset, String metadata, String purpose) {
+
+        String fileKey = fileService.updateRealFileFromStream(fileId, filename, inputStream, contentLength, mimeType, charset);
+
+        FileOps ops = FileOps.builder()
+                .fileId(fileId)
+                .filename(filename)
+                .mimeType(mimeType)
+                .metadata(metadata)
+                .bytes(contentLength)
+                .type(type)
+                .extension(extension)
+                .path(fileKey)
+                .purpose(purpose)
+                .build();
+
+        return fileService.updateFile(ops, true, Scope.CONTENT);
+    }
+
     @PostMapping("/dom-tree")
     public OpenAIFile uploadDomTree(
-            @RequestParam(value = "file_id") String sourceFileId,
-            @RequestPart(value = "file") MultipartFile file) {
+            @RequestParam(value = "file") MultipartFile file,
+            @RequestParam(value = "file_id") String sourceFileId) throws Exception {
         if(StringUtils.isEmpty(sourceFileId)) {
             throw new IllegalArgumentException("file_id is required, but not provided");
         }
 
-        String filename = String.format("dom_tree_%s.json", sourceFileId);
-        String spaceCode = BellaContextHelper.getOperateSpaceCode();
+        final String filename = String.format("dom_tree_%s.json", sourceFileId);
+        final String spaceCode = BellaContextHelper.getOperateSpaceCode();
+
+        // 提取文件元数据
+        MediaType mimeTypeSource = Optional.ofNullable(file.getContentType()).map(MediaType::parse).orElse(null);
+        final String type;
+        final String mimeType;
+        final String charset;
+        if(mimeTypeSource != null) {
+            type = FileUtils.getType(mimeTypeSource);
+            mimeType = FileUtils.extraPureMediaType(mimeTypeSource);
+            charset = Optional.ofNullable(mimeTypeSource.charset()).map(Charset::name).orElse(null);
+        } else {
+            type = "json";
+            mimeType = "application/json";
+            charset = StandardCharsets.UTF_8.name();
+        }
 
         return fl.executeWithLock(spaceCode, null, filename, FILE_LOCK_TIMEOUT_MS, () -> {
-
-            TmpFileInfo tmpFileInfo = null;
-            try {
-
-                tmpFileInfo = createTempFile(file);
-
-                return uploadDomTree(sourceFileId, filename, spaceCode, tmpFileInfo);
-
+            try (InputStream inputStream = file.getInputStream()) {
+                return uploadDomTreeFromStream(sourceFileId, filename, spaceCode, inputStream,
+                        file.getSize(), type, mimeType, charset);
             } catch (Exception e) {
                 LOGGER.error("Dom tree upload failed, file_id: {}, error: {}", sourceFileId, e.getMessage(), e);
                 throw new IllegalStateException("Dom tree upload failed", e);
-            } finally {
-                if(tmpFileInfo != null) {
-                    tmpFileInfo.close();
-                }
             }
         });
     }
@@ -606,30 +703,50 @@ public class FileController {
 
     @PostMapping("/pdf")
     public OpenAIFile uploadPdf(
-            @RequestParam(value = "file_id") String sourceFileId,
-            @RequestPart(value = "file") MultipartFile file) {
+            @RequestParam(value = "file") MultipartFile file,
+            @RequestParam(value = "file_id") String sourceFileId) throws Exception {
         if(StringUtils.isEmpty(sourceFileId)) {
             throw new IllegalArgumentException("file_id is required, but not provided");
         }
 
-        String filename = String.format("pdf_%s.pdf", sourceFileId);
-        String spaceCode = BellaContextHelper.getOperateSpaceCode();
+        final String filename = String.format("pdf_%s.pdf", sourceFileId);
+        final String spaceCode = BellaContextHelper.getOperateSpaceCode();
+
+        // 提取文件元数据
+        MediaType mimeTypeSource = Optional.ofNullable(file.getContentType()).map(MediaType::parse).orElse(null);
+        final String type;
+        final String mimeType;
+        final String charset;
+        if(mimeTypeSource != null) {
+            type = FileUtils.getType(mimeTypeSource);
+            mimeType = FileUtils.extraPureMediaType(mimeTypeSource);
+            charset = Optional.ofNullable(mimeTypeSource.charset()).map(Charset::name).orElse(null);
+        } else {
+            type = "pdf";
+            mimeType = "application/pdf";
+            charset = null;
+        }
 
         return fl.executeWithLock(spaceCode, null, filename, FILE_LOCK_TIMEOUT_MS, () -> {
-            TmpFileInfo tmpFileInfo = null;
-
-            try {
-                tmpFileInfo = createTempFile(file);
+            try (InputStream inputStream = file.getInputStream()) {
                 if(fileService.exists(spaceCode, null, filename)) {
                     OpenAIFile existingFile = fileService.getFile(spaceCode, null, filename);
 
-                    return updateFile(existingFile.getId(), tmpFileInfo.getTmpFile(), filename,
-                            "pdf", "application/pdf",
-                            "pdf", tmpFileInfo.getCharset(), null, "pdf");
+                    return updateFileFromStream(existingFile.getId(), inputStream, file.getSize(),
+                            filename, "pdf", "application/pdf", "pdf", charset, null, "pdf");
                 } else {
-                    OpenAIFile uploaded = fileService.upload(tmpFileInfo.getTmpFile(), filename, "pdf", null,
-                            tmpFileInfo.getMimeType(), tmpFileInfo.getType(), tmpFileInfo.getExtension(),
-                            tmpFileInfo.getCharset());
+                    OpenAIFile uploaded = fileService.uploadFromStream(
+                            inputStream,
+                            file.getSize(),
+                            filename,
+                            "pdf",
+                            null,
+                            mimeType,
+                            type,
+                            "pdf",
+                            charset,
+                            null
+                    );
 
                     FileOps bindOp = FileOps.builder()
                             .fileId(sourceFileId)
@@ -640,14 +757,9 @@ public class FileController {
 
                     return uploaded;
                 }
-
             } catch (Exception e) {
                 LOGGER.error("PDF upload failed, file_id: {}, error: {}", sourceFileId, e.getMessage(), e);
                 throw new IllegalStateException("PDF upload failed", e);
-            } finally {
-                if(tmpFileInfo != null) {
-                    tmpFileInfo.close();
-                }
             }
         });
     }

@@ -22,7 +22,7 @@
         <spring-cloud.version>Hoxton.SR12</spring-cloud.version>
         <jooq.version>3.14.15</jooq.version>
         <apollo.version>2.1.0</apollo.version>
-        <aws.sdk.version>2.20.26</aws.sdk.version>
+        <aws.sdk.version>2.30.0</aws.sdk.version>
         <!-- jooq数据库连接配置，jooq生成代码时替换为真实数据库配置 -->
         <db.driver>com.mysql.cj.jdbc.Driver</db.driver>
         <db.url>jdbc:mysql://localhost:3306/bella_file_api?useSSL=false&amp;allowPublicKeyRetrieval=true</db.url>
@@ -230,7 +230,12 @@
         <dependency>
             <groupId>software.amazon.awssdk.crt</groupId>
             <artifactId>aws-crt</artifactId>
-            <version>0.29.0</version>
+            <version>0.30.9</version>
+        </dependency>
+        <!-- AWS CRT HTTP Client for zero-copy streaming -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>aws-crt-client</artifactId>
         </dependency>
         <!-- Apache POI - Excel处理 -->
         <dependency>

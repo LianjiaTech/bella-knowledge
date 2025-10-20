@@ -2,10 +2,12 @@ package com.ke.bella.files.service.storage;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 
 import org.apache.commons.io.FileUtils;
 
@@ -50,6 +52,35 @@ public class LocalStorageService implements StorageService {
         } catch (IOException e) {
             LOGGER.error("Failed to store file locally: {}", fileKey, e);
             throw new RuntimeException("Failed to store file locally", e);
+        }
+    }
+
+    @Override
+    public String putObjectFromStream(String bucketName, String fileKey, String mimeType, InputStream inputStream,
+                                       long contentLength, String filename, String charset) {
+        try {
+            // 构建目标路径：rootPath/bucketName/fileKey
+            Path targetDir = Paths.get(config.getRootPath(), bucketName);
+            Files.createDirectories(targetDir);
+
+            Path targetPath = targetDir.resolve(fileKey);
+
+            // 使用Files.copy()直接从InputStream复制到文件
+            // 这个方法会使用操作系统的零拷贝优化（如果支持）
+            Files.copy(inputStream, targetPath, StandardCopyOption.REPLACE_EXISTING);
+
+            // 保存文件元数据
+            Path metadataPath = targetDir.resolve(fileKey + ".meta");
+            String metadata = String.format("filename=%s\nmimeType=%s\ncharset=%s", filename, mimeType, charset);
+            Files.write(metadataPath, metadata.getBytes(StandardCharsets.UTF_8));
+
+            LOGGER.info("Successfully stored file from stream locally: {}/{}, size: {}KB",
+                    bucketName, fileKey, contentLength / 1024);
+
+            return fileKey;
+        } catch (IOException e) {
+            LOGGER.error("Failed to store file from stream locally: {}", fileKey, e);
+            throw new RuntimeException("Failed to store file from stream locally", e);
         }
     }
 
