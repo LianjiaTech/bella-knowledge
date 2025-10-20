@@ -442,12 +442,18 @@ public class DatasetRepo implements BaseRepo {
             if(referenceOp.getSnippet() != null) {
                 insertRec.setSnippet(referenceOp.getSnippet());
             }
+            if(referenceOp.getPrimary() != null) {
+                insertRec.setPrimary(referenceOp.getPrimary());
+            }
             fillCreatorInfo(insertRec);
 
             DatasetQaReferenceRecord updateRec = DATASET_QA_REFERENCE.newRecord();
             updateRec.setStatus(0);
             if(referenceOp.getSnippet() != null) {
                 updateRec.setSnippet(referenceOp.getSnippet());
+            }
+            if(referenceOp.getPrimary() != null) {
+                updateRec.setPrimary(referenceOp.getPrimary());
             }
             fillCreatorInfo(updateRec);
 
@@ -488,6 +494,9 @@ public class DatasetRepo implements BaseRepo {
         if(op.getSnippet() != null) {
             rec.setSnippet(op.getSnippet());
         }
+        if(op.getPrimary() != null) {
+            rec.setPrimary(op.getPrimary());
+        }
 
         fillCreatorInfo(rec);
 
@@ -495,6 +504,9 @@ public class DatasetRepo implements BaseRepo {
         updateRec.setStatus(0);
         if(op.getSnippet() != null) {
             updateRec.setSnippet(op.getSnippet());
+        }
+        if(op.getPrimary() != null) {
+            updateRec.setPrimary(op.getPrimary());
         }
         fillCreatorInfo(updateRec);
 
@@ -530,6 +542,10 @@ public class DatasetRepo implements BaseRepo {
 
         if(op.getSnippet() != null) {
             rec.set(DATASET_QA_REFERENCE.SNIPPET, op.getSnippet());
+        }
+
+        if(op.getPrimary() != null) {
+            rec.set(DATASET_QA_REFERENCE.PRIMARY, op.getPrimary());
         }
 
         fillUpdatorInfo(rec);

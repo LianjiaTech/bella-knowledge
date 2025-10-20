@@ -615,6 +615,7 @@ public class DatasetController {
                             Map<String, Object> refData = new LinkedHashMap<>();
                             refData.put("file_id", ref.getFileId());
                             refData.put("path", ref.getPath());
+                            refData.put("primary", ref.getPrimary());
                             return refData;
                         })
                         .collect(Collectors.toList());

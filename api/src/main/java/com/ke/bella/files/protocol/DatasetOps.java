@@ -94,6 +94,8 @@ public class DatasetOps {
         private String datasetId;
         @JsonProperty("snippet")
         private String snippet;
+        @JsonProperty("primary")
+        private Integer primary;
     }
 
     @Data

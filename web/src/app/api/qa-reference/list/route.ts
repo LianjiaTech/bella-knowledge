@@ -21,11 +21,13 @@ export async function GET(req: NextRequest) {
         path: string;
         reference_id: string;
         snippet: string;
+        primary?: number;
       }) => ({
         file_id: item.file_id,
         path: item.path ? item.path.split("/").filter(Boolean) : [],
         reference_id: item.reference_id,
         snippet: item.snippet,
+        primary: item.primary || 0,
       }),
     ),
   };

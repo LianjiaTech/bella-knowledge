@@ -11,8 +11,8 @@ import java.time.LocalDateTime;
 
 import org.jooq.Field;
 import org.jooq.Record1;
-import org.jooq.Record14;
-import org.jooq.Row14;
+import org.jooq.Record15;
+import org.jooq.Row15;
 import org.jooq.impl.UpdatableRecordImpl;
 
 
@@ -20,7 +20,7 @@ import org.jooq.impl.UpdatableRecordImpl;
  * 数据集问答对引用关系表
  */
 @SuppressWarnings({ "all", "unchecked", "rawtypes" })
-public class DatasetQaReferenceRecord extends UpdatableRecordImpl<DatasetQaReferenceRecord> implements Operator, Record14<Long, String, String, String, String, String, String, Long, String, LocalDateTime, Long, String, LocalDateTime, Integer> {
+public class DatasetQaReferenceRecord extends UpdatableRecordImpl<DatasetQaReferenceRecord> implements Operator, Record15<Long, String, String, String, String, String, String, Integer, Long, String, LocalDateTime, Long, String, LocalDateTime, Integer> {
 
     private static final long serialVersionUID = 1L;
 
@@ -123,101 +123,115 @@ public class DatasetQaReferenceRecord extends UpdatableRecordImpl<DatasetQaRefer
     }
 
     /**
+     * Setter for <code>dataset_qa_reference.primary</code>. 是否为关键知识，0表示普通知识，1表示关键知识
+     */
+    public void setPrimary(Integer value) {
+        set(7, value);
+    }
+
+    /**
+     * Getter for <code>dataset_qa_reference.primary</code>. 是否为关键知识，0表示普通知识，1表示关键知识
+     */
+    public Integer getPrimary() {
+        return (Integer) get(7);
+    }
+
+    /**
      * Setter for <code>dataset_qa_reference.cuid</code>.
      */
     public void setCuid(Long value) {
-        set(7, value);
+        set(8, value);
     }
 
     /**
      * Getter for <code>dataset_qa_reference.cuid</code>.
      */
     public Long getCuid() {
-        return (Long) get(7);
+        return (Long) get(8);
     }
 
     /**
      * Setter for <code>dataset_qa_reference.cu_name</code>.
      */
     public void setCuName(String value) {
-        set(8, value);
+        set(9, value);
     }
 
     /**
      * Getter for <code>dataset_qa_reference.cu_name</code>.
      */
     public String getCuName() {
-        return (String) get(8);
+        return (String) get(9);
     }
 
     /**
      * Setter for <code>dataset_qa_reference.ctime</code>.
      */
     public void setCtime(LocalDateTime value) {
-        set(9, value);
+        set(10, value);
     }
 
     /**
      * Getter for <code>dataset_qa_reference.ctime</code>.
      */
     public LocalDateTime getCtime() {
-        return (LocalDateTime) get(9);
+        return (LocalDateTime) get(10);
     }
 
     /**
      * Setter for <code>dataset_qa_reference.muid</code>.
      */
     public void setMuid(Long value) {
-        set(10, value);
+        set(11, value);
     }
 
     /**
      * Getter for <code>dataset_qa_reference.muid</code>.
      */
     public Long getMuid() {
-        return (Long) get(10);
+        return (Long) get(11);
     }
 
     /**
      * Setter for <code>dataset_qa_reference.mu_name</code>.
      */
     public void setMuName(String value) {
-        set(11, value);
+        set(12, value);
     }
 
     /**
      * Getter for <code>dataset_qa_reference.mu_name</code>.
      */
     public String getMuName() {
-        return (String) get(11);
+        return (String) get(12);
     }
 
     /**
      * Setter for <code>dataset_qa_reference.mtime</code>.
      */
     public void setMtime(LocalDateTime value) {
-        set(12, value);
+        set(13, value);
     }
 
     /**
      * Getter for <code>dataset_qa_reference.mtime</code>.
      */
     public LocalDateTime getMtime() {
-        return (LocalDateTime) get(12);
+        return (LocalDateTime) get(13);
     }
 
     /**
      * Setter for <code>dataset_qa_reference.status</code>. 引用是否被删除，0表示未删除，-1表示已删除
      */
     public void setStatus(Integer value) {
-        set(13, value);
+        set(14, value);
     }
 
     /**
      * Getter for <code>dataset_qa_reference.status</code>. 引用是否被删除，0表示未删除，-1表示已删除
      */
     public Integer getStatus() {
-        return (Integer) get(13);
+        return (Integer) get(14);
     }
 
     // -------------------------------------------------------------------------
@@ -230,17 +244,17 @@ public class DatasetQaReferenceRecord extends UpdatableRecordImpl<DatasetQaRefer
     }
 
     // -------------------------------------------------------------------------
-    // Record14 type implementation
+    // Record15 type implementation
     // -------------------------------------------------------------------------
 
     @Override
-    public Row14<Long, String, String, String, String, String, String, Long, String, LocalDateTime, Long, String, LocalDateTime, Integer> fieldsRow() {
-        return (Row14) super.fieldsRow();
+    public Row15<Long, String, String, String, String, String, String, Integer, Long, String, LocalDateTime, Long, String, LocalDateTime, Integer> fieldsRow() {
+        return (Row15) super.fieldsRow();
     }
 
     @Override
-    public Row14<Long, String, String, String, String, String, String, Long, String, LocalDateTime, Long, String, LocalDateTime, Integer> valuesRow() {
-        return (Row14) super.valuesRow();
+    public Row15<Long, String, String, String, String, String, String, Integer, Long, String, LocalDateTime, Long, String, LocalDateTime, Integer> valuesRow() {
+        return (Row15) super.valuesRow();
     }
 
     @Override
@@ -279,37 +293,42 @@ public class DatasetQaReferenceRecord extends UpdatableRecordImpl<DatasetQaRefer
     }
 
     @Override
-    public Field<Long> field8() {
+    public Field<Integer> field8() {
+        return DatasetQaReference.DATASET_QA_REFERENCE.PRIMARY;
+    }
+
+    @Override
+    public Field<Long> field9() {
         return DatasetQaReference.DATASET_QA_REFERENCE.CUID;
     }
 
     @Override
-    public Field<String> field9() {
+    public Field<String> field10() {
         return DatasetQaReference.DATASET_QA_REFERENCE.CU_NAME;
     }
 
     @Override
-    public Field<LocalDateTime> field10() {
+    public Field<LocalDateTime> field11() {
         return DatasetQaReference.DATASET_QA_REFERENCE.CTIME;
     }
 
     @Override
-    public Field<Long> field11() {
+    public Field<Long> field12() {
         return DatasetQaReference.DATASET_QA_REFERENCE.MUID;
     }
 
     @Override
-    public Field<String> field12() {
+    public Field<String> field13() {
         return DatasetQaReference.DATASET_QA_REFERENCE.MU_NAME;
     }
 
     @Override
-    public Field<LocalDateTime> field13() {
+    public Field<LocalDateTime> field14() {
         return DatasetQaReference.DATASET_QA_REFERENCE.MTIME;
     }
 
     @Override
-    public Field<Integer> field14() {
+    public Field<Integer> field15() {
         return DatasetQaReference.DATASET_QA_REFERENCE.STATUS;
     }
 
@@ -349,37 +368,42 @@ public class DatasetQaReferenceRecord extends UpdatableRecordImpl<DatasetQaRefer
     }
 
     @Override
-    public Long component8() {
+    public Integer component8() {
+        return getPrimary();
+    }
+
+    @Override
+    public Long component9() {
         return getCuid();
     }
 
     @Override
-    public String component9() {
+    public String component10() {
         return getCuName();
     }
 
     @Override
-    public LocalDateTime component10() {
+    public LocalDateTime component11() {
         return getCtime();
     }
 
     @Override
-    public Long component11() {
+    public Long component12() {
         return getMuid();
     }
 
     @Override
-    public String component12() {
+    public String component13() {
         return getMuName();
     }
 
     @Override
-    public LocalDateTime component13() {
+    public LocalDateTime component14() {
         return getMtime();
     }
 
     @Override
-    public Integer component14() {
+    public Integer component15() {
         return getStatus();
     }
 
@@ -419,37 +443,42 @@ public class DatasetQaReferenceRecord extends UpdatableRecordImpl<DatasetQaRefer
     }
 
     @Override
-    public Long value8() {
+    public Integer value8() {
+        return getPrimary();
+    }
+
+    @Override
+    public Long value9() {
         return getCuid();
     }
 
     @Override
-    public String value9() {
+    public String value10() {
         return getCuName();
     }
 
     @Override
-    public LocalDateTime value10() {
+    public LocalDateTime value11() {
         return getCtime();
     }
 
     @Override
-    public Long value11() {
+    public Long value12() {
         return getMuid();
     }
 
     @Override
-    public String value12() {
+    public String value13() {
         return getMuName();
     }
 
     @Override
-    public LocalDateTime value13() {
+    public LocalDateTime value14() {
         return getMtime();
     }
 
     @Override
-    public Integer value14() {
+    public Integer value15() {
         return getStatus();
     }
 
@@ -496,49 +525,55 @@ public class DatasetQaReferenceRecord extends UpdatableRecordImpl<DatasetQaRefer
     }
 
     @Override
-    public DatasetQaReferenceRecord value8(Long value) {
+    public DatasetQaReferenceRecord value8(Integer value) {
+        setPrimary(value);
+        return this;
+    }
+
+    @Override
+    public DatasetQaReferenceRecord value9(Long value) {
         setCuid(value);
         return this;
     }
 
     @Override
-    public DatasetQaReferenceRecord value9(String value) {
+    public DatasetQaReferenceRecord value10(String value) {
         setCuName(value);
         return this;
     }
 
     @Override
-    public DatasetQaReferenceRecord value10(LocalDateTime value) {
+    public DatasetQaReferenceRecord value11(LocalDateTime value) {
         setCtime(value);
         return this;
     }
 
     @Override
-    public DatasetQaReferenceRecord value11(Long value) {
+    public DatasetQaReferenceRecord value12(Long value) {
         setMuid(value);
         return this;
     }
 
     @Override
-    public DatasetQaReferenceRecord value12(String value) {
+    public DatasetQaReferenceRecord value13(String value) {
         setMuName(value);
         return this;
     }
 
     @Override
-    public DatasetQaReferenceRecord value13(LocalDateTime value) {
+    public DatasetQaReferenceRecord value14(LocalDateTime value) {
         setMtime(value);
         return this;
     }
 
     @Override
-    public DatasetQaReferenceRecord value14(Integer value) {
+    public DatasetQaReferenceRecord value15(Integer value) {
         setStatus(value);
         return this;
     }
 
     @Override
-    public DatasetQaReferenceRecord values(Long value1, String value2, String value3, String value4, String value5, String value6, String value7, Long value8, String value9, LocalDateTime value10, Long value11, String value12, LocalDateTime value13, Integer value14) {
+    public DatasetQaReferenceRecord values(Long value1, String value2, String value3, String value4, String value5, String value6, String value7, Integer value8, Long value9, String value10, LocalDateTime value11, Long value12, String value13, LocalDateTime value14, Integer value15) {
         value1(value1);
         value2(value2);
         value3(value3);
@@ -553,6 +588,7 @@ public class DatasetQaReferenceRecord extends UpdatableRecordImpl<DatasetQaRefer
         value12(value12);
         value13(value13);
         value14(value14);
+        value15(value15);
         return this;
     }
 
@@ -570,7 +606,7 @@ public class DatasetQaReferenceRecord extends UpdatableRecordImpl<DatasetQaRefer
     /**
      * Create a detached, initialised DatasetQaReferenceRecord
      */
-    public DatasetQaReferenceRecord(Long id, String referenceId, String itemId, String datasetId, String fileId, String path, String snippet, Long cuid, String cuName, LocalDateTime ctime, Long muid, String muName, LocalDateTime mtime, Integer status) {
+    public DatasetQaReferenceRecord(Long id, String referenceId, String itemId, String datasetId, String fileId, String path, String snippet, Integer primary, Long cuid, String cuName, LocalDateTime ctime, Long muid, String muName, LocalDateTime mtime, Integer status) {
         super(DatasetQaReference.DATASET_QA_REFERENCE);
 
         setId(id);
@@ -580,6 +616,7 @@ public class DatasetQaReferenceRecord extends UpdatableRecordImpl<DatasetQaRefer
         setFileId(fileId);
         setPath(path);
         setSnippet(snippet);
+        setPrimary(primary);
         setCuid(cuid);
         setCuName(cuName);
         setCtime(ctime);
