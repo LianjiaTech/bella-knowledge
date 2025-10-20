@@ -3,6 +3,7 @@ package com.ke.bella.files.service;
 import static com.ke.bella.files.db.IDGenerator.FILE_ID_GENERATOR;
 
 import java.io.File;
+import java.io.InputStream;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
@@ -14,6 +15,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.context.annotation.Lazy;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.ke.bella.files.FileShardingCountUpdator;
@@ -61,6 +63,9 @@ public class FileService {
     private BroadcastService broadcastService;
     @Autowired
     private FileShardingCountUpdator fileShardingCountUpdator;
+    @Autowired
+    @Lazy
+    private FileService self;
 
     public boolean exists(String spaceCode, String ancestorId, String filename) {
         return fileRepo.exists(spaceCode, ancestorId, filename);
@@ -177,6 +182,7 @@ public class FileService {
         return openaiFile;
     }
 
+    @Transactional
     public OpenAIFile upload(
             File file,
             String filename,
@@ -186,24 +192,15 @@ public class FileService {
             String type,
             String extension,
             String charset) {
-        return upload(file, filename, purpose, metadata, mimeType, type, extension, charset, null);
+        return upload(file, filename, purpose, metadata, mimeType, type, extension, charset, null, null, null, null);
     }
 
-    @Transactional(rollbackFor = Exception.class)
-    public OpenAIFile upload(
-            File file,
-            String filename,
-            String purpose,
-            String metadata,
-            String mimeType,
-            String type,
-            String extension,
-            String charset,
-            String ancestorId) {
-        return upload(file, filename, purpose, metadata, mimeType, type, extension, charset, ancestorId, null, null, null);
-    }
 
-    @Transactional(rollbackFor = Exception.class)
+
+    /**
+     * 基于File的上传 - 临时文件方式
+     * 优化：将S3上传移出事务，减少数据库连接占用时间
+     */
     public OpenAIFile upload(
             File file,
             String filename,
@@ -216,6 +213,118 @@ public class FileService {
             String ancestorId,
             String description,
             List<String> cities,
+            List<String> tags
+            ){
+        // 步骤1：创建数据库记录（在事务内，快速完成）
+        FileUploadContext context = self.createFile(
+            filename, file.length(), purpose, metadata,
+            mimeType, type, extension, ancestorId, description, cities, tags);
+
+        // 步骤2：上传到S3（在事务外，不占用数据库连接）
+        try {
+            storageService.putObject(
+                context.getBucketName(),
+                context.getKeyName(),
+                mimeType,
+                file,
+                filename,
+                charset);
+        } catch (Exception e) {
+            LOGGER.error("S3 upload failed for fileId: {}, error: {}", context.getFileDB().getFileId(), e.getMessage(), e);
+            // S3上传失败，删除已创建的数据库记录，保证数据一致性
+            try {
+                self.delete(context.getFileDB().getFileId());
+                LOGGER.info("Cleaned up orphaned DB record after S3 upload failure, fileId: {}", context.getFileDB().getFileId());
+            } catch (Exception cleanupError) {
+                LOGGER.error("Failed to cleanup DB record after S3 upload failure, fileId: {}, error: {}",
+                    context.getFileDB().getFileId(), cleanupError.getMessage(), cleanupError);
+            }
+            throw new IllegalStateException("Failed to upload file to storage", e);
+        }
+
+        // 步骤3：查询并广播
+        return self.finalizeFileUpload(context.getFileDB(), metadata);
+    }
+
+    public OpenAIFile uploadFromStream(
+            InputStream inputStream,
+            long contentLength,
+            String filename,
+            String purpose,
+            String metadata,
+            String mimeType,
+            String type,
+            String extension,
+            String charset,
+            String ancestorId) {
+        return uploadFromStream(inputStream, contentLength, filename, purpose, metadata, mimeType, type, extension, charset, ancestorId, null, null, null);
+    }
+
+    /**
+     * 基于InputStream的流式上传 - 避免创建临时文件
+     *
+     * 优化：将S3上传移出事务，减少数据库连接占用时间
+     */
+    public OpenAIFile uploadFromStream(
+            InputStream inputStream,
+            long contentLength,
+            String filename,
+            String purpose,
+            String metadata,
+            String mimeType,
+            String type,
+            String extension,
+            String charset,
+            String ancestorId,
+            String description,
+            List<String> cities,
+            List<String> tags) {
+
+        // 步骤1：创建数据库记录（在事务内，快速完成）
+        FileUploadContext context = self.createFile(
+            filename, contentLength, purpose, metadata,
+            mimeType, type, extension, ancestorId,
+            description, cities, tags);
+
+        // 步骤2：上传到S3（在事务外，不占用数据库连接）
+        try {
+            storageService.putObjectFromStream(
+                context.getBucketName(),
+                context.getKeyName(),
+                mimeType,
+                inputStream,
+                contentLength,
+                filename,
+                charset);
+        } catch (Exception e) {
+            LOGGER.error("S3 upload failed for fileId: {}, error: {}", context.getFileDB().getFileId(), e.getMessage(), e);
+            // S3上传失败，删除已创建的数据库记录，保证数据一致性
+            try {
+                self.delete(context.getFileDB().getFileId());
+                LOGGER.info("Cleaned up orphaned DB record after S3 upload failure, fileId: {}", context.getFileDB().getFileId());
+            } catch (Exception cleanupError) {
+                LOGGER.error("Failed to cleanup DB record after S3 upload failure, fileId: {}, error: {}",
+                    context.getFileDB().getFileId(), cleanupError.getMessage(), cleanupError);
+            }
+            throw new IllegalStateException("Failed to upload file to storage", e);
+        }
+
+        // 步骤3：查询并广播
+        return self.finalizeFileUpload(context.getFileDB(), metadata);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public FileUploadContext createFile(
+            String filename,
+            long contentLength,
+            String purpose,
+            String metadata,
+            String mimeType,
+            String type,
+            String extension,
+            String ancestorId,
+            String description,
+            List<String> cities,
             List<String> tags) {
         String spaceCode = BellaContextHelper.getOperateSpaceCode();
         FileType fileType = FilePurposeClassifier.classify(purpose);
@@ -225,8 +334,6 @@ public class FileService {
         if(StringUtils.isNotEmpty(extension)) {
             keyName += "." + extension;
         }
-        storageService.putObject(bucketName, keyName, mimeType, file, filename, charset);
-
         String akCode = BellaContextHelper.getOperatorAkCode();
 
         String citiesJson = cities == null ? "" : JsonUtils.toJson(cities);
@@ -241,7 +348,7 @@ public class FileService {
         fileDB.setType(type);
         fileDB.setBucket(bucketName);
         fileDB.setPath(keyName);
-        fileDB.setBytes(file.length());
+        fileDB.setBytes(contentLength);
         fileDB.setSpaceCode(spaceCode);
         fileDB.setPurpose(purpose);
         fileDB.setMetaData(metadata);
@@ -253,13 +360,22 @@ public class FileService {
         if(fileType.notUsersType()) {
             fileShardingCountUpdator.increase(shardingKey, fileType.getType());
         }
+        // 返回上传上下文
+        return FileUploadContext.builder()
+                .fileDB(fileDB)
+                .bucketName(bucketName)
+                .keyName(keyName)
+                .fileType(fileType)
+                .build();
+    }
 
-        FileDB res = fileRepo.queryFile(fileId, fileType);
-        if(res == null) {
-            throw new FileNotFoundException(fileId);
-        }
+    /**
+     * 完成上传并广播
+     */
+    @Transactional
+    public OpenAIFile finalizeFileUpload(FileDB fileDB, String metadata) {
 
-        OpenAIFile openAIFile = buildOpenAIFileWithSource(res);
+        OpenAIFile openAIFile = buildOpenAIFileWithSource(fileDB);
 
         // 文件创建后的广播机制
         FileBroadcasting<OpenAIFile> message = new FileBroadcasting<>();
@@ -268,9 +384,23 @@ public class FileService {
         message.setMetadata(metadata);
         message.setUserId(BellaContextHelper.getOperatorUserId());
         message.setUserName(BellaContextHelper.getOperatorUserName());
-        broadcastService.broadcast(message, () -> updateBroadcastStatus(fileId, BroadcastStatus.SUCCESS),
-                () -> updateBroadcastStatus(fileId, BroadcastStatus.FAILED));
+        broadcastService.broadcast(message,
+            () -> updateBroadcastStatus(fileDB.getFileId(), BroadcastStatus.SUCCESS),
+            () -> updateBroadcastStatus(fileDB.getFileId(), BroadcastStatus.FAILED));
+
         return openAIFile;
+    }
+
+    /**
+     * 上传上下文 - 用于在步骤间传递信息
+     */
+    @Data
+    @Builder
+    public static class FileUploadContext {
+        private String bucketName;
+        private String keyName;
+        private FileType fileType;
+        private FileDB fileDB;
     }
 
     public List<OpenAIFile> list(
@@ -305,6 +435,11 @@ public class FileService {
         FileType fileType = FileType.fromFileId(fileId);
         FileDB fileDB = fileRepo.queryFile(fileId, fileType);
         return storageService.putObject(fileDB.getBucket(), fileDB.getPath(), mimeType, file, filename, charset);
+    }
+
+    public String updateRealFileFromStream(String fileId, String filename, java.io.InputStream inputStream, long contentLength, String mimeType, String charset) {
+        FileDB fileDB = fileRepo.queryFile(fileId);
+        return storageService.putObjectFromStream(fileDB.getBucket(), fileDB.getPath(), mimeType, inputStream, contentLength, filename, charset);
     }
 
     @Transactional(rollbackFor = Exception.class)

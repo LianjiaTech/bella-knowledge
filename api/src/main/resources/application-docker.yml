@@ -20,6 +20,7 @@ spring:
     multipart:
       max-file-size: 512MB
       max-request-size: 512MB
+      file-size-threshold: 512KB
       resolve-lazily: true
   jackson:
     property-naming-strategy: SNAKE_CASE
