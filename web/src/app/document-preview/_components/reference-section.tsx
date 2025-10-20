@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Trash } from "lucide-react";
+import { Trash, Star } from "lucide-react";
 import { DocumentViewerRef } from "@/components/document-viewer";
 import { useDocumentPreviewStore } from "../model";
 import { useSearchParams } from "next/navigation";
@@ -26,6 +26,7 @@ const ReferenceSection = forwardRef<ReferenceSectionRef, ReferenceSectionProps>(
       selectFileId,
       referenceFileList,
       deleteQuestionReference,
+      updateReferencePrimary,
       onFileSelect,
     } = useDocumentPreviewStore();
     const currentReferences =
@@ -125,19 +126,47 @@ const ReferenceSection = forwardRef<ReferenceSectionRef, ReferenceSectionProps>(
                   )}
                 </div>
 
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={(e) => {
-                    e.stopPropagation(); // 阻止事件冒泡
-                    deleteQuestionReference({
-                      dataset_id: searchParams.get("dataset_id") || "",
-                      reference_id: reference.reference_id,
-                    });
-                  }}
-                >
-                  <Trash />
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation(); // 阻止事件冒泡
+                      updateReferencePrimary({
+                        dataset_id: searchParams.get("dataset_id") || "",
+                        reference_id: reference.reference_id.toString(),
+                        primary: reference.primary === 1 ? 0 : 1,
+                      });
+                    }}
+                    className={cn(
+                      reference.primary === 1 
+                        ? "border-yellow-300 bg-yellow-50 text-yellow-600 hover:bg-yellow-100" 
+                        : "text-gray-400 hover:text-yellow-500 hover:border-yellow-300"
+                    )}
+                    title={reference.primary === 1 ? "取消关键知识标记" : "标记为关键知识"}
+                  >
+                    <Star 
+                      className={cn(
+                        "w-4 h-4",
+                        reference.primary === 1 ? "fill-current" : ""
+                      )}
+                    />
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation(); // 阻止事件冒泡
+                      deleteQuestionReference({
+                        dataset_id: searchParams.get("dataset_id") || "",
+                        reference_id: reference.reference_id,
+                      });
+                    }}
+                  >
+                    <Trash className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
             ))}
           {currentReferences.length === 0 && (

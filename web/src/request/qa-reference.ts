@@ -6,6 +6,7 @@ export async function requestCreateQaReference(data: {
   file_id: string;
   path: number[];
   snippet: string;
+  primary?: number;
   children_references?: number[];
 }) {
   const res = await webRequest<{ reference_id: number }>({
@@ -29,6 +30,19 @@ export async function requestUpdateQaReference(data: {
 }) {
   const res = await webRequest({
     path: "/api/qa-reference",
+    method: "PUT",
+    body: data,
+  });
+  return res;
+}
+
+export async function requestUpdateQaReferencePrimary(data: {
+  dataset_id: string;
+  reference_id: string;
+  primary: number;
+}) {
+  const res = await webRequest({
+    path: "/api/qa-reference/primary",
     method: "PUT",
     body: data,
   });

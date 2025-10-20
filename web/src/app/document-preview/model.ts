@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { KnowledgeFile } from "@/lib/types/file";
 import { getFileList } from "@/request/files";
 import { requestGetDatasetQuestionList } from "@/request/dataset";
-import { requestCreateQaReference } from "@/request/qa-reference";
+import { requestCreateQaReference, requestUpdateQaReferencePrimary } from "@/request/qa-reference";
 import { requestTagsList, requestCreateTag, Tag } from "@/request/tags";
 
 type State = {
@@ -65,6 +65,11 @@ type Action = {
     dataset_id: string;
     reference_id: number;
   }) => void;
+  updateReferencePrimary: (body: {
+    dataset_id: string;
+    reference_id: string;
+    primary: number;
+  }) => Promise<void>;
   getReferenceList: (dataset_id: string, item_id: string) => void;
   getFileList: () => void;
   addReferenceFile: (fileId: string) => void;
@@ -296,6 +301,30 @@ const store = create<State & Action>((set, get) => ({
         lastEditTime: Date.now(),
       });
       toast.success("删除成功");
+    }
+  },
+  updateReferencePrimary: async (body: {
+    dataset_id: string;
+    reference_id: string;
+    primary: number;
+  }) => {
+    const { qaReferenceList } = get();
+    const res = await requestUpdateQaReferencePrimary(body);
+    if (res.code === 200) {
+      set({
+        qaReferenceList: qaReferenceList.map((qaReference) => ({
+          ...qaReference,
+          references: qaReference.references.map((r) =>
+            r.reference_id.toString() === body.reference_id
+              ? { ...r, primary: body.primary }
+              : r
+          ),
+        })),
+        lastEditTime: Date.now(),
+      });
+      toast.success(body.primary === 1 ? "已标记为关键知识" : "已取消关键知识标记");
+    } else {
+      toast.error("更新失败");
     }
   },
   getReferenceList: async (dataset_id: string, item_id: string) => {

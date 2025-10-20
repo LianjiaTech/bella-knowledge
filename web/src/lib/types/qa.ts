@@ -42,6 +42,7 @@ export type QaReference = {
     path: number[];
     reference_id: number;
     snippet: string;
+    primary?: number;
   }[];
 };
 

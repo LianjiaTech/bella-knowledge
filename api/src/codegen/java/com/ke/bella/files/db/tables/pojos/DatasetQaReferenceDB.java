@@ -25,6 +25,7 @@ public class DatasetQaReferenceDB implements Operator, Serializable {
     private String        fileId;
     private String        path;
     private String        snippet;
+    private Integer       primary;
     private Long          cuid;
     private String        cuName;
     private LocalDateTime ctime;
@@ -43,6 +44,7 @@ public class DatasetQaReferenceDB implements Operator, Serializable {
         this.fileId = value.fileId;
         this.path = value.path;
         this.snippet = value.snippet;
+        this.primary = value.primary;
         this.cuid = value.cuid;
         this.cuName = value.cuName;
         this.ctime = value.ctime;
@@ -60,6 +62,7 @@ public class DatasetQaReferenceDB implements Operator, Serializable {
         String        fileId,
         String        path,
         String        snippet,
+        Integer       primary,
         Long          cuid,
         String        cuName,
         LocalDateTime ctime,
@@ -75,6 +78,7 @@ public class DatasetQaReferenceDB implements Operator, Serializable {
         this.fileId = fileId;
         this.path = path;
         this.snippet = snippet;
+        this.primary = primary;
         this.cuid = cuid;
         this.cuName = cuName;
         this.ctime = ctime;
@@ -180,6 +184,20 @@ public class DatasetQaReferenceDB implements Operator, Serializable {
      */
     public void setSnippet(String snippet) {
         this.snippet = snippet;
+    }
+
+    /**
+     * Getter for <code>dataset_qa_reference.primary</code>. 是否为关键知识，0表示普通知识，1表示关键知识
+     */
+    public Integer getPrimary() {
+        return this.primary;
+    }
+
+    /**
+     * Setter for <code>dataset_qa_reference.primary</code>. 是否为关键知识，0表示普通知识，1表示关键知识
+     */
+    public void setPrimary(Integer primary) {
+        this.primary = primary;
     }
 
     /**
@@ -291,6 +309,7 @@ public class DatasetQaReferenceDB implements Operator, Serializable {
         sb.append(", ").append(fileId);
         sb.append(", ").append(path);
         sb.append(", ").append(snippet);
+        sb.append(", ").append(primary);
         sb.append(", ").append(cuid);
         sb.append(", ").append(cuName);
         sb.append(", ").append(ctime);

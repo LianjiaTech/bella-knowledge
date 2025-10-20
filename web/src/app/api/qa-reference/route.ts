@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { dataset_id, item_id, file_id, path, snippet, children_references } =
+  const { dataset_id, item_id, file_id, path, snippet, primary, children_references } =
     body;
   await Promise.all(
     children_references.map((reference_id: number) =>
@@ -36,6 +36,7 @@ export async function POST(req: NextRequest) {
       file_id,
       path: path.length > 0 ? "/" + path.join("/") : "",
       snippet: snippet || "",
+      primary: primary !== undefined ? primary : 0,
     },
   });
   return res;
