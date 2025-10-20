@@ -40,6 +40,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.ke.bella.files.annotations.FileAPI;
+import com.ke.bella.files.db.repo.Page;
 import com.ke.bella.files.db.tables.pojos.FileDB;
 import com.ke.bella.files.enums.FilePurpose;
 import com.ke.bella.files.protocol.DomTreeOps.DomTreeUploadOp;
@@ -55,6 +56,7 @@ import com.ke.bella.files.protocol.FileUrl;
 import com.ke.bella.files.protocol.ListFileOps;
 import com.ke.bella.files.protocol.OpenAIFile;
 import com.ke.bella.files.protocol.OpenapiListResponse;
+import com.ke.bella.files.protocol.PageFileOps;
 import com.ke.bella.files.protocol.Progress;
 import com.ke.bella.files.protocol.Scope;
 import com.ke.bella.files.protocol.UpdateCitiesOps;
@@ -1110,5 +1112,23 @@ public class FileController {
             LOGGER.error("move file failed, file_id: {}, ancestor_id: {}, error: {}", fileId, targetAncestorId, e.getMessage(), e);
             throw new IllegalStateException("move file failed", e);
         }
+    }
+
+    @PostMapping("/page")
+    public Page<OpenAIFile> pageFiles(@RequestBody PageFileOps ops) {
+        Assert.notNull(ops, "invalid request body");
+
+        // 校验spaceCode和ancestorId至少提供一个
+        Assert.isTrue(StringUtils.isNotEmpty(ops.getSpaceCode()) || StringUtils.isNotEmpty(ops.getAncestorId()),
+                "either space_code or ancestor_id must be provided");
+        Assert.hasText(ops.getType(), "type is required");
+        Assert.isTrue("dir".equals(ops.getType()) || "file".equals(ops.getType()), "type must be 'dir' or 'file', but got: " + ops.getType());
+        Assert.isTrue(ops.getPage() >= 1, "page must be greater than 0");
+        Assert.isTrue(ops.getPageSize() >= 1, "page_size must be greater than 0");
+        Assert.isTrue(ops.getPageSize() <= 100, "page_size cannot exceed 100");
+        Assert.isTrue("desc".equalsIgnoreCase(ops.getOrder()) || "asc".equalsIgnoreCase(ops.getOrder()),
+                "order must be 'desc' or 'asc', but got: " + ops.getOrder());
+
+        return fileService.pageFiles(ops);
     }
 }

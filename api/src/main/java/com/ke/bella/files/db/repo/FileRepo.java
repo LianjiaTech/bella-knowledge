@@ -21,13 +21,16 @@ import javax.annotation.Resource;
 
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
+import org.jooq.Condition;
 import org.jooq.DSLContext;
 import org.jooq.InsertSetMoreStep;
 import org.jooq.Record;
 import org.jooq.Record1;
 import org.jooq.SelectConditionStep;
 import org.jooq.SelectOrderByStep;
+import org.jooq.SortField;
 import org.jooq.UpdateSetMoreStep;
+import org.jooq.impl.DSL;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.Assert;
@@ -46,6 +49,7 @@ import com.ke.bella.files.protocol.FileException.FileNotFoundException;
 import com.ke.bella.files.protocol.FileOps;
 import com.ke.bella.files.protocol.FileStatus;
 import com.ke.bella.files.protocol.ListFileOps;
+import com.ke.bella.files.protocol.PageFileOps;
 import com.ke.bella.files.utils.BellaContextHelper;
 import com.ke.bella.files.utils.CustomStringUtils;
 import com.ke.bella.files.utils.JsonUtils;
@@ -579,5 +583,113 @@ public class FileRepo implements BaseRepo {
                 .where(FILE_SHARDING.KEY.eq(key))
                 .and(FILE_SHARDING.TYPE.eq(type))
                 .execute();
+    }
+
+    public Page<FileDB> pageFiles(PageFileOps ops) {
+        String shardingKey;
+        if(StringUtils.isNotEmpty(ops.getAncestorId())) {
+            shardingKey = getShardingKeyByFileId(ops.getAncestorId());
+        } else {
+            shardingKey = getShardingKeyBySpaceCode(ops.getSpaceCode());
+        }
+
+        Condition whereCondition = buildWhereConditionForPageFiles(ops);
+
+        SelectConditionStep<Record> sql = db(shardingKey).select(FILE.fields())
+                .from(FILE_CLOSURE)
+                .innerJoin(FILE)
+                .on(FILE_CLOSURE.DESCENDANT_ID.eq(FILE.FILE_ID))
+                .where(whereCondition);
+
+        boolean isAsc = "asc".equalsIgnoreCase(ops.getOrder());
+        SortField<?> ctimeOrder = isAsc ? FILE.CTIME.asc() : FILE.CTIME.desc();
+
+        sql.orderBy(FILE.IS_DIR.desc(), ctimeOrder);
+
+        return queryPage(db(shardingKey), sql, ops.getPage(), ops.getPageSize(), FileDB.class);
+
+    }
+
+    /**
+     * 构造分页查询的通用 where 条件，供数据查询与计数查询复用。
+     * 将 `FILE_CLOSURE` 与 `FILE` 的筛选条件分组，避免交错，提升可读性。
+     */
+    private Condition buildWhereConditionForPageFiles(PageFileOps ops) {
+        // FILE_CLOSURE 条件分组
+        Condition closureCondition;
+        if(StringUtils.isNotEmpty(ops.getAncestorId())) {
+            closureCondition = FILE_CLOSURE.ANCESTOR_ID.eq(ops.getAncestorId())
+                    .and(FILE_CLOSURE.DEPTH.eq(1L));
+        } else {
+            closureCondition = FILE_CLOSURE.SPACE_CODE.eq(ops.getSpaceCode())
+                    .and(FILE_CLOSURE.ROOT_DEPTH.eq(1L));
+        }
+
+        // FILE 条件分组
+        Condition fileCondition = FILE.STATUS.eq(FileStatus.NOT_DELETED.getValue());
+        if(StringUtils.isEmpty(ops.getAncestorId())) {
+            fileCondition = fileCondition.and(FILE.SPACE_CODE.eq(ops.getSpaceCode()));
+        }
+        if(ops.getPurpose() != null) {
+            fileCondition = fileCondition.and(FILE.PURPOSE.eq(ops.getPurpose()));
+        }
+        if(ops.getFileId() != null) {
+            String normalizedId = queryNewFileId(ops.getFileId());
+            fileCondition = fileCondition.and(FILE.FILE_ID.eq(normalizedId));
+        }
+        if(ops.getFilename() != null) {
+            fileCondition = fileCondition.and(FILE.FILENAME.like(DSL.concat(DSL.escape(ops.getFilename(), '\\'), "%")));
+        }
+        if(ops.getExtension() != null) {
+            fileCondition = fileCondition.and(FILE.EXTENSION.eq(ops.getExtension()));
+        }
+        switch (ops.getType()) {
+        case "dir":
+            fileCondition = fileCondition.and(FILE.IS_DIR.eq(1));
+            break;
+        case "file":
+            fileCondition = fileCondition.and(FILE.IS_DIR.eq(0));
+            break;
+        default:
+            break;
+        }
+        if(ops.getTags() != null) {
+            fileCondition = applyJsonArrayFilter(fileCondition, FILE.TAGS, ops.getTags());
+        }
+        if(ops.getCities() != null) {
+            fileCondition = applyJsonArrayFilter(fileCondition, FILE.CITIES, ops.getCities());
+        }
+        if(ops.getCuid() != null) {
+            fileCondition = fileCondition.and(FILE.CUID.eq(ops.getCuid()));
+        }
+        if(ops.getMuid() != null) {
+            fileCondition = fileCondition.and(FILE.MUID.eq(ops.getMuid()));
+        }
+
+        return closureCondition.and(fileCondition);
+    }
+
+    private Condition buildContainsAnyCondition(org.jooq.Field<String> field, List<String> values) {
+        Condition orCondition = null;
+        for (String value : values) {
+            String jsonScalar = JsonUtils.toJson(value);
+            Condition single = DSL.condition("JSON_CONTAINS(COALESCE(NULLIF({0}, ''), '[]'), {1}, '$')", field, DSL.inline(jsonScalar));
+            orCondition = (orCondition == null) ? single : orCondition.or(single);
+        }
+        return orCondition;
+    }
+
+    private Condition applyJsonArrayFilter(Condition base, org.jooq.Field<String> field, List<String> values) {
+        // 空集合：仅匹配数据库中严格等于 '[]' 的记录
+        if(values.isEmpty()) {
+            return base.and(field.eq("[]"));
+        }
+        // 非空集合：任意一个命中（OR），使用 JSON_CONTAINS
+        Condition orCondition = buildContainsAnyCondition(field, values);
+        if(orCondition == null) {
+            // 所有入参均为空串或无效，视为不加筛选
+            return base;
+        }
+        return base.and(orCondition);
     }
 }
