@@ -22,6 +22,7 @@ import com.ke.bella.files.FileShardingCountUpdator;
 import com.ke.bella.files.TaskExecutor;
 import com.ke.bella.files.configuration.BucketConfig;
 import com.ke.bella.files.db.repo.FileRepo;
+import com.ke.bella.files.db.repo.Page;
 import com.ke.bella.files.db.tables.pojos.FileDB;
 import com.ke.bella.files.db.tables.pojos.FileProgressDB;
 import com.ke.bella.files.enums.FileType;
@@ -33,6 +34,7 @@ import com.ke.bella.files.protocol.FileOps;
 import com.ke.bella.files.protocol.FileStatus;
 import com.ke.bella.files.protocol.ListFileOps;
 import com.ke.bella.files.protocol.OpenAIFile;
+import com.ke.bella.files.protocol.PageFileOps;
 import com.ke.bella.files.protocol.Progress;
 import com.ke.bella.files.protocol.Scope;
 import com.ke.bella.files.protocol.UpdateProgressRequestData;
@@ -668,5 +670,16 @@ public class FileService {
         updateFile(ops, false, Scope.LOCATION);
 
         return getFile(fileId);
+    }
+
+    public Page<OpenAIFile> pageFiles(PageFileOps ops) {
+        Page<FileDB> pageResult = fileRepo.pageFiles(ops);
+        List<OpenAIFile> openAIFiles = pageResult.getData().stream()
+                .map(this::transferToOpenAIFile)
+                .collect(Collectors.toList());
+
+        return Page.<OpenAIFile>from(ops.getPage(), ops.getPageSize())
+                .total(pageResult.getTotal())
+                .list(openAIFiles);
     }
 }
