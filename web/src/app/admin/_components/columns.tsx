@@ -2,7 +2,7 @@
 
 import { ColumnDef, Row } from "@tanstack/react-table";
 import dayjs from "dayjs";
-import { Edit, EditIcon, Import, Trash2 } from "lucide-react";
+import { Edit, EditIcon, FilePlus2, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -101,7 +101,7 @@ const CreateRowActions = (
                 onClick={handleAppend}
                 className="h-8 px-2"
               >
-                <Import className="h-4 w-4" />
+                <FilePlus2 className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>追加数据集</TooltipContent>
