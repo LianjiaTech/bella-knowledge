@@ -76,6 +76,8 @@ export function LeftSidebar() {
     }
   };
 
+  const isComposing = useRef(false);
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.nativeEvent.isComposing) {
       return;
@@ -99,7 +101,7 @@ export function LeftSidebar() {
         }}
         onMouseLeave={() => {
           // 鼠标离开边栏时，延迟关闭
-          if (open) {
+          if (open && !isComposing.current) {
             hoverTimeoutRef.current = setTimeout(() => {
               setOpen(false);
             }, 300);
@@ -122,6 +124,12 @@ export function LeftSidebar() {
               value={newQuestionText}
               onChange={(e) => setNewQuestionText(e.target.value)}
               onKeyDown={handleKeyDown}
+              onCompositionStart={() => {
+                isComposing.current = true;
+              }}
+              onCompositionEnd={() => {
+                isComposing.current = false;
+              }}
               rows={2}
               className="pr-10 !resize-none max-h-6 scrollbar-hide"
             />
