@@ -362,9 +362,13 @@ public class FileService {
         if(fileType.notUsersType()) {
             fileShardingCountUpdator.increase(shardingKey, fileType.getType());
         }
+        
+        // Query complete file record with auto-generated fields (ctime, etc.)
+        FileDB completeFileDB = fileRepo.queryFile(fileId, fileType);
+        
         // 返回上传上下文
         return FileUploadContext.builder()
-                .fileDB(fileDB)
+                .fileDB(completeFileDB)
                 .bucketName(bucketName)
                 .keyName(keyName)
                 .fileType(fileType)
