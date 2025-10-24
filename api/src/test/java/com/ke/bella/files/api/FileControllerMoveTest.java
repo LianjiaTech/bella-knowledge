@@ -178,7 +178,7 @@ public class FileControllerMoveTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error.message").value("ancestor_id must be dir"));
+                .andExpect(jsonPath("$.error.message").value("ancestor_id must refer to a directory"));
     }
 
     @Test
