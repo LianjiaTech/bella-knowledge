@@ -33,6 +33,7 @@ public class FilePurposeClassifier {
         TEMP_PURPOSES.add(FilePurpose.TEMP.getValue());
         TEMP_PURPOSES.add(FilePurpose.FINE_TUNE.getValue());
         TEMP_PURPOSES.add(FilePurpose.EVALS.getValue());
+        TEMP_PURPOSES.add(FilePurpose.ASSISTANTS_CHAT.getValue());
     }
 
     public static FileType classify(String purpose) {

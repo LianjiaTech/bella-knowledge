@@ -11,6 +11,7 @@ import lombok.Getter;
 public enum FilePurpose {
 
     ASSISTANTS("assistants"),
+    ASSISTANTS_CHAT("assistants-chat"),
     VISION("vision"),
     FINE_TUNE("fine-tune"),
     EVALS("evals"),
