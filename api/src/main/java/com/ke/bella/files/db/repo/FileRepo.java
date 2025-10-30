@@ -603,8 +603,10 @@ public class FileRepo implements BaseRepo {
 
         boolean isAsc = "asc".equalsIgnoreCase(ops.getOrder());
         SortField<?> ctimeOrder = isAsc ? FILE.CTIME.asc() : FILE.CTIME.desc();
+        // 使用自增 ID 作为二级排序键，方向与 ctime 保持一致，避免相同 ctime 时分页数据重复
+        SortField<?> idOrder = isAsc ? FILE.ID.asc() : FILE.ID.desc();
 
-        sql.orderBy(FILE.IS_DIR.desc(), ctimeOrder);
+        sql.orderBy(FILE.IS_DIR.desc(), ctimeOrder, idOrder);
 
         return queryPage(db(shardingKey), sql, ops.getPage(), ops.getPageSize(), FileDB.class);
 
