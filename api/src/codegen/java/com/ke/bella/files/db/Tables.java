@@ -13,6 +13,7 @@ import com.ke.bella.files.db.tables.File;
 import com.ke.bella.files.db.tables.FileClosure;
 import com.ke.bella.files.db.tables.FileMapping;
 import com.ke.bella.files.db.tables.FileProgress;
+import com.ke.bella.files.db.tables.FileProgressTemp;
 import com.ke.bella.files.db.tables.FileSharding;
 import com.ke.bella.files.db.tables.FileSystem;
 import com.ke.bella.files.db.tables.FileTemp;
@@ -70,6 +71,11 @@ public class Tables {
      * The table <code>file_progress</code>.
      */
     public static final FileProgress FILE_PROGRESS = FileProgress.FILE_PROGRESS;
+
+    /**
+     * The table <code>file_progress_temp</code>.
+     */
+    public static final FileProgressTemp FILE_PROGRESS_TEMP = FileProgressTemp.FILE_PROGRESS_TEMP;
 
     /**
      * The table <code>file_sharding</code>.

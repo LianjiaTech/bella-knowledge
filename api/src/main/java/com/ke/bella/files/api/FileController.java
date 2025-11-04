@@ -103,7 +103,8 @@ public class FileController {
 
     /**
      * 文件上传接口
-     * 优化策略： 1. socketBuffer: 1MB - 减少系统调用次数 2. file-size-threshold: 4MB - 减少磁盘写入 3. 直接流式上传到S3
+     * 优化策略： 1. socketBuffer: 1MB - 减少系统调用次数 2. file-size-threshold: 4MB -
+     * 减少磁盘写入 3. 直接流式上传到S3
      */
     @PostMapping
     public OpenAIFile upload(
@@ -183,8 +184,7 @@ public class FileController {
                             ancestorId,
                             description,
                             cities,
-                            tags
-                    );
+                            tags);
 
                     if(getUrl) {
                         String url = fileService.getUrl(openAIFile.getId(), expires);
@@ -305,8 +305,7 @@ public class FileController {
                     type,
                     "json",
                     charset,
-                    null
-            );
+                    null);
 
             FileOps bindOp = FileOps.builder()
                     .fileId(sourceFileId)
@@ -747,8 +746,7 @@ public class FileController {
                             type,
                             "pdf",
                             charset,
-                            null
-                    );
+                            null);
 
                     FileOps bindOp = FileOps.builder()
                             .fileId(sourceFileId)
@@ -799,11 +797,17 @@ public class FileController {
             @RequestBody UpdateProgressRequestData data,
             @PathVariable("file_id") String fileId,
             @PathVariable("progress_name") String progressName) {
-        if(fileService.getFile(fileId) == null) {
-            throw new IllegalArgumentException("Invalid fileId: " + fileId);
+        OpenAIFile file = fileService.getFile(fileId);
+        if(file == null) {
+            throw new FileNotFoundException(fileId);
         }
-        if(!FilePurposeClassifier.isUserFile(fileId)) {
-            throw new IllegalArgumentException("Progress tracking is only supported for USER files, fileId: " + fileId);
+        String purpose = file.getPurpose();
+        if(!FilePurposeClassifier.allowedProgressTrackablePurposes().contains(purpose)) {
+            throw new IllegalArgumentException(String.format(
+                    "Progress tracking is not supported for files with purpose '%s'. Supported purposes are: %s. file_id: %s",
+                    purpose,
+                    String.join(", ", FilePurposeClassifier.allowedProgressTrackablePurposes()),
+                    fileId));
         }
         fileService.updateProgress(data, fileId, progressName);
         return fileService.getProgress(fileId, progressName);
@@ -813,11 +817,17 @@ public class FileController {
     public Progress getProgress(
             @PathVariable("file_id") String fileId,
             @RequestParam("progress_name") String progressName) {
-        if(fileService.getFile(fileId) == null) {
-            throw new IllegalArgumentException("Invalid fileId: " + fileId);
+        OpenAIFile file = fileService.getFile(fileId);
+        if(file == null) {
+            throw new FileNotFoundException(fileId);
         }
-        if(!FilePurposeClassifier.isUserFile(fileId)) {
-            throw new IllegalArgumentException("Progress tracking is only supported for USER files, fileId: " + fileId);
+        String purpose = file.getPurpose();
+        if(!FilePurposeClassifier.allowedProgressTrackablePurposes().contains(purpose)) {
+            throw new IllegalArgumentException(String.format(
+                    "Progress tracking is not supported for files with purpose '%s'. Supported purposes are: %s. file_id: %s",
+                    purpose,
+                    String.join(", ", FilePurposeClassifier.allowedProgressTrackablePurposes()),
+                    fileId));
         }
         Progress res = fileService.getProgress(fileId, progressName);
         if(res == null) {

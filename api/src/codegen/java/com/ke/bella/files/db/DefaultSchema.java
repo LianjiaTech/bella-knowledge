@@ -13,6 +13,7 @@ import com.ke.bella.files.db.tables.File;
 import com.ke.bella.files.db.tables.FileClosure;
 import com.ke.bella.files.db.tables.FileMapping;
 import com.ke.bella.files.db.tables.FileProgress;
+import com.ke.bella.files.db.tables.FileProgressTemp;
 import com.ke.bella.files.db.tables.FileSharding;
 import com.ke.bella.files.db.tables.FileSystem;
 import com.ke.bella.files.db.tables.FileTemp;
@@ -86,6 +87,11 @@ public class DefaultSchema extends SchemaImpl {
     public final FileProgress FILE_PROGRESS = FileProgress.FILE_PROGRESS;
 
     /**
+     * The table <code>file_progress_temp</code>.
+     */
+    public final FileProgressTemp FILE_PROGRESS_TEMP = FileProgressTemp.FILE_PROGRESS_TEMP;
+
+    /**
      * The table <code>file_sharding</code>.
      */
     public final FileSharding FILE_SHARDING = FileSharding.FILE_SHARDING;
@@ -135,6 +141,7 @@ public class DefaultSchema extends SchemaImpl {
             FileClosure.FILE_CLOSURE,
             FileMapping.FILE_MAPPING,
             FileProgress.FILE_PROGRESS,
+            FileProgressTemp.FILE_PROGRESS_TEMP,
             FileSharding.FILE_SHARDING,
             FileSystem.FILE_SYSTEM,
             FileTemp.FILE_TEMP,
