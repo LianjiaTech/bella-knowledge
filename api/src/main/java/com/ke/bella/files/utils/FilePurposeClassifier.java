@@ -16,6 +16,7 @@ public class FilePurposeClassifier {
     private static final Set<String> USER_PURPOSES = new HashSet<>();
     private static final Set<String> SYSTEM_PURPOSES = new HashSet<>();
     private static final Set<String> TEMP_PURPOSES = new HashSet<>();
+    private static final Set<String> PROGRESS_TRACKABLE_PURPOSES = new HashSet<>();
 
     static {
         // User files
@@ -34,6 +35,11 @@ public class FilePurposeClassifier {
         TEMP_PURPOSES.add(FilePurpose.FINE_TUNE.getValue());
         TEMP_PURPOSES.add(FilePurpose.EVALS.getValue());
         TEMP_PURPOSES.add(FilePurpose.ASSISTANTS_CHAT.getValue());
+
+        // Progress trackable purposes
+        PROGRESS_TRACKABLE_PURPOSES.add(FilePurpose.ASSISTANTS.getValue());
+        PROGRESS_TRACKABLE_PURPOSES.add(FilePurpose.ASSISTANTS_CHAT.getValue());
+        PROGRESS_TRACKABLE_PURPOSES.add(FilePurpose.VISION.getValue());
     }
 
     public static FileType classify(String purpose) {
@@ -74,5 +80,9 @@ public class FilePurposeClassifier {
         all.addAll(SYSTEM_PURPOSES);
         all.addAll(TEMP_PURPOSES);
         return all;
+    }
+
+    public static Set<String> allowedProgressTrackablePurposes() {
+        return new HashSet<>(PROGRESS_TRACKABLE_PURPOSES);
     }
 }

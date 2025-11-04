@@ -79,13 +79,6 @@ public enum FileType {
     }
 
     /**
-     * 判断是否支持进度跟踪
-     */
-    public boolean supportsProgress() {
-        return isUsersType();
-    }
-
-    /**
      * 判断是否为目录类型
      */
     public boolean isDirectory() {

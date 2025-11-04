@@ -338,7 +338,8 @@ public class FileRepo implements BaseRepo {
             String fileId,
             String progressName) {
         fileId = queryNewFileId(fileId);
-        String shardingKey = getShardingKeyByFileId(fileId);
+        FileType fileType = FileType.fromFileId(fileId);
+        String shardingKey = getShardingKeyByFileId(fileId, fileType);
         return db(shardingKey).selectFrom(FILE_PROGRESS)
                 .where(FILE_PROGRESS.FILE_ID.eq(fileId).and(FILE_PROGRESS.NAME.eq(progressName)))
                 .fetchOneInto(FileProgressDB.class);
@@ -351,7 +352,8 @@ public class FileRepo implements BaseRepo {
             String message,
             Integer percent) {
         fileId = queryNewFileId(fileId);
-        String shardingKey = getShardingKeyByFileId(fileId);
+        FileType fileType = FileType.fromFileId(fileId);
+        String shardingKey = getShardingKeyByFileId(fileId, fileType);
         FileProgressRecord rec = FILE_PROGRESS.newRecord();
         rec.setFileId(fileId);
         rec.setName(progressName);
@@ -365,9 +367,8 @@ public class FileRepo implements BaseRepo {
                 .set(rec)
                 .execute();
         if(insertedNum != 1) {
-            throw new IllegalStateException("insert progress failed, fileId: " + fileId + ", progressName: " + progressName);
+            throw new IllegalStateException("insert progress failed, file_id: " + fileId + ", progress_name: " + progressName);
         }
-
     }
 
     public void updateProgress(
@@ -377,7 +378,8 @@ public class FileRepo implements BaseRepo {
             String message,
             Integer percent) {
         fileId = queryNewFileId(fileId);
-        String shardingKey = getShardingKeyByFileId(fileId);
+        FileType fileType = FileType.fromFileId(fileId);
+        String shardingKey = getShardingKeyByFileId(fileId, fileType);
         FileProgressRecord rec = FILE_PROGRESS.newRecord();
         rec.setStatus(status);
         rec.setPercent(percent);
@@ -390,7 +392,7 @@ public class FileRepo implements BaseRepo {
                 .where(FILE_PROGRESS.FILE_ID.eq(fileId).and(FILE_PROGRESS.NAME.eq(progressName)))
                 .execute();
         if(updatedNum != 1) {
-            throw new IllegalStateException("update progress failed, fileId: " + fileId + ", progressName: " + progressName);
+            throw new IllegalStateException("update progress failed, file_id: " + fileId + ", progress_name: " + progressName);
         }
     }
 
