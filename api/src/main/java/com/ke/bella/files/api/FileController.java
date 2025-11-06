@@ -11,6 +11,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
@@ -43,6 +44,7 @@ import com.ke.bella.files.db.repo.Page;
 import com.ke.bella.files.db.tables.pojos.FileDB;
 import com.ke.bella.files.enums.FilePurpose;
 import com.ke.bella.files.protocol.DomTreeOps.DomTreeUploadOp;
+import com.ke.bella.files.protocol.FileAncestorIdsOps;
 import com.ke.bella.files.protocol.FileCropOps;
 import com.ke.bella.files.protocol.FileCropOps.FileCropOp;
 import com.ke.bella.files.protocol.FileException.FileNotFoundException;
@@ -1260,5 +1262,24 @@ public class FileController {
                 "order must be 'desc' or 'asc', but got: " + ops.getOrder());
 
         return fileService.pageFiles(ops);
+    }
+
+    /**
+     * 批量获取文件的祖先ID列表
+     * 返回每个文件从根路径开始的完整祖先ID数组
+     *
+     * @param ops 请求参数，包含 space_code 和 file_ids
+     *
+     * @return Map<String, List<String>>
+     *         key为fileId，value为从根路径开始的祖先ID数组（根路径文件返回空数组）
+     */
+    @PostMapping("/ancestor-ids")
+    public Map<String, List<String>> getFileAncestorIds(@RequestBody FileAncestorIdsOps ops) {
+        Assert.notNull(ops, "invalid request body");
+        Assert.hasText(ops.getSpaceCode(), "space_code is required");
+        Assert.notNull(ops.getFileIds(), "file_ids is required");
+        Assert.notEmpty(ops.getFileIds(), "file_ids cannot be empty");
+        Assert.isTrue(ops.getFileIds().size() <= 1000, "file_ids size cannot exceed 1000");
+        return fileService.getFileAncestorIds(ops.getSpaceCode(), ops.getFileIds());
     }
 }

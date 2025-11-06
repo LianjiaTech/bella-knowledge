@@ -7,6 +7,7 @@ import java.io.InputStream;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import javax.annotation.PostConstruct;
@@ -683,5 +684,18 @@ public class FileService {
         return Page.<OpenAIFile>from(ops.getPage(), ops.getPageSize())
                 .total(pageResult.getTotal())
                 .list(openAIFiles);
+    }
+
+    /**
+     * 批量获取文件的祖先ID列表
+     *
+     * @param spaceCode 空间编码，必传，用于分表计算
+     * @param fileIds   文件ID列表
+     *
+     * @return Map<String, List<String>>
+     *         key为fileId，value为从根路径开始的祖先ID数组（根路径文件返回空数组）
+     */
+    public Map<String, List<String>> getFileAncestorIds(String spaceCode, List<String> fileIds) {
+        return fileRepo.getFileAncestorIds(spaceCode, fileIds);
     }
 }

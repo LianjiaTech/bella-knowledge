@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -26,6 +27,8 @@ import org.jooq.DSLContext;
 import org.jooq.InsertSetMoreStep;
 import org.jooq.Record;
 import org.jooq.Record1;
+import org.jooq.Record3;
+import org.jooq.Result;
 import org.jooq.SelectConditionStep;
 import org.jooq.SelectOrderByStep;
 import org.jooq.SortField;
@@ -690,5 +693,45 @@ public class FileRepo implements BaseRepo {
             return base;
         }
         return base.and(orCondition);
+    }
+
+    /**
+     * 批量获取文件的祖先ID列表
+     * 利用闭包表特性，一次查询获取所有文件的祖先路径
+     *
+     * @param spaceCode 空间编码，用于分表
+     * @param fileIds   文件ID列表
+     *
+     * @return Map<String, List<String>>
+     *         key为fileId，value为从根路径开始的祖先ID数组（根路径文件返回空数组）
+     */
+    public Map<String, List<String>> getFileAncestorIds(String spaceCode, List<String> fileIds) {
+        if(CollectionUtils.isEmpty(fileIds)) {
+            return Collections.emptyMap();
+        }
+        String shardingKey = getShardingKeyBySpaceCode(spaceCode);
+        // 查询所有文件的祖先关系
+        // depth > 0 排除自己，只查询祖先
+        Result<Record3<String, String, Long>> records = db(shardingKey)
+                .select(FILE_CLOSURE.DESCENDANT_ID, FILE_CLOSURE.ANCESTOR_ID, FILE_CLOSURE.DEPTH)
+                .from(FILE_CLOSURE)
+                .where(FILE_CLOSURE.DESCENDANT_ID.in(fileIds))
+                .and(FILE_CLOSURE.SPACE_CODE.eq(spaceCode))
+                .and(FILE_CLOSURE.DEPTH.gt(0L))
+                .orderBy(FILE_CLOSURE.DESCENDANT_ID.asc(), FILE_CLOSURE.DEPTH.desc())
+                .fetch();
+        // 按 descendant_id 分组，并按 depth 降序排列（从根路径到直接父节点）
+        Map<String, List<String>> result = new HashMap<>();
+        // 初始化所有 fileId 的结果为空数组（处理根路径文件的情况）
+        for (String fileId : fileIds) {
+            result.put(fileId, new ArrayList<>());
+        }
+        // 填充祖先路径
+        for (Record3<String, String, Long> record : records) {
+            String descendantId = record.get(FILE_CLOSURE.DESCENDANT_ID);
+            String ancestorId = record.get(FILE_CLOSURE.ANCESTOR_ID);
+            result.get(descendantId).add(ancestorId);
+        }
+        return result;
     }
 }
