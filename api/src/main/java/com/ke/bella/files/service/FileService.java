@@ -13,9 +13,9 @@ import javax.annotation.PostConstruct;
 
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.context.annotation.Lazy;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.ke.bella.files.FileShardingCountUpdator;
@@ -197,8 +197,6 @@ public class FileService {
         return upload(file, filename, purpose, metadata, mimeType, type, extension, charset, null, null, null, null);
     }
 
-
-
     /**
      * 基于File的上传 - 临时文件方式
      * 优化：将S3上传移出事务，减少数据库连接占用时间
@@ -215,22 +213,21 @@ public class FileService {
             String ancestorId,
             String description,
             List<String> cities,
-            List<String> tags
-            ){
+            List<String> tags) {
         // 步骤1：创建数据库记录（在事务内，快速完成）
         FileUploadContext context = self.createFile(
-            filename, file.length(), purpose, metadata,
-            mimeType, type, extension, ancestorId, description, cities, tags);
+                filename, file.length(), purpose, metadata,
+                mimeType, type, extension, ancestorId, description, cities, tags);
 
         // 步骤2：上传到S3（在事务外，不占用数据库连接）
         try {
             storageService.putObject(
-                context.getBucketName(),
-                context.getKeyName(),
-                mimeType,
-                file,
-                filename,
-                charset);
+                    context.getBucketName(),
+                    context.getKeyName(),
+                    mimeType,
+                    file,
+                    filename,
+                    charset);
         } catch (Exception e) {
             LOGGER.error("S3 upload failed for fileId: {}, error: {}", context.getFileDB().getFileId(), e.getMessage(), e);
             // S3上传失败，删除已创建的数据库记录，保证数据一致性
@@ -239,7 +236,7 @@ public class FileService {
                 LOGGER.info("Cleaned up orphaned DB record after S3 upload failure, fileId: {}", context.getFileDB().getFileId());
             } catch (Exception cleanupError) {
                 LOGGER.error("Failed to cleanup DB record after S3 upload failure, fileId: {}, error: {}",
-                    context.getFileDB().getFileId(), cleanupError.getMessage(), cleanupError);
+                        context.getFileDB().getFileId(), cleanupError.getMessage(), cleanupError);
             }
             throw new IllegalStateException("Failed to upload file to storage", e);
         }
@@ -259,12 +256,12 @@ public class FileService {
             String extension,
             String charset,
             String ancestorId) {
-        return uploadFromStream(inputStream, contentLength, filename, purpose, metadata, mimeType, type, extension, charset, ancestorId, null, null, null);
+        return uploadFromStream(inputStream, contentLength, filename, purpose, metadata, mimeType, type, extension, charset, ancestorId, null, null,
+                null);
     }
 
     /**
      * 基于InputStream的流式上传 - 避免创建临时文件
-     *
      * 优化：将S3上传移出事务，减少数据库连接占用时间
      */
     public OpenAIFile uploadFromStream(
@@ -284,20 +281,20 @@ public class FileService {
 
         // 步骤1：创建数据库记录（在事务内，快速完成）
         FileUploadContext context = self.createFile(
-            filename, contentLength, purpose, metadata,
-            mimeType, type, extension, ancestorId,
-            description, cities, tags);
+                filename, contentLength, purpose, metadata,
+                mimeType, type, extension, ancestorId,
+                description, cities, tags);
 
         // 步骤2：上传到S3（在事务外，不占用数据库连接）
         try {
             storageService.putObjectFromStream(
-                context.getBucketName(),
-                context.getKeyName(),
-                mimeType,
-                inputStream,
-                contentLength,
-                filename,
-                charset);
+                    context.getBucketName(),
+                    context.getKeyName(),
+                    mimeType,
+                    inputStream,
+                    contentLength,
+                    filename,
+                    charset);
         } catch (Exception e) {
             LOGGER.error("S3 upload failed for fileId: {}, error: {}", context.getFileDB().getFileId(), e.getMessage(), e);
             // S3上传失败，删除已创建的数据库记录，保证数据一致性
@@ -306,7 +303,7 @@ public class FileService {
                 LOGGER.info("Cleaned up orphaned DB record after S3 upload failure, fileId: {}", context.getFileDB().getFileId());
             } catch (Exception cleanupError) {
                 LOGGER.error("Failed to cleanup DB record after S3 upload failure, fileId: {}, error: {}",
-                    context.getFileDB().getFileId(), cleanupError.getMessage(), cleanupError);
+                        context.getFileDB().getFileId(), cleanupError.getMessage(), cleanupError);
             }
             throw new IllegalStateException("Failed to upload file to storage", e);
         }
@@ -362,10 +359,10 @@ public class FileService {
         if(fileType.notUsersType()) {
             fileShardingCountUpdator.increase(shardingKey, fileType.getType());
         }
-        
+
         // Query complete file record with auto-generated fields (ctime, etc.)
         FileDB completeFileDB = fileRepo.queryFile(fileId, fileType);
-        
+
         // 返回上传上下文
         return FileUploadContext.builder()
                 .fileDB(completeFileDB)
@@ -391,8 +388,8 @@ public class FileService {
         message.setUserId(BellaContextHelper.getOperatorUserId());
         message.setUserName(BellaContextHelper.getOperatorUserName());
         broadcastService.broadcast(message,
-            () -> updateBroadcastStatus(fileDB.getFileId(), BroadcastStatus.SUCCESS),
-            () -> updateBroadcastStatus(fileDB.getFileId(), BroadcastStatus.FAILED));
+                () -> updateBroadcastStatus(fileDB.getFileId(), BroadcastStatus.SUCCESS),
+                () -> updateBroadcastStatus(fileDB.getFileId(), BroadcastStatus.FAILED));
 
         return openAIFile;
     }
@@ -443,7 +440,8 @@ public class FileService {
         return storageService.putObject(fileDB.getBucket(), fileDB.getPath(), mimeType, file, filename, charset);
     }
 
-    public String updateRealFileFromStream(String fileId, String filename, java.io.InputStream inputStream, long contentLength, String mimeType, String charset) {
+    public String updateRealFileFromStream(String fileId, String filename, java.io.InputStream inputStream, long contentLength, String mimeType,
+            String charset) {
         FileDB fileDB = fileRepo.queryFile(fileId);
         return storageService.putObjectFromStream(fileDB.getBucket(), fileDB.getPath(), mimeType, inputStream, contentLength, filename, charset);
     }
