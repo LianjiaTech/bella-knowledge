@@ -562,7 +562,7 @@ public class FileService {
         }
     }
 
-    public OpenAIFile mkdir(String name, String ancestorId, String description) {
+    public OpenAIFile mkdir(String name, String ancestorId, String description, String purpose) {
         String spaceCode = BellaContextHelper.getOperateSpaceCode();
 
         FileType fileType = FileType.DIRECTORY;
@@ -579,7 +579,7 @@ public class FileService {
         fileDB.setPath("");
         fileDB.setBytes(0L);
         fileDB.setSpaceCode(spaceCode);
-        fileDB.setPurpose(null);
+        fileDB.setPurpose(purpose);
         fileDB.setMetaData("{}");
         fileDB.setAkCode(akCode);
         fileDB.setIsDir(1);
