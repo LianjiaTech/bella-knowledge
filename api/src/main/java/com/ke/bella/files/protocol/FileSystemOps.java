@@ -28,6 +28,7 @@ public class FileSystemOps {
         private String ancestorId;
         private String name;
         private String description;
+        private String purpose;
     }
 
     @Data
