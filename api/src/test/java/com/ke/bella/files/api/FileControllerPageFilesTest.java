@@ -239,4 +239,248 @@ public class FileControllerPageFilesTest {
                 ops.getPageSize() == 10 &&
                 "desc".equalsIgnoreCase(ops.getOrder())));
     }
+
+    // ========== 新增测试：type 参数可选和校验 ==========
+
+    @Test
+    public void pageFiles_MissingType_Success() throws Exception {
+        // Given: 不传 type 参数，应该成功并返回所有 file 和 dir
+        int page = 1;
+        int pageSize = 10;
+        List<OpenAIFile> data = Arrays.asList(
+                OpenAIFile.builder().id("dir-1").filename("folder1").isDir(true).build(),
+                OpenAIFile.builder().id("file-1").filename("doc.txt").isDir(false).build());
+
+        when(fileService.pageFiles(any(PageFileOps.class)))
+                .thenReturn(Page.<OpenAIFile>from(page, pageSize).total(2).list(data));
+
+        // When & Then
+        mockMvc.perform(post("/v1/files/page")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\n" +
+                        "  \"space_code\": \"space-1\",\n" +
+                        "  \"page\": 1,\n" +
+                        "  \"page_size\": 10,\n" +
+                        "  \"order\": \"desc\"\n" +
+                        "}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value("dir-1"))
+                .andExpect(jsonPath("$.data[1].id").value("file-1"));
+
+        // 验证 type 参数为 null
+        verify(fileService).pageFiles(argThat(ops -> ops.getType() == null));
+    }
+
+    @Test
+    public void pageFiles_EmptyStringType_BadRequest() throws Exception {
+        // Given: type 为空字符串，应该报错
+        // When & Then
+        mockMvc.perform(post("/v1/files/page")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\n" +
+                        "  \"space_code\": \"space-1\",\n" +
+                        "  \"page\": 1,\n" +
+                        "  \"page_size\": 10,\n" +
+                        "  \"type\": \"\",\n" +
+                        "  \"order\": \"desc\"\n" +
+                        "}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.message").value("type must be 'dir' or 'file', but got: "));
+    }
+
+    @Test
+    public void pageFiles_InvalidType_BadRequest() throws Exception {
+        // Given: type 为无效值，应该报错
+        // When & Then
+        mockMvc.perform(post("/v1/files/page")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\n" +
+                        "  \"space_code\": \"space-1\",\n" +
+                        "  \"page\": 1,\n" +
+                        "  \"page_size\": 10,\n" +
+                        "  \"type\": \"folder\",\n" +
+                        "  \"order\": \"desc\"\n" +
+                        "}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.message").value("type must be 'dir' or 'file', but got: folder"));
+    }
+
+    @Test
+    public void pageFiles_TypeDir_Success() throws Exception {
+        // Given: type 为 dir，应该只返回目录
+        int page = 1;
+        int pageSize = 10;
+        List<OpenAIFile> data = Arrays.asList(
+                OpenAIFile.builder().id("dir-1").filename("folder1").isDir(true).build(),
+                OpenAIFile.builder().id("dir-2").filename("folder2").isDir(true).build());
+
+        when(fileService.pageFiles(any(PageFileOps.class)))
+                .thenReturn(Page.<OpenAIFile>from(page, pageSize).total(2).list(data));
+
+        // When & Then
+        mockMvc.perform(post("/v1/files/page")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\n" +
+                        "  \"space_code\": \"space-1\",\n" +
+                        "  \"page\": 1,\n" +
+                        "  \"page_size\": 10,\n" +
+                        "  \"type\": \"dir\",\n" +
+                        "  \"order\": \"desc\"\n" +
+                        "}"))
+                .andExpect(status().isOk());
+
+        // 验证 type 参数为 "dir"
+        verify(fileService).pageFiles(argThat(ops -> "dir".equals(ops.getType())));
+    }
+
+    @Test
+    public void pageFiles_TypeFileWithoutPurpose_Success() throws Exception {
+        // Given: type 为 file 但不传 purpose，应该返回所有文件
+        int page = 1;
+        int pageSize = 10;
+        List<OpenAIFile> data = Arrays.asList(
+                OpenAIFile.builder().id("file-1").filename("doc.txt").isDir(false).purpose("assistants").build(),
+                OpenAIFile.builder().id("file-2").filename("img.jpg").isDir(false).purpose("vision").build());
+
+        when(fileService.pageFiles(any(PageFileOps.class)))
+                .thenReturn(Page.<OpenAIFile>from(page, pageSize).total(2).list(data));
+
+        // When & Then
+        mockMvc.perform(post("/v1/files/page")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\n" +
+                        "  \"space_code\": \"space-1\",\n" +
+                        "  \"page\": 1,\n" +
+                        "  \"page_size\": 10,\n" +
+                        "  \"type\": \"file\",\n" +
+                        "  \"order\": \"desc\"\n" +
+                        "}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value("file-1"))
+                .andExpect(jsonPath("$.data[1].id").value("file-2"));
+
+        // 验证 type 为 file 且 purpose 为 null
+        verify(fileService).pageFiles(argThat(ops -> "file".equals(ops.getType()) && ops.getPurpose() == null));
+    }
+
+    @Test
+    public void pageFiles_NoTypeNoPurpose_Success() throws Exception {
+        // Given: 既不传 type 也不传 purpose，应该返回所有文件和目录
+        int page = 1;
+        int pageSize = 10;
+        List<OpenAIFile> data = Arrays.asList(
+                OpenAIFile.builder().id("dir-1").filename("folder").isDir(true).build(),
+                OpenAIFile.builder().id("file-1").filename("doc.txt").isDir(false).purpose("assistants").build(),
+                OpenAIFile.builder().id("file-2").filename("img.jpg").isDir(false).purpose("vision").build());
+
+        when(fileService.pageFiles(any(PageFileOps.class)))
+                .thenReturn(Page.<OpenAIFile>from(page, pageSize).total(3).list(data));
+
+        // When & Then
+        mockMvc.perform(post("/v1/files/page")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\n" +
+                        "  \"space_code\": \"space-1\",\n" +
+                        "  \"page\": 1,\n" +
+                        "  \"page_size\": 10,\n" +
+                        "  \"order\": \"desc\"\n" +
+                        "}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value("dir-1"))
+                .andExpect(jsonPath("$.data[1].id").value("file-1"))
+                .andExpect(jsonPath("$.data[2].id").value("file-2"));
+
+        // 验证 type 和 purpose 都为 null
+        verify(fileService).pageFiles(argThat(ops -> ops.getType() == null && ops.getPurpose() == null));
+    }
+
+    // ========== 新增测试：purpose 和 type 的组合场景 ==========
+
+    @Test
+    public void pageFiles_PurposeWithoutType_Success() throws Exception {
+        // Given: 传 purpose 但不传 type，应该返回所有 dir + purpose 匹配的 file
+        int page = 1;
+        int pageSize = 10;
+        List<OpenAIFile> data = Arrays.asList(
+                OpenAIFile.builder().id("dir-1").filename("folder1").isDir(true).purpose(null).build(),
+                OpenAIFile.builder().id("file-1").filename("vision.jpg").isDir(false).purpose("vision").build());
+
+        when(fileService.pageFiles(any(PageFileOps.class)))
+                .thenReturn(Page.<OpenAIFile>from(page, pageSize).total(2).list(data));
+
+        // When & Then
+        mockMvc.perform(post("/v1/files/page")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\n" +
+                        "  \"space_code\": \"space-1\",\n" +
+                        "  \"purpose\": \"vision\",\n" +
+                        "  \"page\": 1,\n" +
+                        "  \"page_size\": 10,\n" +
+                        "  \"order\": \"desc\"\n" +
+                        "}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value("dir-1"))
+                .andExpect(jsonPath("$.data[1].id").value("file-1"))
+                .andExpect(jsonPath("$.data[1].purpose").value("vision"));
+
+        // 验证 purpose 有值但 type 为 null
+        verify(fileService).pageFiles(argThat(ops -> "vision".equals(ops.getPurpose()) && ops.getType() == null));
+    }
+
+    @Test
+    public void pageFiles_PurposeWithTypeFile_Success() throws Exception {
+        // Given: 传 purpose 且 type 为 file，应该只返回 purpose 匹配的 file
+        int page = 1;
+        int pageSize = 10;
+        List<OpenAIFile> data = Arrays.asList(
+                OpenAIFile.builder().id("file-1").filename("vision.jpg").isDir(false).purpose("vision").build());
+
+        when(fileService.pageFiles(any(PageFileOps.class)))
+                .thenReturn(Page.<OpenAIFile>from(page, pageSize).total(1).list(data));
+
+        // When & Then
+        mockMvc.perform(post("/v1/files/page")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\n" +
+                        "  \"space_code\": \"space-1\",\n" +
+                        "  \"purpose\": \"vision\",\n" +
+                        "  \"type\": \"file\",\n" +
+                        "  \"page\": 1,\n" +
+                        "  \"page_size\": 10,\n" +
+                        "  \"order\": \"desc\"\n" +
+                        "}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].purpose").value("vision"));
+
+        // 验证 purpose 和 type 都有值
+        verify(fileService).pageFiles(argThat(ops -> "vision".equals(ops.getPurpose()) && "file".equals(ops.getType())));
+    }
+
+    @Test
+    public void pageFiles_PurposeWithTypeDir_Success() throws Exception {
+        // Given: 传 purpose 且 type 为 dir，应该只返回 dir（purpose 对 dir 无实际过滤效果）
+        int page = 1;
+        int pageSize = 10;
+        List<OpenAIFile> data = Arrays.asList(
+                OpenAIFile.builder().id("dir-1").filename("folder1").isDir(true).purpose(null).build());
+
+        when(fileService.pageFiles(any(PageFileOps.class)))
+                .thenReturn(Page.<OpenAIFile>from(page, pageSize).total(1).list(data));
+
+        // When & Then
+        mockMvc.perform(post("/v1/files/page")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\n" +
+                        "  \"space_code\": \"space-1\",\n" +
+                        "  \"purpose\": \"vision\",\n" +
+                        "  \"type\": \"dir\",\n" +
+                        "  \"page\": 1,\n" +
+                        "  \"page_size\": 10,\n" +
+                        "  \"order\": \"desc\"\n" +
+                        "}"))
+                .andExpect(status().isOk());
+
+        // 验证 purpose 和 type 都有值
+        verify(fileService).pageFiles(argThat(ops -> "vision".equals(ops.getPurpose()) && "dir".equals(ops.getType())));
+    }
 }
