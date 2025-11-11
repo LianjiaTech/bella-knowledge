@@ -634,6 +634,11 @@ public class FileRepo implements BaseRepo {
         if(StringUtils.isEmpty(ops.getAncestorId())) {
             fileCondition = fileCondition.and(FILE.SPACE_CODE.eq(ops.getSpaceCode()));
         }
+        if("dir".equals(ops.getType())) {
+            fileCondition = fileCondition.and(FILE.IS_DIR.eq(1));
+        } else if("file".equals(ops.getType())) {
+            fileCondition = fileCondition.and(FILE.IS_DIR.eq(0));
+        }
         if(ops.getPurpose() != null) {
             fileCondition = fileCondition.and(FILE.PURPOSE.eq(ops.getPurpose()));
         }
@@ -646,16 +651,6 @@ public class FileRepo implements BaseRepo {
         }
         if(ops.getExtension() != null) {
             fileCondition = fileCondition.and(FILE.EXTENSION.eq(ops.getExtension()));
-        }
-        switch (ops.getType()) {
-        case "dir":
-            fileCondition = fileCondition.and(FILE.IS_DIR.eq(1));
-            break;
-        case "file":
-            fileCondition = fileCondition.and(FILE.IS_DIR.eq(0));
-            break;
-        default:
-            break;
         }
         if(ops.getTags() != null) {
             fileCondition = applyJsonArrayFilter(fileCondition, FILE.TAGS, ops.getTags());

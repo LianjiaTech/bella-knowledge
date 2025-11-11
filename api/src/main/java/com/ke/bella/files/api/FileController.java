@@ -1249,8 +1249,10 @@ public class FileController {
         // 校验spaceCode和ancestorId至少提供一个
         Assert.isTrue(StringUtils.isNotEmpty(ops.getSpaceCode()) || StringUtils.isNotEmpty(ops.getAncestorId()),
                 "either space_code or ancestor_id must be provided");
-        Assert.hasText(ops.getType(), "type is required");
-        Assert.isTrue("dir".equals(ops.getType()) || "file".equals(ops.getType()), "type must be 'dir' or 'file', but got: " + ops.getType());
+        // type 为可选参数，如果提供则必须是 dir 或 file
+        if(ops.getType() != null) {
+            Assert.isTrue("dir".equals(ops.getType()) || "file".equals(ops.getType()), "type must be 'dir' or 'file', but got: " + ops.getType());
+        }
         Assert.isTrue(ops.getPage() >= 1, "page must be greater than 0");
         Assert.isTrue(ops.getPageSize() >= 1, "page_size must be greater than 0");
         Assert.isTrue(ops.getPageSize() <= 100, "page_size cannot exceed 100");
