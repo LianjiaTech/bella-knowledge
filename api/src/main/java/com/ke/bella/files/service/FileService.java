@@ -388,6 +388,7 @@ public class FileService {
         message.setMetadata(metadata);
         message.setUserId(BellaContextHelper.getOperatorUserId());
         message.setUserName(BellaContextHelper.getOperatorUserName());
+        message.setAkCode(BellaContextHelper.getOperatorAkCode());
         broadcastService.broadcast(message,
                 () -> updateBroadcastStatus(fileDB.getFileId(), BroadcastStatus.SUCCESS),
                 () -> updateBroadcastStatus(fileDB.getFileId(), BroadcastStatus.FAILED));
@@ -461,6 +462,7 @@ public class FileService {
         message.setMetadata(fileDB.getMetaData());
         message.setUserId(BellaContextHelper.getOperatorUserId());
         message.setUserName(BellaContextHelper.getOperatorUserName());
+        message.setAkCode(BellaContextHelper.getOperatorAkCode());
         broadcastService.broadcast(message, () -> updateBroadcastStatus(finalOpenAIFile.getId(), BroadcastStatus.SUCCESS),
                 () -> updateBroadcastStatus(finalOpenAIFile.getId(), BroadcastStatus.FAILED));
 
@@ -603,6 +605,7 @@ public class FileService {
         message.setMetadata("{}");
         message.setUserId(BellaContextHelper.getOperatorUserId());
         message.setUserName(BellaContextHelper.getOperatorUserName());
+        message.setAkCode(BellaContextHelper.getOperatorAkCode());
         broadcastService.broadcast(message, () -> updateBroadcastStatus(fileId, BroadcastStatus.SUCCESS),
                 () -> updateBroadcastStatus(fileId, BroadcastStatus.FAILED));
         return openAIFile;
