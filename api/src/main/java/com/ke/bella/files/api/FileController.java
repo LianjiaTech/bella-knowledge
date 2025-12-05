@@ -448,11 +448,11 @@ public class FileController {
 
     @DeleteMapping("/{file_id}")
     public OpenAIFile delete(@PathVariable("file_id") String fileId) {
-        OpenAIFile file = fileService.getFile(fileId);
-        if(file == null) {
+        FileDB fileDB = fileService.getFile0(fileId);
+        if(fileDB == null) {
             throw new FileNotFoundException(fileId);
         }
-        fileService.delete(fileId);
+        fileService.delete(fileDB);
         return OpenAIFile.builder()
                 .id(fileId)
                 .deleted(true)

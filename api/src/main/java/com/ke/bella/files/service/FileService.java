@@ -472,6 +472,19 @@ public class FileService {
     @Transactional(rollbackFor = Exception.class)
     public void delete(String fileId) {
         FileType fileType = FileType.fromFileId(fileId);
+        // 删除前获取文件信息用于广播
+        FileDB fileDB = fileRepo.queryFile(fileId, fileType);
+        delete(fileDB);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void delete(FileDB fileDB) {
+        String fileId = fileDB.getFileId();
+        FileType fileType = FileType.fromFileId(fileId);
+
+        // 构建广播数据
+        OpenAIFile fileToDelete = buildOpenAIFileWithSource(fileDB);
+
         // 只标记status字段，不删除文件，不删除数据库记录
         FileOps op = new FileOps();
         op.setFileId(fileId);
@@ -481,6 +494,18 @@ public class FileService {
             if(fileType.needsDirectorySupport()) {
                 fileRepo.deleteFileClosure(fileId, fileType);
             }
+
+            // 文件删除后的广播机制
+            FileBroadcasting<OpenAIFile> message = new FileBroadcasting<>();
+            message.setEvent(EventType.FILE_DELETED);
+            message.setData(fileToDelete);
+            message.setMetadata(fileDB.getMetaData());
+            message.setUserId(BellaContextHelper.getOperatorUserId());
+            message.setUserName(BellaContextHelper.getOperatorUserName());
+            message.setAkCode(BellaContextHelper.getOperatorAkCode());
+            broadcastService.broadcast(message,
+                    () -> updateBroadcastStatus(fileId, BroadcastStatus.SUCCESS),
+                    () -> updateBroadcastStatus(fileId, BroadcastStatus.FAILED));
         } catch (Exception e) {
             throw new IllegalStateException("Failed to update file status (indicating deletion), fileId: "
                     + fileId + ", status: " + FileStatus.DELETED, e);
