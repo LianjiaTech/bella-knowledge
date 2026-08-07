@@ -453,10 +453,7 @@ public class FileRepo implements BaseRepo {
         long rootDepth = 1L;
 
         if(StringUtils.isNotEmpty(ancestorId)) {
-            List<FileClosureRecord> ancestorClosures = dsl.selectFrom(FILE_CLOSURE)
-                    .where(FILE_CLOSURE.DESCENDANT_ID.eq(ancestorId))
-                    .orderBy(FILE_CLOSURE.DEPTH.asc())
-                    .fetchInto(FileClosureRecord.class);
+            List<FileClosureRecord> ancestorClosures = loadAncestorClosuresForUpdate(dsl, ancestorId);
 
             Assert.isTrue(!CollectionUtils.isEmpty(ancestorClosures),
                     "descendant_id not found in file_closure, descendant_id: " + ancestorId);
@@ -474,6 +471,19 @@ public class FileRepo implements BaseRepo {
         if(results.length != inserts.size()) {
             throw new IllegalStateException("batch insert file_closure failed, fileId: " + fileId);
         }
+    }
+
+    private List<FileClosureRecord> loadAncestorClosuresForUpdate(DSLContext dsl, String ancestorId) {
+        dsl.select(FILE_CLOSURE.ID)
+                .from(FILE_CLOSURE)
+                .where(FILE_CLOSURE.DESCENDANT_ID.eq(ancestorId))
+                .forUpdate()
+                .fetch();
+        return dsl.selectFrom(FILE_CLOSURE)
+                .where(FILE_CLOSURE.DESCENDANT_ID.eq(ancestorId))
+                .orderBy(FILE_CLOSURE.DEPTH.asc())
+                .forUpdate()
+                .fetchInto(FileClosureRecord.class);
     }
 
     public void deleteFileClosure(String fileId, FileType fileType) {

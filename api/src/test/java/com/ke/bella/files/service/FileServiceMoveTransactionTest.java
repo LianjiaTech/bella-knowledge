@@ -1,6 +1,7 @@
 package com.ke.bella.files.service;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -8,6 +9,11 @@ import static org.mockito.Mockito.verifyNoInteractions;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import javax.sql.DataSource;
 
@@ -30,6 +36,7 @@ import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import com.ke.bella.files.FileShardingCountUpdator;
 import com.ke.bella.files.configuration.BucketConfig;
@@ -47,6 +54,7 @@ public class FileServiceMoveTransactionTest {
     private static final String SOURCE = "file-source-1-d";
     private static final String CHILD = "file-child-1-d";
     private static final String TARGET = "file-target-1-d";
+    private static final String CREATED_FILE = "file-created-1-d";
 
     @javax.annotation.Resource
     private DSLContext dsl;
@@ -54,6 +62,10 @@ public class FileServiceMoveTransactionTest {
     private FileService fileService;
     @javax.annotation.Resource
     private BroadcastService broadcastService;
+    @javax.annotation.Resource
+    private FileRepo fileRepo;
+    @javax.annotation.Resource
+    private PlatformTransactionManager transactionManager;
 
     @Before
     public void setup() {
@@ -63,7 +75,7 @@ public class FileServiceMoveTransactionTest {
         createFileTable();
         insertTree();
         insertFile();
-        BellaContext.setOperator(Operator.builder().userId(1L).userName("tester").spaceCode("sp-a").build());
+        setOperator();
     }
 
     @Test
@@ -77,6 +89,63 @@ public class FileServiceMoveTransactionTest {
         assertEquals(closuresBefore, snapshotClosures());
         assertEquals(fileBefore, snapshotFile());
         verifyNoInteractions(broadcastService);
+    }
+
+    @Test
+    public void creatingInMovingSubtreeWaitsForNewAncestorChain() throws Exception {
+        CountDownLatch moveCompleted = new CountDownLatch(1);
+        CountDownLatch allowMoveCommit = new CountDownLatch(1);
+        CountDownLatch createStarted = new CountDownLatch(1);
+        CountDownLatch createCompleted = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+
+        try {
+            Future<?> move = executor.submit(() -> transactionTemplate.executeWithoutResult(status -> {
+                setOperator();
+                fileRepo.moveFileClosures(SOURCE, TARGET);
+                moveCompleted.countDown();
+                await(allowMoveCommit);
+            }));
+            assertTrue(moveCompleted.await(5, TimeUnit.SECONDS));
+
+            Future<?> create = executor.submit(() -> {
+                setOperator();
+                createStarted.countDown();
+                fileRepo.addFileClosures(CREATED_FILE, CHILD);
+                createCompleted.countDown();
+            });
+            assertTrue(createStarted.await(5, TimeUnit.SECONDS));
+            assertFalse(createCompleted.await(200, TimeUnit.MILLISECONDS));
+
+            allowMoveCommit.countDown();
+            move.get(5, TimeUnit.SECONDS);
+            create.get(5, TimeUnit.SECONDS);
+
+            assertFalse(hasClosure(OLD_ROOT, CREATED_FILE));
+            assertClosure(TARGET, CREATED_FILE, 3L);
+            assertClosure(SOURCE, CREATED_FILE, 2L);
+            assertClosure(CHILD, CREATED_FILE, 1L);
+            assertClosure(CREATED_FILE, CREATED_FILE, 0L);
+        } finally {
+            allowMoveCommit.countDown();
+            executor.shutdownNow();
+        }
+    }
+
+    private static void await(CountDownLatch latch) {
+        try {
+            if(!latch.await(5, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("timed out waiting for concurrent transaction");
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private static void setOperator() {
+        BellaContext.setOperator(Operator.builder().userId(1L).userName("tester").spaceCode("sp-a").build());
     }
 
     private void createFileClosureTable() {
@@ -165,6 +234,18 @@ public class FileServiceMoveTransactionTest {
             snapshot.put(key, record.get(2, Long.class) + ":" + record.get(3, Long.class));
         }
         return snapshot;
+    }
+
+    private boolean hasClosure(String ancestorId, String descendantId) {
+        Record record = dsl.fetchOne("select count(*) from file_closure_1 where ancestor_id = ? and descendant_id = ?",
+                ancestorId, descendantId);
+        return record.get(0, Number.class).intValue() > 0;
+    }
+
+    private void assertClosure(String ancestorId, String descendantId, long depth) {
+        Record record = dsl.fetchOne("select depth from file_closure_1 where ancestor_id = ? and descendant_id = ?",
+                ancestorId, descendantId);
+        assertEquals(depth, record.get(0, Long.class).longValue());
     }
 
     @Configuration
