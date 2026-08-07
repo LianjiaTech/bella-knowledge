@@ -501,7 +501,7 @@ public class FileRepo implements BaseRepo {
         DSLContext dsl = db(shardingKey);
         ClosureMoveSnapshot snapshot = loadClosureMoveSnapshot(dsl, fileId, targetAncestorId);
 
-        deleteExternalClosures(dsl, snapshot, fileId);
+        deleteExternalClosures(dsl, snapshot);
         insertExternalClosures(dsl, snapshot, fileId);
         updateSubtreeRootDepths(dsl, snapshot, fileId);
     }
@@ -558,17 +558,12 @@ public class FileRepo implements BaseRepo {
                 targetAncestorClosures.size(), targetSelfClosure.getRootDepth());
     }
 
-    private void deleteExternalClosures(DSLContext dsl, ClosureMoveSnapshot snapshot, String fileId) {
-        int expectedDeleteCount = snapshot.externalAncestorIds.size() * snapshot.subtreeIds.size();
-        int deletedCount = 0;
+    private void deleteExternalClosures(DSLContext dsl, ClosureMoveSnapshot snapshot) {
         if(!snapshot.externalAncestorIds.isEmpty()) {
-            deletedCount = dsl.delete(FILE_CLOSURE)
+            dsl.delete(FILE_CLOSURE)
                     .where(FILE_CLOSURE.ANCESTOR_ID.in(snapshot.externalAncestorIds))
                     .and(FILE_CLOSURE.DESCENDANT_ID.in(snapshot.subtreeIds))
                     .execute();
-        }
-        if(deletedCount != expectedDeleteCount) {
-            throw new IllegalStateException("delete external file_closure failed, fileId: " + fileId);
         }
     }
 

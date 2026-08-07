@@ -86,6 +86,19 @@ public class FileRepoMoveTest {
     }
 
     @Test
+    public void moveDirectoryAllowsMissingExternalClosureRows() {
+        dsl.execute("delete from file_closure_0 where ancestor_id = ? and descendant_id = ?", OLD_ROOT, LEAF);
+
+        fileRepo.moveFileClosures(SOURCE, TARGET);
+
+        assertFalse(hasClosure(OLD_ROOT, SOURCE));
+        assertFalse(hasClosure(OLD_ROOT, CHILD));
+        assertFalse(hasClosure(OLD_ROOT, LEAF));
+        assertClosure(TARGET, LEAF, 3L, -1L);
+        assertClosure(LEAF, LEAF, 0L, 5L);
+    }
+
+    @Test
     public void movedSubtreeIsVisibleThroughHierarchyQueries() {
         fileRepo.moveFileClosures(SOURCE, TARGET);
 
