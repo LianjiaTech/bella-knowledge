@@ -1,0 +1,29 @@
+name: Issue Flow Milestones
+
+on:
+  create:
+  delete:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  sync-branch:
+    if: github.event.ref_type == 'branch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout: |
+            .agentrix/plugins/issue-flow
+            .issue-flow
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Sync branch milestone
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node .agentrix/plugins/issue-flow/skills/issue-flow/cli.cjs milestone sync --event "$GITHUB_EVENT_PATH"

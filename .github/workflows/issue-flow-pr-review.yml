@@ -1,0 +1,59 @@
+name: Issue Flow PR Review
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - ready_for_review
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: PR number to review
+        required: true
+        type: number
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: issue-flow-review-${{ github.event.pull_request.number || inputs.pr_number }}
+  cancel-in-progress: false
+
+jobs:
+  review:
+    if: vars.ISSUE_FLOW_REVIEW_ENABLED == 'true' || vars.ISSUE_FLOW_REVIEW_ENABLED == '1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout issue-flow plugin
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.ref || github.event.repository.default_branch }}
+          fetch-depth: 1
+          sparse-checkout: |
+            .agentrix/plugins/issue-flow
+            .issue-flow
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Route PR/MR review check
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          AGENTRIX_BASE_URL: ${{ vars.AGENTRIX_BASE_URL }}
+          AGENTRIX_API_KEY: ${{ secrets.AGENTRIX_API_KEY }}
+          AGENTRIX_RUNNER_ID: ${{ vars.AGENTRIX_RUNNER_ID }}
+          AGENTRIX_ISSUE_FLOW_AGENT: ${{ vars.AGENTRIX_ISSUE_FLOW_AGENT }}
+          ISSUE_FLOW_REVIEW_ENABLED: ${{ vars.ISSUE_FLOW_REVIEW_ENABLED }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            node .agentrix/plugins/issue-flow/skills/issue-flow/scripts/dispatch.cjs review --pr-number "${{ inputs.pr_number }}"
+          else
+            node .agentrix/plugins/issue-flow/skills/issue-flow/scripts/dispatch.cjs review --event "$GITHUB_EVENT_PATH"
+          fi

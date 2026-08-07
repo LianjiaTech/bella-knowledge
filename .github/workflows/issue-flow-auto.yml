@@ -1,0 +1,59 @@
+name: Issue Flow Auto
+
+on:
+  issues:
+    types:
+      - opened
+      - labeled
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  route:
+    if: >-
+      github.event.issue.pull_request == null &&
+      github.event.issue.state == 'open' &&
+      (
+        github.event.action != 'labeled' ||
+        startsWith(github.event.label.name, 'flow::') ||
+        github.event.label.name == 'automation::plan' ||
+        github.event.label.name == 'automation::build' ||
+        github.event.label.name == 'status::active'
+      )
+    concurrency:
+      group: issue-flow-${{ github.event.issue.number }}
+      cancel-in-progress: false
+      queue: max
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout issue-flow files
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout: |
+            .agentrix/plugins/issue-flow
+            .issue-flow
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Ensure intake labels
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node .agentrix/plugins/issue-flow/skills/issue-flow/scripts/intake.cjs --issue-number "${{ github.event.issue.number }}"
+
+      - name: Route automatic issue-flow action
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          AGENTRIX_BASE_URL: ${{ vars.AGENTRIX_BASE_URL }}
+          AGENTRIX_API_KEY: ${{ secrets.AGENTRIX_API_KEY }}
+          AGENTRIX_RUNNER_ID: ${{ vars.AGENTRIX_RUNNER_ID }}
+          AGENTRIX_ISSUE_FLOW_AGENT: ${{ vars.AGENTRIX_ISSUE_FLOW_AGENT }}
+          ISSUE_FLOW_AUTO_DEFAULT: ${{ vars.ISSUE_FLOW_AUTO_DEFAULT }}
+        run: node .agentrix/plugins/issue-flow/skills/issue-flow/scripts/dispatch.cjs auto --event "$GITHUB_EVENT_PATH"

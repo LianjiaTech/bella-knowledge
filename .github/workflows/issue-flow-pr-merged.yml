@@ -1,0 +1,42 @@
+name: Issue Flow PR Merged
+
+on:
+  pull_request:
+    types:
+      - closed
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  apply-transition:
+    if: github.event.pull_request.merged == true && (contains(toJson(github.event.pull_request.labels), 'mr-by::plan') || contains(toJson(github.event.pull_request.labels), 'mr-by::build'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout issue-flow plugin
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+          fetch-depth: 1
+          sparse-checkout: |
+            .agentrix/plugins/issue-flow
+            .issue-flow
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Apply source issue transition
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          AGENTRIX_BASE_URL: ${{ vars.AGENTRIX_BASE_URL }}
+          AGENTRIX_API_KEY: ${{ secrets.AGENTRIX_API_KEY }}
+          AGENTRIX_RUNNER_ID: ${{ vars.AGENTRIX_RUNNER_ID }}
+          AGENTRIX_ISSUE_FLOW_AGENT: ${{ vars.AGENTRIX_ISSUE_FLOW_AGENT }}
+          ISSUE_FLOW_AUTO_DEFAULT: ${{ vars.ISSUE_FLOW_AUTO_DEFAULT }}
+        run: node .agentrix/plugins/issue-flow/skills/issue-flow/scripts/dispatch.cjs pr-merged --event "$GITHUB_EVENT_PATH"

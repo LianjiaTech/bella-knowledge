@@ -1,0 +1,41 @@
+name: Issue Flow Labels
+
+on:
+  push:
+    paths:
+      - '.agentrix/plugins/issue-flow/**'
+      - '.github/workflows/issue-flow-*.yml'
+      - '.issue-flow/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: issue-flow-labels-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sync-labels:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout issue-flow files
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout: |
+            .agentrix/plugins/issue-flow
+            .issue-flow
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Sync issue-flow labels
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node .agentrix/plugins/issue-flow/skills/issue-flow/scripts/sync-labels.cjs --provider github --repo "${{ github.repository }}"
