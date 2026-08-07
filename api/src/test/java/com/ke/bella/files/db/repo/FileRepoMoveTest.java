@@ -50,63 +50,10 @@ public class FileRepoMoveTest {
 
     @Before
     public void setup() {
-        dsl.execute("drop table if exists file_closure_0");
-        dsl.execute("drop table if exists file_0");
-        createFileClosureTable();
-        createFileTable();
+        FileRepoTestFixture.recreateUserFileTables(dsl, "0");
         BellaContext.setOperator(Operator.builder().userId(1L).userName("tester").spaceCode("sp-0").build());
         insertTree();
         insertFiles();
-    }
-
-    private void createFileClosureTable() {
-        dsl.execute("create table file_closure_0 ("
-                + "id bigint auto_increment primary key,"
-                + "ancestor_id varchar(255) not null,"
-                + "descendant_id varchar(255) not null,"
-                + "space_code varchar(128) not null default '',"
-                + "depth bigint not null default 0,"
-                + "root_depth bigint not null default -1,"
-                + "cuid bigint not null default 0,"
-                + "cu_name varchar(32) not null default '',"
-                + "ctime timestamp not null default current_timestamp,"
-                + "muid bigint not null default 0,"
-                + "mu_name varchar(32) not null default '',"
-                + "mtime timestamp not null default current_timestamp,"
-                + "unique (ancestor_id, descendant_id))");
-    }
-
-    private void createFileTable() {
-        dsl.execute("create table file_0 ("
-                + "id bigint auto_increment primary key,"
-                + "file_id varchar(256) not null,"
-                + "version bigint not null default 0,"
-                + "filename varchar(512) not null default '',"
-                + "is_dir int not null default 0,"
-                + "extension varchar(512) not null default '',"
-                + "mime_type varchar(512) not null default '',"
-                + "type varchar(512) not null default '',"
-                + "bucket varchar(256) not null default '',"
-                + "path varchar(512) not null default '',"
-                + "bytes bigint not null default 0,"
-                + "space_code varchar(128) not null default '',"
-                + "purpose varchar(64) not null default '',"
-                + "cuid bigint not null default 0,"
-                + "cu_name varchar(32) not null default '',"
-                + "ctime timestamp not null default current_timestamp,"
-                + "muid bigint not null default 0,"
-                + "mu_name varchar(32) not null default '',"
-                + "mtime timestamp not null default current_timestamp,"
-                + "meta_data clob,"
-                + "status int not null default 0,"
-                + "ak_code varchar(128) not null default '',"
-                + "broadcast_status bigint not null default 0,"
-                + "dom_tree_file_id varchar(256) not null default '',"
-                + "pdf_file_id varchar(256) not null default '',"
-                + "description varchar(256) not null default '',"
-                + "cities varchar(512) not null default '',"
-                + "tags varchar(512) not null default '',"
-                + "unique (file_id, space_code))");
     }
 
     @AfterClass
