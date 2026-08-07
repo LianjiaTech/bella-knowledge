@@ -8,6 +8,7 @@ import static com.ke.bella.files.db.Tables.FILE_SHARDING;
 import static com.ke.bella.files.db.repo.DSLContextHolder.targetTableName;
 import static org.jooq.impl.DSL.field;
 
+import java.sql.Statement;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -25,6 +26,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jooq.Condition;
 import org.jooq.DSLContext;
 import org.jooq.InsertSetMoreStep;
+import org.jooq.Query;
 import org.jooq.Record;
 import org.jooq.Record1;
 import org.jooq.Record3;
@@ -480,6 +482,105 @@ public class FileRepo implements BaseRepo {
                 .where(FILE_CLOSURE.DESCENDANT_ID.eq(fileId))
                 .or(FILE_CLOSURE.ANCESTOR_ID.eq(fileId))
                 .execute();
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void moveFileClosures(String fileId, String targetAncestorId) {
+        String shardingKey = getShardingKeyByFileId(fileId);
+        DSLContext dsl = db(shardingKey);
+
+        List<FileClosureRecord> subtreeClosures = dsl.selectFrom(FILE_CLOSURE)
+                .where(FILE_CLOSURE.ANCESTOR_ID.eq(fileId))
+                .orderBy(FILE_CLOSURE.DEPTH.asc())
+                .forUpdate()
+                .fetchInto(FileClosureRecord.class);
+        Assert.isTrue(!CollectionUtils.isEmpty(subtreeClosures),
+                "ancestor_id not found in file_closure, ancestor_id: " + fileId);
+        boolean sourceSelfClosureExists = subtreeClosures.stream()
+                .anyMatch(closure -> StringUtils.equals(closure.getDescendantId(), fileId) && closure.getDepth() == 0L);
+        Assert.isTrue(sourceSelfClosureExists, "self closure not found, fileId: " + fileId);
+
+        boolean targetInSubtree = subtreeClosures.stream()
+                .anyMatch(closure -> StringUtils.equals(closure.getDescendantId(), targetAncestorId));
+        Assert.isTrue(!targetInSubtree, "cannot move a directory into itself or its descendant");
+
+        List<FileClosureRecord> sourceAncestorClosures = dsl.selectFrom(FILE_CLOSURE)
+                .where(FILE_CLOSURE.DESCENDANT_ID.eq(fileId))
+                .orderBy(FILE_CLOSURE.DEPTH.asc())
+                .forUpdate()
+                .fetchInto(FileClosureRecord.class);
+        Assert.isTrue(!CollectionUtils.isEmpty(sourceAncestorClosures),
+                "descendant_id not found in file_closure, descendant_id: " + fileId);
+
+        List<FileClosureRecord> targetAncestorClosures = dsl.selectFrom(FILE_CLOSURE)
+                .where(FILE_CLOSURE.DESCENDANT_ID.eq(targetAncestorId))
+                .orderBy(FILE_CLOSURE.DEPTH.asc())
+                .forUpdate()
+                .fetchInto(FileClosureRecord.class);
+        Assert.isTrue(!CollectionUtils.isEmpty(targetAncestorClosures),
+                "descendant_id not found in file_closure, descendant_id: " + targetAncestorId);
+
+        FileClosureRecord targetSelfClosure = targetAncestorClosures.stream()
+                .filter(closure -> closure.getDepth() == 0L)
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException(
+                        "self closure not found, descendant_id: " + targetAncestorId));
+        Assert.isTrue(targetSelfClosure.getRootDepth() > 0,
+                "invalid root_depth for target ancestor, descendant_id: " + targetAncestorId);
+
+        List<String> subtreeIds = subtreeClosures.stream()
+                .map(FileClosureRecord::getDescendantId)
+                .collect(Collectors.toList());
+        List<String> externalAncestorIds = sourceAncestorClosures.stream()
+                .map(FileClosureRecord::getAncestorId)
+                .filter(ancestorId -> !StringUtils.equals(ancestorId, fileId))
+                .collect(Collectors.toList());
+
+        int expectedDeleteCount = externalAncestorIds.size() * subtreeIds.size();
+        int deletedCount = 0;
+        if(!externalAncestorIds.isEmpty()) {
+            deletedCount = dsl.delete(FILE_CLOSURE)
+                    .where(FILE_CLOSURE.ANCESTOR_ID.in(externalAncestorIds))
+                    .and(FILE_CLOSURE.DESCENDANT_ID.in(subtreeIds))
+                    .execute();
+        }
+        if(deletedCount != expectedDeleteCount) {
+            throw new IllegalStateException("delete external file_closure failed, fileId: " + fileId);
+        }
+
+        List<InsertSetMoreStep<FileClosureRecord>> inserts = new ArrayList<>();
+        for (FileClosureRecord targetAncestorClosure : targetAncestorClosures) {
+            for (FileClosureRecord subtreeClosure : subtreeClosures) {
+                long depth = targetAncestorClosure.getDepth() + 1 + subtreeClosure.getDepth();
+                inserts.add(createFileClosureInsert(dsl, subtreeClosure.getDescendantId(),
+                        targetAncestorClosure.getAncestorId(), depth));
+            }
+        }
+        assertBatchSucceeded(dsl.batch(inserts).execute(), inserts.size(),
+                "batch insert moved file_closure failed, fileId: " + fileId);
+
+        List<Query> rootDepthUpdates = new ArrayList<>();
+        for (FileClosureRecord subtreeClosure : subtreeClosures) {
+            long rootDepth = targetSelfClosure.getRootDepth() + 1 + subtreeClosure.getDepth();
+            rootDepthUpdates.add(dsl.update(FILE_CLOSURE)
+                    .set(FILE_CLOSURE.ROOT_DEPTH, rootDepth)
+                    .where(FILE_CLOSURE.ANCESTOR_ID.eq(subtreeClosure.getDescendantId()))
+                    .and(FILE_CLOSURE.DESCENDANT_ID.eq(subtreeClosure.getDescendantId()))
+                    .and(FILE_CLOSURE.DEPTH.eq(0L)));
+        }
+        assertBatchSucceeded(dsl.batch(rootDepthUpdates).execute(), rootDepthUpdates.size(),
+                "batch update file_closure root_depth failed, fileId: " + fileId);
+    }
+
+    private void assertBatchSucceeded(int[] results, int expectedSize, String message) {
+        if(results.length != expectedSize) {
+            throw new IllegalStateException(message);
+        }
+        for (int result : results) {
+            if(result != 1 && result != Statement.SUCCESS_NO_INFO) {
+                throw new IllegalStateException(message);
+            }
+        }
     }
 
     public List<FileDB> findFiles(String spaceCode, String ancestorId) {
