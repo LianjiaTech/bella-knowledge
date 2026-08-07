@@ -254,7 +254,7 @@ public class FileServiceMoveTransactionTest {
         @Bean
         public DataSource dataSource() {
             JdbcDataSource dataSource = new JdbcDataSource();
-            dataSource.setURL("jdbc:h2:mem:fileServiceMove;MODE=MySQL;DB_CLOSE_DELAY=-1");
+            dataSource.setURL("jdbc:h2:mem:fileServiceMove;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1");
             dataSource.setUser("sa");
             return dataSource;
         }
@@ -267,7 +267,7 @@ public class FileServiceMoveTransactionTest {
         @Bean
         public DSLContext dslContext(DataSource dataSource) {
             DefaultConfiguration configuration = new DefaultConfiguration();
-            configuration.setSQLDialect(SQLDialect.MYSQL);
+            configuration.setSQLDialect(SQLDialect.H2);
             configuration.setConnectionProvider(new DataSourceConnectionProvider(
                     new TransactionAwareDataSourceProxy(dataSource)));
             return new DefaultDSLContext(configuration);

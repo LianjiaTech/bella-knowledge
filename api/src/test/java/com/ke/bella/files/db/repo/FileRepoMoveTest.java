@@ -43,8 +43,8 @@ public class FileRepoMoveTest {
 
     @BeforeClass
     public static void setupConnection() throws Exception {
-        connection = DriverManager.getConnection("jdbc:h2:mem:fileRepoMove;MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", "");
-        dsl = DSL.using(connection, SQLDialect.MYSQL);
+        connection = DriverManager.getConnection("jdbc:h2:mem:fileRepoMove;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1", "sa", "");
+        dsl = DSL.using(connection, SQLDialect.H2);
         fileRepo = new FileRepo(dsl);
     }
 

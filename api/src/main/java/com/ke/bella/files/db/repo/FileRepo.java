@@ -8,7 +8,6 @@ import static com.ke.bella.files.db.Tables.FILE_SHARDING;
 import static com.ke.bella.files.db.repo.DSLContextHolder.targetTableName;
 import static org.jooq.impl.DSL.field;
 
-import java.sql.Statement;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -25,15 +24,17 @@ import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jooq.Condition;
 import org.jooq.DSLContext;
+import org.jooq.Field;
 import org.jooq.InsertSetMoreStep;
-import org.jooq.Query;
 import org.jooq.Record;
 import org.jooq.Record1;
 import org.jooq.Record3;
 import org.jooq.Result;
+import org.jooq.SQLDialect;
 import org.jooq.SelectConditionStep;
 import org.jooq.SelectOrderByStep;
 import org.jooq.SortField;
+import org.jooq.Table;
 import org.jooq.UpdateSetMoreStep;
 import org.jooq.impl.DSL;
 import org.springframework.stereotype.Component;
@@ -553,8 +554,8 @@ public class FileRepo implements BaseRepo {
                 .filter(ancestorId -> !StringUtils.equals(ancestorId, fileId))
                 .collect(Collectors.toList());
 
-        return new ClosureMoveSnapshot(subtreeClosures, targetAncestorClosures, subtreeIds,
-                externalAncestorIds, targetSelfClosure.getRootDepth());
+        return new ClosureMoveSnapshot(subtreeIds, externalAncestorIds, targetAncestorId,
+                targetAncestorClosures.size(), targetSelfClosure.getRootDepth());
     }
 
     private void deleteExternalClosures(DSLContext dsl, ClosureMoveSnapshot snapshot, String fileId) {
@@ -572,57 +573,86 @@ public class FileRepo implements BaseRepo {
     }
 
     private void insertExternalClosures(DSLContext dsl, ClosureMoveSnapshot snapshot, String fileId) {
-        List<InsertSetMoreStep<FileClosureRecord>> inserts = new ArrayList<>();
-        for (FileClosureRecord targetAncestorClosure : snapshot.targetAncestorClosures) {
-            for (FileClosureRecord subtreeClosure : snapshot.subtreeClosures) {
-                long depth = targetAncestorClosure.getDepth() + 1 + subtreeClosure.getDepth();
-                inserts.add(createFileClosureInsert(dsl, subtreeClosure.getDescendantId(),
-                        targetAncestorClosure.getAncestorId(), depth));
-            }
+        Table<FileClosureRecord> target = FILE_CLOSURE.as("target_closure");
+        Table<FileClosureRecord> subtree = FILE_CLOSURE.as("subtree_closure");
+        Field<String> targetAncestorId = target.field(FILE_CLOSURE.ANCESTOR_ID);
+        Field<Long> targetDepth = target.field(FILE_CLOSURE.DEPTH);
+        Field<String> targetDescendantId = target.field(FILE_CLOSURE.DESCENDANT_ID);
+        Field<String> subtreeAncestorId = subtree.field(FILE_CLOSURE.ANCESTOR_ID);
+        Field<String> subtreeDescendantId = subtree.field(FILE_CLOSURE.DESCENDANT_ID);
+        Field<Long> subtreeDepth = subtree.field(FILE_CLOSURE.DEPTH);
+        FileClosureRecord audit = FILE_CLOSURE.newRecord();
+        fillCreatorInfo(audit);
+
+        int insertedCount = dsl.insertInto(FILE_CLOSURE,
+                FILE_CLOSURE.ANCESTOR_ID, FILE_CLOSURE.DESCENDANT_ID, FILE_CLOSURE.SPACE_CODE,
+                FILE_CLOSURE.DEPTH, FILE_CLOSURE.ROOT_DEPTH, FILE_CLOSURE.CUID, FILE_CLOSURE.CU_NAME,
+                FILE_CLOSURE.CTIME, FILE_CLOSURE.MUID, FILE_CLOSURE.MU_NAME, FILE_CLOSURE.MTIME)
+                .select(dsl.select(targetAncestorId, subtreeDescendantId,
+                        DSL.val(BellaContextHelper.getOperateSpaceCode()), targetDepth.add(1L).add(subtreeDepth),
+                        DSL.val(-1L), DSL.val(audit.getCuid() == null ? 0L : audit.getCuid()),
+                        DSL.val(audit.getCuName() == null ? "" : audit.getCuName()), DSL.val(audit.getCtime()),
+                        DSL.val(audit.getMuid() == null ? 0L : audit.getMuid()),
+                        DSL.val(audit.getMuName() == null ? "" : audit.getMuName()), DSL.val(audit.getMtime()))
+                        .from(target)
+                        .crossJoin(subtree)
+                        .where(targetDescendantId.eq(snapshot.targetAncestorId))
+                        .and(subtreeAncestorId.eq(fileId)))
+                .execute();
+
+        int expectedInsertCount = snapshot.targetAncestorCount * snapshot.subtreeIds.size();
+        if(insertedCount != expectedInsertCount) {
+            throw new IllegalStateException("insert moved file_closure failed, fileId: " + fileId);
         }
-        assertBatchSucceeded(dsl.batch(inserts).execute(), inserts.size(),
-                "batch insert moved file_closure failed, fileId: " + fileId);
     }
 
     private void updateSubtreeRootDepths(DSLContext dsl, ClosureMoveSnapshot snapshot, String fileId) {
-        List<Query> rootDepthUpdates = new ArrayList<>();
-        for (FileClosureRecord subtreeClosure : snapshot.subtreeClosures) {
-            long rootDepth = snapshot.targetRootDepth + 1 + subtreeClosure.getDepth();
-            rootDepthUpdates.add(dsl.update(FILE_CLOSURE)
-                    .set(FILE_CLOSURE.ROOT_DEPTH, rootDepth)
-                    .where(FILE_CLOSURE.ANCESTOR_ID.eq(subtreeClosure.getDescendantId()))
-                    .and(FILE_CLOSURE.DESCENDANT_ID.eq(subtreeClosure.getDescendantId()))
-                    .and(FILE_CLOSURE.DEPTH.eq(0L)));
+        long rootDepthOffset = snapshot.targetRootDepth + 1L;
+        int updatedCount;
+        if(isH2Database(dsl)) {
+            updatedCount = dsl.execute("update {0} self_closure "
+                            + "set root_depth = {1} + (select subtree_closure.depth from {0} subtree_closure "
+                            + "where subtree_closure.ancestor_id = {2} "
+                            + "and subtree_closure.descendant_id = self_closure.descendant_id) "
+                            + "where self_closure.ancestor_id = self_closure.descendant_id "
+                            + "and self_closure.depth = 0 "
+                            + "and exists (select 1 from {0} subtree_closure "
+                            + "where subtree_closure.ancestor_id = {2} "
+                            + "and subtree_closure.descendant_id = self_closure.descendant_id)",
+                    FILE_CLOSURE, DSL.val(rootDepthOffset), DSL.val(fileId));
+        } else {
+            updatedCount = dsl.execute("update {0} self_closure "
+                            + "join {0} subtree_closure "
+                            + "on subtree_closure.ancestor_id = {1} "
+                            + "and subtree_closure.descendant_id = self_closure.descendant_id "
+                            + "set self_closure.root_depth = {2} + subtree_closure.depth "
+                            + "where self_closure.ancestor_id = self_closure.descendant_id "
+                            + "and self_closure.depth = 0",
+                    FILE_CLOSURE, DSL.val(fileId), DSL.val(rootDepthOffset));
         }
-        assertBatchSucceeded(dsl.batch(rootDepthUpdates).execute(), rootDepthUpdates.size(),
-                "batch update file_closure root_depth failed, fileId: " + fileId);
+        if(updatedCount != snapshot.subtreeIds.size()) {
+            throw new IllegalStateException("update file_closure root_depth failed, fileId: " + fileId);
+        }
+    }
+
+    private boolean isH2Database(DSLContext dsl) {
+        return dsl.dialect().family() == SQLDialect.H2;
     }
 
     private static class ClosureMoveSnapshot {
-        private final List<FileClosureRecord> subtreeClosures;
-        private final List<FileClosureRecord> targetAncestorClosures;
         private final List<String> subtreeIds;
         private final List<String> externalAncestorIds;
+        private final String targetAncestorId;
+        private final int targetAncestorCount;
         private final long targetRootDepth;
 
-        ClosureMoveSnapshot(List<FileClosureRecord> subtreeClosures, List<FileClosureRecord> targetAncestorClosures,
-                List<String> subtreeIds, List<String> externalAncestorIds, long targetRootDepth) {
-            this.subtreeClosures = subtreeClosures;
-            this.targetAncestorClosures = targetAncestorClosures;
+        ClosureMoveSnapshot(List<String> subtreeIds, List<String> externalAncestorIds, String targetAncestorId,
+                int targetAncestorCount, long targetRootDepth) {
             this.subtreeIds = subtreeIds;
             this.externalAncestorIds = externalAncestorIds;
+            this.targetAncestorId = targetAncestorId;
+            this.targetAncestorCount = targetAncestorCount;
             this.targetRootDepth = targetRootDepth;
-        }
-    }
-
-    private void assertBatchSucceeded(int[] results, int expectedSize, String message) {
-        if(results.length != expectedSize) {
-            throw new IllegalStateException(message);
-        }
-        for (int result : results) {
-            if(result != 1 && result != Statement.SUCCESS_NO_INFO) {
-                throw new IllegalStateException(message);
-            }
         }
     }
 
