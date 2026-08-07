@@ -1,6 +1,7 @@
 package com.ke.bella.files.api;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -45,6 +46,8 @@ public class FileControllerMoveTest {
 
         ReflectionTestUtils.setField(fileController, "fileService", fileService);
         ReflectionTestUtils.setField(fileController, "fl", fileUniquenessLock);
+        when(fileUniquenessLock.executeWithMoveLock(any(), anyBoolean(), anyLong(), any()))
+                .thenAnswer(invocation -> ((Supplier<?>) invocation.getArgument(3)).get());
 
         mockMvc = MockMvcBuilders
                 .standaloneSetup(fileController)
@@ -98,6 +101,7 @@ public class FileControllerMoveTest {
                 .andExpect(jsonPath("$.filename").value("name.txt"))
                 .andExpect(jsonPath("$.spaceCode").value(spaceCode));
 
+        verify(fileUniquenessLock).executeWithMoveLock(eq(spaceCode), eq(false), anyLong(), any());
         verify(fileService).moveFile(fileId, ancestorId);
     }
 
@@ -133,6 +137,7 @@ public class FileControllerMoveTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(fileId));
 
+        verify(fileUniquenessLock).executeWithMoveLock(eq(spaceCode), eq(true), anyLong(), any());
         verify(fileService).moveFile(fileId, ancestorId);
     }
 

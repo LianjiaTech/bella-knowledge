@@ -6,6 +6,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 import org.redisson.api.RLock;
+import org.redisson.api.RReadWriteLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -17,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 public class RedisFileUniquenessLock implements FileUniquenessLock {
 
     private static final String LOCK_PREFIX = "file-api:file:uniqueness:";
+    private static final String MOVE_LOCK_PREFIX = "file-api:file:move:";
 
     @Autowired
     private RedissonClient redissonClient;
@@ -90,6 +92,38 @@ public class RedisFileUniquenessLock implements FileUniquenessLock {
             if(lock.isHeldByCurrentThread()) {
                 lock.unlock();
                 LOGGER.debug("Released lock in executeWithLock finally block: {}, filename: {}", key, filename);
+            }
+        }
+    }
+
+    @Override
+    public <T> T executeWithMoveLock(String spaceCode, boolean directory,
+            long timeoutMs, Supplier<T> action) {
+        String key = MOVE_LOCK_PREFIX + spaceCode;
+        RReadWriteLock readWriteLock = redissonClient.getReadWriteLock(key);
+        RLock lock = directory ? readWriteLock.writeLock() : readWriteLock.readLock();
+
+        try {
+            boolean lockAcquired = lock.tryLock(timeoutMs, TimeUnit.MILLISECONDS);
+            if(!lockAcquired) {
+                LOGGER.warn("File move conflict detected for space lock: {}", key);
+                throw new IllegalStateException(
+                        String.format("Space '%s' has another file move in progress, please try again later", spaceCode));
+            }
+
+            LOGGER.debug("Successfully acquired {} move lock: {}", directory ? "directory" : "file", key);
+            return action.get();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            LOGGER.error("Interrupted while acquiring move lock: {}", key, e);
+            throw new IllegalStateException("Move lock acquisition interrupted", e);
+        } catch (Exception e) {
+            LOGGER.error("Error in executeWithMoveLock for key: {}", key, e);
+            throw e;
+        } finally {
+            if(lock.isHeldByCurrentThread()) {
+                lock.unlock();
+                LOGGER.debug("Released move lock: {}", key);
             }
         }
     }
