@@ -488,7 +488,14 @@ public class FileRepo implements BaseRepo {
     public void moveFileClosures(String fileId, String targetAncestorId) {
         String shardingKey = getShardingKeyByFileId(fileId);
         DSLContext dsl = db(shardingKey);
+        ClosureMoveSnapshot snapshot = loadClosureMoveSnapshot(dsl, fileId, targetAncestorId);
 
+        deleteExternalClosures(dsl, snapshot, fileId);
+        insertExternalClosures(dsl, snapshot, fileId);
+        updateSubtreeRootDepths(dsl, snapshot, fileId);
+    }
+
+    private ClosureMoveSnapshot loadClosureMoveSnapshot(DSLContext dsl, String fileId, String targetAncestorId) {
         List<FileClosureRecord> subtreeClosures = dsl.selectFrom(FILE_CLOSURE)
                 .where(FILE_CLOSURE.ANCESTOR_ID.eq(fileId))
                 .orderBy(FILE_CLOSURE.DEPTH.asc())
@@ -536,21 +543,28 @@ public class FileRepo implements BaseRepo {
                 .filter(ancestorId -> !StringUtils.equals(ancestorId, fileId))
                 .collect(Collectors.toList());
 
-        int expectedDeleteCount = externalAncestorIds.size() * subtreeIds.size();
+        return new ClosureMoveSnapshot(subtreeClosures, targetAncestorClosures, subtreeIds,
+                externalAncestorIds, targetSelfClosure.getRootDepth());
+    }
+
+    private void deleteExternalClosures(DSLContext dsl, ClosureMoveSnapshot snapshot, String fileId) {
+        int expectedDeleteCount = snapshot.externalAncestorIds.size() * snapshot.subtreeIds.size();
         int deletedCount = 0;
-        if(!externalAncestorIds.isEmpty()) {
+        if(!snapshot.externalAncestorIds.isEmpty()) {
             deletedCount = dsl.delete(FILE_CLOSURE)
-                    .where(FILE_CLOSURE.ANCESTOR_ID.in(externalAncestorIds))
-                    .and(FILE_CLOSURE.DESCENDANT_ID.in(subtreeIds))
+                    .where(FILE_CLOSURE.ANCESTOR_ID.in(snapshot.externalAncestorIds))
+                    .and(FILE_CLOSURE.DESCENDANT_ID.in(snapshot.subtreeIds))
                     .execute();
         }
         if(deletedCount != expectedDeleteCount) {
             throw new IllegalStateException("delete external file_closure failed, fileId: " + fileId);
         }
+    }
 
+    private void insertExternalClosures(DSLContext dsl, ClosureMoveSnapshot snapshot, String fileId) {
         List<InsertSetMoreStep<FileClosureRecord>> inserts = new ArrayList<>();
-        for (FileClosureRecord targetAncestorClosure : targetAncestorClosures) {
-            for (FileClosureRecord subtreeClosure : subtreeClosures) {
+        for (FileClosureRecord targetAncestorClosure : snapshot.targetAncestorClosures) {
+            for (FileClosureRecord subtreeClosure : snapshot.subtreeClosures) {
                 long depth = targetAncestorClosure.getDepth() + 1 + subtreeClosure.getDepth();
                 inserts.add(createFileClosureInsert(dsl, subtreeClosure.getDescendantId(),
                         targetAncestorClosure.getAncestorId(), depth));
@@ -558,10 +572,12 @@ public class FileRepo implements BaseRepo {
         }
         assertBatchSucceeded(dsl.batch(inserts).execute(), inserts.size(),
                 "batch insert moved file_closure failed, fileId: " + fileId);
+    }
 
+    private void updateSubtreeRootDepths(DSLContext dsl, ClosureMoveSnapshot snapshot, String fileId) {
         List<Query> rootDepthUpdates = new ArrayList<>();
-        for (FileClosureRecord subtreeClosure : subtreeClosures) {
-            long rootDepth = targetSelfClosure.getRootDepth() + 1 + subtreeClosure.getDepth();
+        for (FileClosureRecord subtreeClosure : snapshot.subtreeClosures) {
+            long rootDepth = snapshot.targetRootDepth + 1 + subtreeClosure.getDepth();
             rootDepthUpdates.add(dsl.update(FILE_CLOSURE)
                     .set(FILE_CLOSURE.ROOT_DEPTH, rootDepth)
                     .where(FILE_CLOSURE.ANCESTOR_ID.eq(subtreeClosure.getDescendantId()))
@@ -570,6 +586,23 @@ public class FileRepo implements BaseRepo {
         }
         assertBatchSucceeded(dsl.batch(rootDepthUpdates).execute(), rootDepthUpdates.size(),
                 "batch update file_closure root_depth failed, fileId: " + fileId);
+    }
+
+    private static class ClosureMoveSnapshot {
+        private final List<FileClosureRecord> subtreeClosures;
+        private final List<FileClosureRecord> targetAncestorClosures;
+        private final List<String> subtreeIds;
+        private final List<String> externalAncestorIds;
+        private final long targetRootDepth;
+
+        ClosureMoveSnapshot(List<FileClosureRecord> subtreeClosures, List<FileClosureRecord> targetAncestorClosures,
+                List<String> subtreeIds, List<String> externalAncestorIds, long targetRootDepth) {
+            this.subtreeClosures = subtreeClosures;
+            this.targetAncestorClosures = targetAncestorClosures;
+            this.subtreeIds = subtreeIds;
+            this.externalAncestorIds = externalAncestorIds;
+            this.targetRootDepth = targetRootDepth;
+        }
     }
 
     private void assertBatchSucceeded(int[] results, int expectedSize, String message) {

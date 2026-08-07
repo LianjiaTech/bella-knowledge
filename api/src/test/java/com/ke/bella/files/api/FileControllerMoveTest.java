@@ -63,7 +63,7 @@ public class FileControllerMoveTest {
     }
 
     @Test
-    public void move_Success() throws Exception {
+    public void moveSuccess() throws Exception {
         String ancestorId = "anc-1";
         String spaceCode = "sp-a";
         String fileId = "f-1";
@@ -102,7 +102,7 @@ public class FileControllerMoveTest {
     }
 
     @Test
-    public void move_DirectorySuccess() throws Exception {
+    public void moveDirectorySuccess() throws Exception {
         String ancestorId = "anc-1";
         String spaceCode = "sp-a";
         String fileId = "dir-1";
@@ -137,7 +137,7 @@ public class FileControllerMoveTest {
     }
 
     @Test
-    public void move_CurrentDirectoryCheckedInsideLock() throws Exception {
+    public void moveCurrentDirectoryCheckedInsideLock() throws Exception {
         String ancestorId = "anc-1";
         String spaceCode = "sp-a";
         String fileId = "dir-1";
@@ -164,7 +164,7 @@ public class FileControllerMoveTest {
     }
 
     @Test
-    public void move_DuplicateNameCheckedInsideLock() throws Exception {
+    public void moveDuplicateNameCheckedInsideLock() throws Exception {
         String ancestorId = "anc-1";
         String spaceCode = "sp-a";
         String fileId = "dir-1";
@@ -191,7 +191,7 @@ public class FileControllerMoveTest {
     }
 
     @Test
-    public void move_CrossSpaceRejected() throws Exception {
+    public void moveCrossSpaceRejected() throws Exception {
         String ancestorId = "anc-1";
         String fileId = "dir-1";
         when(fileService.getFile0(ancestorId)).thenReturn(buildFile(ancestorId, "target", true, "sp-a"));
@@ -211,7 +211,7 @@ public class FileControllerMoveTest {
     }
 
     @Test
-    public void move_FileNotFound() throws Exception {
+    public void moveFileNotFound() throws Exception {
         String ancestorId = "anc-1";
         String spaceCode = "sp-a";
         String fileId = "missing";
@@ -234,7 +234,7 @@ public class FileControllerMoveTest {
     }
 
     @Test
-    public void move_LockConflict() throws Exception {
+    public void moveLockConflict() throws Exception {
         String ancestorId = "anc-1";
         String spaceCode = "sp-a";
         String fileId = "f-1";
@@ -258,7 +258,7 @@ public class FileControllerMoveTest {
     }
 
     @Test
-    public void move_InvalidAncestorId() throws Exception {
+    public void moveInvalidAncestorId() throws Exception {
         String ancestorId = "invalid-anc";
         when(fileService.getFile0(ancestorId)).thenReturn(null);
 
@@ -274,7 +274,7 @@ public class FileControllerMoveTest {
     }
 
     @Test
-    public void move_AncestorIsNotDir() throws Exception {
+    public void moveAncestorIsNotDir() throws Exception {
         String ancestorId = "anc-1";
         FileDB ancestor = buildFile(ancestorId, "anc", false, "sp-a");
         when(fileService.getFile0(ancestorId)).thenReturn(ancestor);
@@ -291,7 +291,7 @@ public class FileControllerMoveTest {
     }
 
     @Test
-    public void move_ServiceThrowsIllegalArgument() throws Exception {
+    public void moveServiceThrowsIllegalArgument() throws Exception {
         String ancestorId = "anc-1";
         String spaceCode = "sp-a";
         String fileId = "f-1";
@@ -321,7 +321,7 @@ public class FileControllerMoveTest {
     }
 
     @Test
-    public void move_MissingFileId_BadRequest() throws Exception {
+    public void moveMissingFileIdBadRequest() throws Exception {
         String body = "{\"ancestor_id\":\"anc-1\"}";
 
         BellaContext.setOperator(Operator.builder().spaceCode("sp-a").build());
@@ -334,7 +334,7 @@ public class FileControllerMoveTest {
     }
 
     @Test
-    public void move_MissingAncestorId_BadRequest() throws Exception {
+    public void moveMissingAncestorIdBadRequest() throws Exception {
         String body = "{\"file_id\":\"f-1\"}";
 
         BellaContext.setOperator(Operator.builder().spaceCode("sp-a").build());
@@ -347,7 +347,7 @@ public class FileControllerMoveTest {
     }
 
     @Test
-    public void move_NullRequestBody_InternalServerError() throws Exception {
+    public void moveNullRequestBodyInternalServerError() throws Exception {
         BellaContext.setOperator(Operator.builder().spaceCode("sp-a").build());
         mockMvc.perform(post("/v1/files/move")
                 .header("X-BELLA-SPACE-CODE", "sp-a")

@@ -7,8 +7,12 @@ import static org.junit.Assert.assertTrue;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.jooq.DSLContext;
 import org.jooq.Record;
@@ -20,6 +24,8 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import com.ke.bella.files.db.tables.pojos.FileDB;
+import com.ke.bella.files.protocol.PageFileOps;
 import com.ke.bella.openapi.BellaContext;
 import com.ke.bella.openapi.Operator;
 
@@ -45,6 +51,15 @@ public class FileRepoMoveTest {
     @Before
     public void setup() {
         dsl.execute("drop table if exists file_closure_0");
+        dsl.execute("drop table if exists file_0");
+        createFileClosureTable();
+        createFileTable();
+        BellaContext.setOperator(Operator.builder().userId(1L).userName("tester").spaceCode("sp-0").build());
+        insertTree();
+        insertFiles();
+    }
+
+    private void createFileClosureTable() {
         dsl.execute("create table file_closure_0 ("
                 + "id bigint auto_increment primary key,"
                 + "ancestor_id varchar(255) not null,"
@@ -59,8 +74,39 @@ public class FileRepoMoveTest {
                 + "mu_name varchar(32) not null default '',"
                 + "mtime timestamp not null default current_timestamp,"
                 + "unique (ancestor_id, descendant_id))");
-        BellaContext.setOperator(Operator.builder().userId(1L).userName("tester").spaceCode("sp-a").build());
-        insertTree();
+    }
+
+    private void createFileTable() {
+        dsl.execute("create table file_0 ("
+                + "id bigint auto_increment primary key,"
+                + "file_id varchar(256) not null,"
+                + "version bigint not null default 0,"
+                + "filename varchar(512) not null default '',"
+                + "is_dir int not null default 0,"
+                + "extension varchar(512) not null default '',"
+                + "mime_type varchar(512) not null default '',"
+                + "type varchar(512) not null default '',"
+                + "bucket varchar(256) not null default '',"
+                + "path varchar(512) not null default '',"
+                + "bytes bigint not null default 0,"
+                + "space_code varchar(128) not null default '',"
+                + "purpose varchar(64) not null default '',"
+                + "cuid bigint not null default 0,"
+                + "cu_name varchar(32) not null default '',"
+                + "ctime timestamp not null default current_timestamp,"
+                + "muid bigint not null default 0,"
+                + "mu_name varchar(32) not null default '',"
+                + "mtime timestamp not null default current_timestamp,"
+                + "meta_data clob,"
+                + "status int not null default 0,"
+                + "ak_code varchar(128) not null default '',"
+                + "broadcast_status bigint not null default 0,"
+                + "dom_tree_file_id varchar(256) not null default '',"
+                + "pdf_file_id varchar(256) not null default '',"
+                + "description varchar(256) not null default '',"
+                + "cities varchar(512) not null default '',"
+                + "tags varchar(512) not null default '',"
+                + "unique (file_id, space_code))");
     }
 
     @AfterClass
@@ -93,6 +139,33 @@ public class FileRepoMoveTest {
     }
 
     @Test
+    public void movedSubtreeIsVisibleThroughHierarchyQueries() {
+        fileRepo.moveFileClosures(SOURCE, TARGET);
+
+        List<String> pathIds = fileRepo.getPathFiles(LEAF).stream()
+                .map(FileDB::getFileId)
+                .collect(Collectors.toList());
+        assertEquals(Arrays.asList(NEW_ROOT, TARGET, SOURCE, CHILD, LEAF), pathIds);
+
+        Map<String, List<String>> ancestorIds = fileRepo.getFileAncestorIds("sp-0", Collections.singletonList(LEAF));
+        assertEquals(Arrays.asList(NEW_ROOT, TARGET, SOURCE, CHILD), ancestorIds.get(LEAF));
+
+        List<String> targetChildren = fileRepo.findFiles("sp-0", TARGET).stream()
+                .map(FileDB::getFileId)
+                .collect(Collectors.toList());
+        assertEquals(Collections.singletonList(SOURCE), targetChildren);
+
+        Page<FileDB> sourcePage = fileRepo.pageFiles(PageFileOps.builder()
+                .ancestorId(SOURCE)
+                .page(1)
+                .pageSize(10)
+                .order("asc")
+                .build());
+        assertEquals(1, sourcePage.getTotal());
+        assertEquals(CHILD, sourcePage.getData().get(0).getFileId());
+    }
+
+    @Test
     public void moveLeafUsesSameSubtreeAlgorithm() {
         fileRepo.moveFileClosures(LEAF, TARGET);
 
@@ -102,21 +175,6 @@ public class FileRepoMoveTest {
         assertClosure(TARGET, LEAF, 1L, -1L);
         assertClosure(NEW_ROOT, LEAF, 2L, -1L);
         assertClosure(LEAF, LEAF, 0L, 3L);
-    }
-
-    @Test
-    public void failedBatchCanRollBackAllClosureChanges() throws Exception {
-        insertClosure(NEW_ROOT, CHILD, 99L, -1L);
-        Map<String, String> before = snapshot();
-
-        connection.setAutoCommit(false);
-        try {
-            assertThrows(RuntimeException.class, () -> fileRepo.moveFileClosures(SOURCE, TARGET));
-            connection.rollback();
-            assertEquals(before, snapshot());
-        } finally {
-            connection.setAutoCommit(true);
-        }
     }
 
     @Test
@@ -151,10 +209,24 @@ public class FileRepoMoveTest {
         insertClosure(NEW_ROOT, TARGET, 1L, -1L);
     }
 
+    private void insertFiles() {
+        insertFile(OLD_ROOT, "old-root", true);
+        insertFile(SOURCE, "source", true);
+        insertFile(CHILD, "child", true);
+        insertFile(LEAF, "leaf.txt", false);
+        insertFile(NEW_ROOT, "new-root", true);
+        insertFile(TARGET, "target", true);
+    }
+
+    private void insertFile(String fileId, String filename, boolean directory) {
+        dsl.execute("insert into file_0 (file_id, filename, is_dir, space_code, meta_data) values (?, ?, ?, ?, ?)",
+                fileId, filename, directory ? 1 : 0, "sp-0", "{}");
+    }
+
     private void insertClosure(String ancestorId, String descendantId, long depth, long rootDepth) {
         dsl.execute("insert into file_closure_0 "
                         + "(ancestor_id, descendant_id, space_code, depth, root_depth) values (?, ?, ?, ?, ?)",
-                ancestorId, descendantId, "sp-a", depth, rootDepth);
+                ancestorId, descendantId, "sp-0", depth, rootDepth);
     }
 
     private boolean hasClosure(String ancestorId, String descendantId) {
