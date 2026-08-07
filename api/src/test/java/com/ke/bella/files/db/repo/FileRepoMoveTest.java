@@ -138,6 +138,58 @@ public class FileRepoMoveTest {
     }
 
     @Test
+    public void moveDirectoryToRootRemovesExternalAncestorsAndResetsRootDepths() {
+        fileRepo.moveFileClosures(SOURCE, null);
+
+        assertFalse(hasClosure(OLD_ROOT, SOURCE));
+        assertFalse(hasClosure(OLD_ROOT, CHILD));
+        assertFalse(hasClosure(OLD_ROOT, LEAF));
+
+        assertClosure(SOURCE, CHILD, 1L, -1L);
+        assertClosure(SOURCE, LEAF, 2L, -1L);
+        assertClosure(CHILD, LEAF, 1L, -1L);
+        assertClosure(SOURCE, SOURCE, 0L, 1L);
+        assertClosure(CHILD, CHILD, 0L, 2L);
+        assertClosure(LEAF, LEAF, 0L, 3L);
+    }
+
+    @Test
+    public void moveLeafToRootResetsRootDepth() {
+        fileRepo.moveFileClosures(LEAF, "");
+
+        assertFalse(hasClosure(OLD_ROOT, LEAF));
+        assertFalse(hasClosure(SOURCE, LEAF));
+        assertFalse(hasClosure(CHILD, LEAF));
+        assertClosure(LEAF, LEAF, 0L, 1L);
+    }
+
+    @Test
+    public void movedSubtreeToRootIsVisibleThroughHierarchyQueries() {
+        fileRepo.moveFileClosures(SOURCE, null);
+
+        List<String> pathIds = fileRepo.getPathFiles(LEAF).stream()
+                .map(FileDB::getFileId)
+                .collect(Collectors.toList());
+        assertEquals(Arrays.asList(SOURCE, CHILD, LEAF), pathIds);
+
+        List<String> rootFiles = fileRepo.findFiles("sp-0", null).stream()
+                .map(FileDB::getFileId)
+                .collect(Collectors.toList());
+        assertTrue(rootFiles.contains(SOURCE));
+        assertTrue(rootFiles.contains(OLD_ROOT));
+        assertTrue(rootFiles.contains(NEW_ROOT));
+
+        Page<FileDB> sourcePage = fileRepo.pageFiles(PageFileOps.builder()
+                .ancestorId(SOURCE)
+                .page(1)
+                .pageSize(10)
+                .order("asc")
+                .build());
+        assertEquals(1, sourcePage.getTotal());
+        assertEquals(CHILD, sourcePage.getData().get(0).getFileId());
+    }
+
+    @Test
     public void movingToSelfOrDescendantDoesNotChangeClosures() {
         Map<String, String> before = snapshot();
 

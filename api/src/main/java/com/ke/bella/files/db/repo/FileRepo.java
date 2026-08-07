@@ -530,21 +530,26 @@ public class FileRepo implements BaseRepo {
         Assert.isTrue(!CollectionUtils.isEmpty(sourceAncestorClosures),
                 "descendant_id not found in file_closure, descendant_id: " + fileId);
 
-        List<FileClosureRecord> targetAncestorClosures = dsl.selectFrom(FILE_CLOSURE)
-                .where(FILE_CLOSURE.DESCENDANT_ID.eq(targetAncestorId))
-                .orderBy(FILE_CLOSURE.DEPTH.asc())
-                .forUpdate()
-                .fetchInto(FileClosureRecord.class);
-        Assert.isTrue(!CollectionUtils.isEmpty(targetAncestorClosures),
-                "descendant_id not found in file_closure, descendant_id: " + targetAncestorId);
+        List<FileClosureRecord> targetAncestorClosures = Collections.emptyList();
+        long targetRootDepth = 0L;
+        if(StringUtils.isNotEmpty(targetAncestorId)) {
+            targetAncestorClosures = dsl.selectFrom(FILE_CLOSURE)
+                    .where(FILE_CLOSURE.DESCENDANT_ID.eq(targetAncestorId))
+                    .orderBy(FILE_CLOSURE.DEPTH.asc())
+                    .forUpdate()
+                    .fetchInto(FileClosureRecord.class);
+            Assert.isTrue(!CollectionUtils.isEmpty(targetAncestorClosures),
+                    "descendant_id not found in file_closure, descendant_id: " + targetAncestorId);
 
-        FileClosureRecord targetSelfClosure = targetAncestorClosures.stream()
-                .filter(closure -> closure.getDepth() == 0L)
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException(
-                        "self closure not found, descendant_id: " + targetAncestorId));
-        Assert.isTrue(targetSelfClosure.getRootDepth() > 0,
-                "invalid root_depth for target ancestor, descendant_id: " + targetAncestorId);
+            FileClosureRecord targetSelfClosure = targetAncestorClosures.stream()
+                    .filter(closure -> closure.getDepth() == 0L)
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException(
+                            "self closure not found, descendant_id: " + targetAncestorId));
+            Assert.isTrue(targetSelfClosure.getRootDepth() > 0,
+                    "invalid root_depth for target ancestor, descendant_id: " + targetAncestorId);
+            targetRootDepth = targetSelfClosure.getRootDepth();
+        }
 
         List<String> subtreeIds = subtreeClosures.stream()
                 .map(FileClosureRecord::getDescendantId)
@@ -555,7 +560,7 @@ public class FileRepo implements BaseRepo {
                 .collect(Collectors.toList());
 
         return new ClosureMoveSnapshot(subtreeIds, externalAncestorIds, targetAncestorId,
-                targetAncestorClosures.size(), targetSelfClosure.getRootDepth());
+                targetAncestorClosures.size(), targetRootDepth);
     }
 
     private void deleteExternalClosures(DSLContext dsl, ClosureMoveSnapshot snapshot) {
@@ -568,6 +573,10 @@ public class FileRepo implements BaseRepo {
     }
 
     private void insertExternalClosures(DSLContext dsl, ClosureMoveSnapshot snapshot, String fileId) {
+        if(StringUtils.isEmpty(snapshot.targetAncestorId)) {
+            return;
+        }
+
         Table<FileClosureRecord> target = FILE_CLOSURE.as("target_closure");
         Table<FileClosureRecord> subtree = FILE_CLOSURE.as("subtree_closure");
         Field<String> targetAncestorId = target.field(FILE_CLOSURE.ANCESTOR_ID);
