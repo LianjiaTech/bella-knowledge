@@ -688,11 +688,7 @@ public class FileService {
 
     @Transactional(rollbackFor = Exception.class)
     public OpenAIFile moveFile(String fileId, String targetAncestorId) {
-
-        // 执行移动操作
-        FileType fileType = FileType.fromFileId(fileId);
-        fileRepo.deleteFileClosure(fileId, fileType);
-        fileRepo.addFileClosures(fileId, targetAncestorId);
+        fileRepo.moveFileClosures(fileId, targetAncestorId);
 
         FileOps ops = FileOps.builder()
                 .fileId(fileId)

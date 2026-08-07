@@ -1224,18 +1224,21 @@ public class FileController {
             throw new FileNotFoundException(fileId);
         }
         Assert.isTrue(StringUtils.equals(ancestor.getSpaceCode(), file.getSpaceCode()), "space mismatch for file_id and ancestor_id");
-        Assert.isTrue(file.getIsDir() == 0, "file_id must be refer to a file");
-
-        // validate no duplicate names and not same directory
-        String currentAncestorId = fileService.getDirectAncestorId(fileId);
-        Assert.isTrue(!StringUtils.equals(currentAncestorId, targetAncestorId), "file already in target directory");
-
-        boolean exists = fileService.exists(ancestor.getSpaceCode(), targetAncestorId, file.getFilename());
-        Assert.isTrue(!exists, "filename already exists");
 
         try {
-            return fl.executeWithLock(ancestor.getSpaceCode(), targetAncestorId, file.getFilename(), FILE_LOCK_TIMEOUT_MS,
-                    () -> fileService.moveFile(fileId, targetAncestorId));
+            boolean directory = file.getIsDir() == 1;
+            return fl.executeWithMoveLock(ancestor.getSpaceCode(), directory, FILE_LOCK_TIMEOUT_MS,
+                    () -> fl.executeWithLock(ancestor.getSpaceCode(), targetAncestorId, file.getFilename(), FILE_LOCK_TIMEOUT_MS,
+                            () -> {
+                                String currentAncestorId = fileService.getDirectAncestorId(fileId);
+                                Assert.isTrue(!StringUtils.equals(currentAncestorId, targetAncestorId),
+                                        "file already in target directory");
+
+                                boolean exists = fileService.exists(ancestor.getSpaceCode(), targetAncestorId, file.getFilename());
+                                Assert.isTrue(!exists, "filename already exists");
+
+                                return fileService.moveFile(fileId, targetAncestorId);
+                            }));
         } catch (IllegalArgumentException e) {
             throw e;
         } catch (Exception e) {
