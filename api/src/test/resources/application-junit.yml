@@ -1,9 +1,11 @@
 bella:
   file-api:
+    file-entry:
+      read-mode: closure
+      cross-space-move-enabled: false
     file:
       tmp-file-dir: .
 
 apollo:
   bootstrap:
     enabled: true
-

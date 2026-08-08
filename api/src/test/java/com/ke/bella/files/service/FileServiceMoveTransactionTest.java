@@ -160,6 +160,15 @@ public class FileServiceMoveTransactionTest {
         dsl.execute("insert into file_1 (file_id, filename, is_dir, space_code, meta_data, mtime) "
                         + "values (?, ?, ?, ?, ?, timestamp '2026-01-01 00:00:00')",
                 SOURCE, "source", 1, "sp-a", "{}");
+        dsl.execute("insert into file_1 (file_id, filename, is_dir, space_code, meta_data, mtime) "
+                        + "values (?, ?, ?, ?, ?, timestamp '2026-01-01 00:00:00')",
+                OLD_ROOT, "old-root", 1, "sp-a", "{}");
+        dsl.execute("insert into file_1 (file_id, filename, is_dir, space_code, meta_data, mtime) "
+                        + "values (?, ?, ?, ?, ?, timestamp '2026-01-01 00:00:00')",
+                CHILD, "child", 1, "sp-a", "{}");
+        dsl.execute("insert into file_1 (file_id, filename, is_dir, space_code, meta_data, mtime) "
+                        + "values (?, ?, ?, ?, ?, timestamp '2026-01-01 00:00:00')",
+                TARGET, "target", 1, "sp-a", "{}");
     }
 
     private void insertClosure(String ancestorId, String descendantId, long depth, long rootDepth) {

@@ -5,6 +5,7 @@ import static com.ke.bella.files.db.Tables.DATASET_QA;
 import static com.ke.bella.files.db.Tables.DATASET_QA_REFERENCE;
 import static com.ke.bella.files.db.Tables.FILE;
 import static com.ke.bella.files.db.Tables.FILE_CLOSURE;
+import static com.ke.bella.files.db.Tables.FILE_ENTRY;
 import static com.ke.bella.files.db.Tables.FILE_PROGRESS;
 
 import java.util.regex.Pattern;
@@ -30,10 +31,11 @@ public class DSLContextHolder {
             return db;
         }
 
-        DSLContext ret = configurations.getIfPresent(key);
+        String configurationKey = System.identityHashCode(db.configuration()) + ":" + key;
+        DSLContext ret = configurations.getIfPresent(configurationKey);
         if(ret == null) {
             ret = DSL.using(db.configuration().derive(newSettings(key)));
-            configurations.put(key, ret);
+            configurations.put(configurationKey, ret);
         }
 
         return ret;
@@ -51,6 +53,9 @@ public class DSLContextHolder {
                                         new MappedTable()
                                                 .withInput(FILE_CLOSURE.getName())
                                                 .withOutput(targetTableName(FILE_CLOSURE.getName(), key)),
+                                        new MappedTable()
+                                                .withInput(FILE_ENTRY.getName())
+                                                .withOutput(targetTableName(FILE_ENTRY.getName(), key)),
                                         new MappedTable().withInput(FILE_PROGRESS.getName())
                                                 .withOutput(targetTableName(FILE_PROGRESS.getName(), key)),
                                         new MappedTable()

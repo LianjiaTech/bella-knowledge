@@ -2,6 +2,7 @@ package com.ke.bella.files.db.repo;
 
 import static com.ke.bella.files.db.Tables.FILE;
 import static com.ke.bella.files.db.Tables.FILE_CLOSURE;
+import static com.ke.bella.files.db.Tables.FILE_ENTRY;
 import static com.ke.bella.files.db.Tables.FILE_MAPPING;
 import static com.ke.bella.files.db.Tables.FILE_PROGRESS;
 import static com.ke.bella.files.db.Tables.FILE_SHARDING;
@@ -38,6 +39,7 @@ import org.jooq.Table;
 import org.jooq.UpdateSetMoreStep;
 import org.jooq.impl.DSL;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
@@ -66,8 +68,14 @@ public class FileRepo implements BaseRepo {
     @Resource
     private DSLContext db;
 
+    private FileEntryRepo fileEntryRepo;
+
+    @Value("${bella.file-api.file-entry.read-mode:closure}")
+    private String fileEntryReadMode;
+
     public FileRepo(DSLContext db) {
         this.db = db;
+        this.fileEntryRepo = new FileEntryRepo(db);
     }
 
     public String getShardingKeyByFileId(String fileId, FileType fileType) {
@@ -106,7 +114,7 @@ public class FileRepo implements BaseRepo {
         return StringUtils.isEmpty(sharding.getKey()) ? fileType.getType() : fileType.getType() + "_" + sharding.getKey();
     }
 
-    private static String getShardingKeyBySpaceCode(String spaceCode) {
+    public static String getShardingKeyBySpaceCode(String spaceCode) {
         Integer hashCode = CustomStringUtils.hashCode(spaceCode);
         return getShardingKeyBySpaceCodeHash(hashCode);
     }
@@ -114,6 +122,10 @@ public class FileRepo implements BaseRepo {
     private static String getShardingKeyBySpaceCodeHash(Integer spaceCodeHash) {
         spaceCodeHash = Math.abs(spaceCodeHash);
         return Integer.toString(spaceCodeHash % 16);
+    }
+
+    public static String getShardingKeyByFileIdStatic(String fileId) {
+        return getShardingKeyBySpaceCodeHash(Integer.valueOf(FileIdGenerator.extractSpaceCodeHash(fileId)));
     }
 
     private DSLContext db(String shardingKey) {
@@ -169,6 +181,9 @@ public class FileRepo implements BaseRepo {
     }
 
     public boolean exists(String spaceCode, @Nullable String ancestorId, @NotNull String filename) {
+        if(useEntryRead()) {
+            return fileEntryRepo.exists(spaceCode, ancestorId, filename);
+        }
         String shardingKey = getShardingKeyBySpaceCode(spaceCode);
 
         SelectConditionStep<Record1<Integer>> sql = db(shardingKey).selectOne()
@@ -186,10 +201,17 @@ public class FileRepo implements BaseRepo {
                     .and(FILE_CLOSURE.DEPTH.eq(1L));
         }
 
-        return sql.limit(1).fetchOptional().isPresent();
+        boolean closureResult = sql.limit(1).fetchOptional().isPresent();
+        if(compareEntryRead()) {
+            fileEntryRepo.exists(spaceCode, ancestorId, filename);
+        }
+        return closureResult;
     }
 
     public FileDB queryFile(String spaceCode, @Nullable String ancestorId, @NotNull String filename) {
+        if(useEntryRead()) {
+            return fileEntryRepo.queryFile(spaceCode, ancestorId, filename);
+        }
         String shardingKey = getShardingKeyBySpaceCode(spaceCode);
 
         SelectConditionStep<Record> sql = db(shardingKey).select(FILE.fields())
@@ -207,7 +229,11 @@ public class FileRepo implements BaseRepo {
                     .and(FILE_CLOSURE.DEPTH.eq(1L));
         }
 
-        return sql.limit(1).fetchOneInto(FileDB.class);
+        FileDB closureResult = sql.limit(1).fetchOneInto(FileDB.class);
+        if(compareEntryRead()) {
+            fileEntryRepo.queryFile(spaceCode, ancestorId, filename);
+        }
+        return closureResult;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -226,6 +252,7 @@ public class FileRepo implements BaseRepo {
 
         if(fileType.needsDirectorySupport()) {
             addFileClosures(fileDB.getFileId(), ancestorId);
+            fileEntryRepo.addEntry(fileDB.getSpaceCode(), fileDB, ancestorId);
         }
 
         return shardingKey;
@@ -234,6 +261,14 @@ public class FileRepo implements BaseRepo {
     public void updateFile(FileOps op, boolean increaseVersion) {
         String fileId = queryNewFileId(op.getFileId());
         String shardingKey = getShardingKeyByFileId(fileId);
+        FileType fileType = FileType.fromFileId(fileId);
+        FileDB currentFile = fileType.needsDirectorySupport() ? queryFile(fileId, fileType) : null;
+        if(currentFile != null && op.getFilename() != null) {
+            fileEntryRepo.rename(currentFile.getSpaceCode(), fileId, op.getFilename());
+        }
+        if(currentFile != null && op.getStatus() == FileStatus.DELETED) {
+            fileEntryRepo.delete(currentFile.getSpaceCode(), fileId);
+        }
         FileRecord rec = FILE.newRecord();
         rec.setFileId(fileId);
         if(op.getStatus() != null) {
@@ -309,6 +344,22 @@ public class FileRepo implements BaseRepo {
             String after,
             String spaceCode,
             String ancestorId) {
+        if(useEntryRead()) {
+            List<FileDB> files = fileEntryRepo.listFiles(spaceCode, ancestorId).stream()
+                    .filter(file -> StringUtils.isEmpty(purpose) || purpose.equals(file.getPurpose()))
+                    .collect(Collectors.toList());
+            if(StringUtils.isNotEmpty(after)) {
+                FileDB afterFile = queryFile(after);
+                files = files.stream()
+                        .filter(file -> "asc".equalsIgnoreCase(order) ? file.getCtime().isAfter(afterFile.getCtime())
+                                : file.getCtime().isBefore(afterFile.getCtime()))
+                        .collect(Collectors.toList());
+            }
+            files.sort("asc".equalsIgnoreCase(order)
+                    ? java.util.Comparator.comparing(FileDB::getCtime)
+                    : java.util.Comparator.comparing(FileDB::getCtime).reversed());
+            return files.stream().limit(limit).collect(Collectors.toList());
+        }
         String shardingKey = getShardingKeyBySpaceCode(spaceCode);
 
         SelectConditionStep<Record> query = db(shardingKey).select(FILE.fields())
@@ -502,6 +553,10 @@ public class FileRepo implements BaseRepo {
 
     @Transactional(rollbackFor = Exception.class)
     public void moveFileClosures(String fileId, String targetAncestorId) {
+        FileDB file = queryFile(fileId);
+        if(file == null) {
+            throw new FileNotFoundException(fileId);
+        }
         String shardingKey = getShardingKeyByFileId(fileId);
         DSLContext dsl = db(shardingKey);
         ClosureMoveSnapshot snapshot = loadClosureMoveSnapshot(dsl, fileId, targetAncestorId);
@@ -509,6 +564,7 @@ public class FileRepo implements BaseRepo {
         deleteExternalClosures(dsl, snapshot);
         insertExternalClosures(dsl, snapshot, fileId);
         updateSubtreeRootDepths(dsl, snapshot, fileId);
+        fileEntryRepo.move(file.getSpaceCode(), fileId, targetAncestorId);
     }
 
     private ClosureMoveSnapshot loadClosureMoveSnapshot(DSLContext dsl, String fileId, String targetAncestorId) {
@@ -666,6 +722,9 @@ public class FileRepo implements BaseRepo {
     }
 
     public List<FileDB> findFiles(String spaceCode, String ancestorId) {
+        if(useEntryRead()) {
+            return fileEntryRepo.listFiles(spaceCode, ancestorId);
+        }
         String shardingKey = getShardingKeyBySpaceCode(spaceCode);
 
         SelectConditionStep<Record> query = db(shardingKey).select(FILE.fields())
@@ -687,6 +746,14 @@ public class FileRepo implements BaseRepo {
                 .orderBy(FILE.IS_DIR.desc(),
                         FILE.CTIME.desc())
                 .fetchInto(FileDB.class);
+    }
+
+    private boolean useEntryRead() {
+        return "entry".equalsIgnoreCase(fileEntryReadMode);
+    }
+
+    private boolean compareEntryRead() {
+        return "compare".equalsIgnoreCase(fileEntryReadMode);
     }
 
     public List<FileDB> getPathFiles(String fileId) {
@@ -784,6 +851,30 @@ public class FileRepo implements BaseRepo {
 
         Condition whereCondition = buildWhereConditionForPageFiles(ops);
 
+        if(useEntryRead()) {
+            String entrySpaceCode = ops.getSpaceCode();
+            if(StringUtils.isEmpty(entrySpaceCode)) {
+                FileDB ancestor = queryFile(ops.getAncestorId());
+                if(ancestor == null) {
+                    throw new FileNotFoundException(ops.getAncestorId());
+                }
+                entrySpaceCode = ancestor.getSpaceCode();
+            }
+            String parentEntryId = fileEntryRepo.resolveParentEntryId(entrySpaceCode, ops.getAncestorId());
+            Condition entryCondition = FILE_ENTRY.SPACE_CODE.eq(entrySpaceCode)
+                    .and(FILE_ENTRY.PARENT_ENTRY_ID.eq(parentEntryId))
+                    .and(FILE_ENTRY.STATUS.eq(FileStatus.NOT_DELETED.getValue()));
+            SelectConditionStep<Record> entrySql = db(shardingKey).select(FILE.fields())
+                    .from(FILE_ENTRY)
+                    .innerJoin(FILE)
+                    .on(FILE_ENTRY.FILE_ID.eq(FILE.FILE_ID))
+                    .where(entryCondition.and(buildFileConditionForPageFiles(ops)));
+            boolean entryAsc = "asc".equalsIgnoreCase(ops.getOrder());
+            entrySql.orderBy(FILE.IS_DIR.desc(), entryAsc ? FILE.CTIME.asc() : FILE.CTIME.desc(),
+                    entryAsc ? FILE.ID.asc() : FILE.ID.desc());
+            return queryPage(db(shardingKey), entrySql, ops.getPage(), ops.getPageSize(), FileDB.class);
+        }
+
         SelectConditionStep<Record> sql = db(shardingKey).select(FILE.fields())
                 .from(FILE_CLOSURE)
                 .innerJoin(FILE)
@@ -816,7 +907,10 @@ public class FileRepo implements BaseRepo {
                     .and(FILE_CLOSURE.ROOT_DEPTH.eq(1L));
         }
 
-        // FILE 条件分组
+        return closureCondition.and(buildFileConditionForPageFiles(ops));
+    }
+
+    private Condition buildFileConditionForPageFiles(PageFileOps ops) {
         Condition fileCondition = FILE.STATUS.eq(FileStatus.NOT_DELETED.getValue());
         if(StringUtils.isEmpty(ops.getAncestorId())) {
             fileCondition = fileCondition.and(FILE.SPACE_CODE.eq(ops.getSpaceCode()));
@@ -856,7 +950,7 @@ public class FileRepo implements BaseRepo {
             fileCondition = fileCondition.and(FILE.MUID.eq(ops.getMuid()));
         }
 
-        return closureCondition.and(fileCondition);
+        return fileCondition;
     }
 
     private Condition buildContainsAnyCondition(org.jooq.Field<String> field, List<String> values) {
