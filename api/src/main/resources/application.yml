@@ -39,6 +39,14 @@ bella:
       max-bytes: ${BELLA_UPLOAD_MAX_BYTES:5368709120}
       # 注意：bucket 的 AbortIncompleteMultipartUpload lifecycle 规则需 ≥ 此 TTL，否则未完成分片会被提前清理
       session-ttl-hours: ${BELLA_UPLOAD_SESSION_TTL_HOURS:720}
+    file-entry:
+      read-mode: ${BELLA_FILE_ENTRY_READ_MODE:closure}
+      cross-space-move-enabled: ${BELLA_FILE_ENTRY_CROSS_SPACE_MOVE_ENABLED:false}
+      backfill:
+        enabled: ${BELLA_FILE_ENTRY_BACKFILL_ENABLED:false}
+        space-code: ${BELLA_FILE_ENTRY_BACKFILL_SPACE_CODE:}
+        min-id: ${BELLA_FILE_ENTRY_BACKFILL_MIN_ID:0}
+        max-id: ${BELLA_FILE_ENTRY_BACKFILL_MAX_ID:9223372036854775807}
     file:
       tmp-file-dir: ${BELLA_TMP_FILE_DIR:.}
     bucket-name:

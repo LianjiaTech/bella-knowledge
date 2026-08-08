@@ -26,6 +26,7 @@ public class IDGenerator {
     // 预定义的生成器实例
     public static final IDGenerator DATASET_ID_GEN = new IDGenerator("dataset-", SIMPLE_STRATEGY);
     public static final IDGenerator QA_ID_GEN = new IDGenerator("qa-", SIMPLE_STRATEGY);
+    public static final IDGenerator FILE_ENTRY_ID_GEN = new IDGenerator("entry-", SIMPLE_STRATEGY);
     // 文件ID生成器（支持purpose后缀）
     public static final FileIdGenerator FILE_ID_GENERATOR = new FileIdGenerator();
 

@@ -11,6 +11,7 @@ import com.ke.bella.files.db.tables.DatasetQaReference;
 import com.ke.bella.files.db.tables.DatasetSharding;
 import com.ke.bella.files.db.tables.File;
 import com.ke.bella.files.db.tables.FileClosure;
+import com.ke.bella.files.db.tables.FileEntry;
 import com.ke.bella.files.db.tables.FileMapping;
 import com.ke.bella.files.db.tables.FileProgress;
 import com.ke.bella.files.db.tables.FileProgressTemp;
@@ -76,6 +77,11 @@ public class DefaultSchema extends SchemaImpl {
      * 文件闭包表
      */
     public final FileClosure FILE_CLOSURE = FileClosure.FILE_CLOSURE;
+
+    /**
+     * 文件目录项表
+     */
+    public final FileEntry FILE_ENTRY = FileEntry.FILE_ENTRY;
 
     /**
      * The table <code>file_mapping</code>.
@@ -145,6 +151,7 @@ public class DefaultSchema extends SchemaImpl {
             DatasetSharding.DATASET_SHARDING,
             File.FILE,
             FileClosure.FILE_CLOSURE,
+            FileEntry.FILE_ENTRY,
             FileMapping.FILE_MAPPING,
             FileProgress.FILE_PROGRESS,
             FileProgressTemp.FILE_PROGRESS_TEMP,
