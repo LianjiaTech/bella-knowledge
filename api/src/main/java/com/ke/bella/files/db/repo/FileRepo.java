@@ -24,14 +24,17 @@ import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jooq.Condition;
 import org.jooq.DSLContext;
+import org.jooq.Field;
 import org.jooq.InsertSetMoreStep;
 import org.jooq.Record;
 import org.jooq.Record1;
 import org.jooq.Record3;
 import org.jooq.Result;
+import org.jooq.SQLDialect;
 import org.jooq.SelectConditionStep;
 import org.jooq.SelectOrderByStep;
 import org.jooq.SortField;
+import org.jooq.Table;
 import org.jooq.UpdateSetMoreStep;
 import org.jooq.impl.DSL;
 import org.springframework.stereotype.Component;
@@ -451,10 +454,7 @@ public class FileRepo implements BaseRepo {
         long rootDepth = 1L;
 
         if(StringUtils.isNotEmpty(ancestorId)) {
-            List<FileClosureRecord> ancestorClosures = dsl.selectFrom(FILE_CLOSURE)
-                    .where(FILE_CLOSURE.DESCENDANT_ID.eq(ancestorId))
-                    .orderBy(FILE_CLOSURE.DEPTH.asc())
-                    .fetchInto(FileClosureRecord.class);
+            List<FileClosureRecord> ancestorClosures = loadAncestorClosuresForUpdate(dsl, ancestorId);
 
             Assert.isTrue(!CollectionUtils.isEmpty(ancestorClosures),
                     "descendant_id not found in file_closure, descendant_id: " + ancestorId);
@@ -474,12 +474,190 @@ public class FileRepo implements BaseRepo {
         }
     }
 
+    private List<FileClosureRecord> loadAncestorClosuresForUpdate(DSLContext dsl, String ancestorId) {
+        dsl.select(FILE_CLOSURE.ID)
+                .from(FILE_CLOSURE)
+                .where(FILE_CLOSURE.DESCENDANT_ID.eq(ancestorId))
+                .forUpdate()
+                .fetch();
+        return dsl.selectFrom(FILE_CLOSURE)
+                .where(FILE_CLOSURE.DESCENDANT_ID.eq(ancestorId))
+                .orderBy(FILE_CLOSURE.DEPTH.asc())
+                .forUpdate()
+                .fetchInto(FileClosureRecord.class);
+    }
+
     public void deleteFileClosure(String fileId, FileType fileType) {
         String shardingKey = getShardingKeyByFileId(fileId, fileType);
         db(shardingKey).delete(FILE_CLOSURE)
                 .where(FILE_CLOSURE.DESCENDANT_ID.eq(fileId))
                 .or(FILE_CLOSURE.ANCESTOR_ID.eq(fileId))
                 .execute();
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void moveFileClosures(String fileId, String targetAncestorId) {
+        String shardingKey = getShardingKeyByFileId(fileId);
+        DSLContext dsl = db(shardingKey);
+        ClosureMoveSnapshot snapshot = loadClosureMoveSnapshot(dsl, fileId, targetAncestorId);
+
+        deleteExternalClosures(dsl, snapshot);
+        insertExternalClosures(dsl, snapshot, fileId);
+        updateSubtreeRootDepths(dsl, snapshot, fileId);
+    }
+
+    private ClosureMoveSnapshot loadClosureMoveSnapshot(DSLContext dsl, String fileId, String targetAncestorId) {
+        List<FileClosureRecord> subtreeClosures = dsl.selectFrom(FILE_CLOSURE)
+                .where(FILE_CLOSURE.ANCESTOR_ID.eq(fileId))
+                .orderBy(FILE_CLOSURE.DEPTH.asc())
+                .forUpdate()
+                .fetchInto(FileClosureRecord.class);
+        Assert.isTrue(!CollectionUtils.isEmpty(subtreeClosures),
+                "ancestor_id not found in file_closure, ancestor_id: " + fileId);
+        boolean sourceSelfClosureExists = subtreeClosures.stream()
+                .anyMatch(closure -> StringUtils.equals(closure.getDescendantId(), fileId) && closure.getDepth() == 0L);
+        Assert.isTrue(sourceSelfClosureExists, "self closure not found, fileId: " + fileId);
+
+        boolean targetInSubtree = subtreeClosures.stream()
+                .anyMatch(closure -> StringUtils.equals(closure.getDescendantId(), targetAncestorId));
+        Assert.isTrue(!targetInSubtree, "cannot move a directory into itself or its descendant");
+
+        List<FileClosureRecord> sourceAncestorClosures = dsl.selectFrom(FILE_CLOSURE)
+                .where(FILE_CLOSURE.DESCENDANT_ID.eq(fileId))
+                .orderBy(FILE_CLOSURE.DEPTH.asc())
+                .forUpdate()
+                .fetchInto(FileClosureRecord.class);
+        Assert.isTrue(!CollectionUtils.isEmpty(sourceAncestorClosures),
+                "descendant_id not found in file_closure, descendant_id: " + fileId);
+
+        List<FileClosureRecord> targetAncestorClosures = Collections.emptyList();
+        long targetRootDepth = 0L;
+        if(StringUtils.isNotEmpty(targetAncestorId)) {
+            targetAncestorClosures = dsl.selectFrom(FILE_CLOSURE)
+                    .where(FILE_CLOSURE.DESCENDANT_ID.eq(targetAncestorId))
+                    .orderBy(FILE_CLOSURE.DEPTH.asc())
+                    .forUpdate()
+                    .fetchInto(FileClosureRecord.class);
+            Assert.isTrue(!CollectionUtils.isEmpty(targetAncestorClosures),
+                    "descendant_id not found in file_closure, descendant_id: " + targetAncestorId);
+
+            FileClosureRecord targetSelfClosure = targetAncestorClosures.stream()
+                    .filter(closure -> closure.getDepth() == 0L)
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException(
+                            "self closure not found, descendant_id: " + targetAncestorId));
+            Assert.isTrue(targetSelfClosure.getRootDepth() > 0,
+                    "invalid root_depth for target ancestor, descendant_id: " + targetAncestorId);
+            targetRootDepth = targetSelfClosure.getRootDepth();
+        }
+
+        List<String> subtreeIds = subtreeClosures.stream()
+                .map(FileClosureRecord::getDescendantId)
+                .collect(Collectors.toList());
+        List<String> externalAncestorIds = sourceAncestorClosures.stream()
+                .map(FileClosureRecord::getAncestorId)
+                .filter(ancestorId -> !StringUtils.equals(ancestorId, fileId))
+                .collect(Collectors.toList());
+
+        return new ClosureMoveSnapshot(subtreeIds, externalAncestorIds, targetAncestorId,
+                targetAncestorClosures.size(), targetRootDepth);
+    }
+
+    private void deleteExternalClosures(DSLContext dsl, ClosureMoveSnapshot snapshot) {
+        if(!snapshot.externalAncestorIds.isEmpty()) {
+            dsl.delete(FILE_CLOSURE)
+                    .where(FILE_CLOSURE.ANCESTOR_ID.in(snapshot.externalAncestorIds))
+                    .and(FILE_CLOSURE.DESCENDANT_ID.in(snapshot.subtreeIds))
+                    .execute();
+        }
+    }
+
+    private void insertExternalClosures(DSLContext dsl, ClosureMoveSnapshot snapshot, String fileId) {
+        if(StringUtils.isEmpty(snapshot.targetAncestorId)) {
+            return;
+        }
+
+        Table<FileClosureRecord> target = FILE_CLOSURE.as("target_closure");
+        Table<FileClosureRecord> subtree = FILE_CLOSURE.as("subtree_closure");
+        Field<String> targetAncestorId = target.field(FILE_CLOSURE.ANCESTOR_ID);
+        Field<Long> targetDepth = target.field(FILE_CLOSURE.DEPTH);
+        Field<String> targetDescendantId = target.field(FILE_CLOSURE.DESCENDANT_ID);
+        Field<String> subtreeAncestorId = subtree.field(FILE_CLOSURE.ANCESTOR_ID);
+        Field<String> subtreeDescendantId = subtree.field(FILE_CLOSURE.DESCENDANT_ID);
+        Field<Long> subtreeDepth = subtree.field(FILE_CLOSURE.DEPTH);
+        FileClosureRecord audit = FILE_CLOSURE.newRecord();
+        fillCreatorInfo(audit);
+
+        int insertedCount = dsl.insertInto(FILE_CLOSURE,
+                FILE_CLOSURE.ANCESTOR_ID, FILE_CLOSURE.DESCENDANT_ID, FILE_CLOSURE.SPACE_CODE,
+                FILE_CLOSURE.DEPTH, FILE_CLOSURE.ROOT_DEPTH, FILE_CLOSURE.CUID, FILE_CLOSURE.CU_NAME,
+                FILE_CLOSURE.CTIME, FILE_CLOSURE.MUID, FILE_CLOSURE.MU_NAME, FILE_CLOSURE.MTIME)
+                .select(dsl.select(targetAncestorId, subtreeDescendantId,
+                        DSL.val(BellaContextHelper.getOperateSpaceCode()), targetDepth.add(1L).add(subtreeDepth),
+                        DSL.val(-1L), DSL.val(audit.getCuid() == null ? 0L : audit.getCuid()),
+                        DSL.val(audit.getCuName() == null ? "" : audit.getCuName()), DSL.val(audit.getCtime()),
+                        DSL.val(audit.getMuid() == null ? 0L : audit.getMuid()),
+                        DSL.val(audit.getMuName() == null ? "" : audit.getMuName()), DSL.val(audit.getMtime()))
+                        .from(target)
+                        .crossJoin(subtree)
+                        .where(targetDescendantId.eq(snapshot.targetAncestorId))
+                        .and(subtreeAncestorId.eq(fileId)))
+                .execute();
+
+        int expectedInsertCount = snapshot.targetAncestorCount * snapshot.subtreeIds.size();
+        if(insertedCount != expectedInsertCount) {
+            throw new IllegalStateException("insert moved file_closure failed, fileId: " + fileId);
+        }
+    }
+
+    private void updateSubtreeRootDepths(DSLContext dsl, ClosureMoveSnapshot snapshot, String fileId) {
+        long rootDepthOffset = snapshot.targetRootDepth + 1L;
+        int updatedCount;
+        if(isH2Database(dsl)) {
+            updatedCount = dsl.execute("update {0} self_closure "
+                            + "set root_depth = {1} + (select subtree_closure.depth from {0} subtree_closure "
+                            + "where subtree_closure.ancestor_id = {2} "
+                            + "and subtree_closure.descendant_id = self_closure.descendant_id) "
+                            + "where self_closure.ancestor_id = self_closure.descendant_id "
+                            + "and self_closure.depth = 0 "
+                            + "and exists (select 1 from {0} subtree_closure "
+                            + "where subtree_closure.ancestor_id = {2} "
+                            + "and subtree_closure.descendant_id = self_closure.descendant_id)",
+                    FILE_CLOSURE, DSL.val(rootDepthOffset), DSL.val(fileId));
+        } else {
+            updatedCount = dsl.execute("update {0} self_closure "
+                            + "join {0} subtree_closure "
+                            + "on subtree_closure.ancestor_id = {1} "
+                            + "and subtree_closure.descendant_id = self_closure.descendant_id "
+                            + "set self_closure.root_depth = {2} + subtree_closure.depth "
+                            + "where self_closure.ancestor_id = self_closure.descendant_id "
+                            + "and self_closure.depth = 0",
+                    FILE_CLOSURE, DSL.val(fileId), DSL.val(rootDepthOffset));
+        }
+        if(updatedCount != snapshot.subtreeIds.size()) {
+            throw new IllegalStateException("update file_closure root_depth failed, fileId: " + fileId);
+        }
+    }
+
+    private boolean isH2Database(DSLContext dsl) {
+        return dsl.dialect().family() == SQLDialect.H2;
+    }
+
+    private static class ClosureMoveSnapshot {
+        private final List<String> subtreeIds;
+        private final List<String> externalAncestorIds;
+        private final String targetAncestorId;
+        private final int targetAncestorCount;
+        private final long targetRootDepth;
+
+        ClosureMoveSnapshot(List<String> subtreeIds, List<String> externalAncestorIds, String targetAncestorId,
+                int targetAncestorCount, long targetRootDepth) {
+            this.subtreeIds = subtreeIds;
+            this.externalAncestorIds = externalAncestorIds;
+            this.targetAncestorId = targetAncestorId;
+            this.targetAncestorCount = targetAncestorCount;
+            this.targetRootDepth = targetRootDepth;
+        }
     }
 
     public List<FileDB> findFiles(String spaceCode, String ancestorId) {

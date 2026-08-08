@@ -10,4 +10,7 @@ public interface FileUniquenessLock {
 
     <T> T executeWithLock(String spaceCode, String ancestorId, String filename,
             long timeoutMs, Supplier<T> action);
+
+    <T> T executeWithMoveLock(String spaceCode, boolean directory,
+            long timeoutMs, Supplier<T> action);
 }
