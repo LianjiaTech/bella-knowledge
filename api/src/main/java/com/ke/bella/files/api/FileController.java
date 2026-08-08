@@ -1223,7 +1223,7 @@ public class FileController {
         if(file == null) {
             throw new FileNotFoundException(fileId);
         }
-        Assert.isTrue(StringUtils.equals(spaceCode, file.getSpaceCode()), "space mismatch for file_id and ancestor_id");
+        Assert.isTrue(StringUtils.equals(spaceCode, file.getSpaceCode()), "space mismatch between context and file_id");
 
         try {
             boolean directory = file.getIsDir() == 1;

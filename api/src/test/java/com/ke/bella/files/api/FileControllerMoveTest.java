@@ -249,7 +249,7 @@ public class FileControllerMoveTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"file_id\":\"" + fileId + "\"}"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error.message").value("space mismatch for file_id and ancestor_id"));
+                .andExpect(jsonPath("$.error.message").value("space mismatch between context and file_id"));
 
         verify(fileUniquenessLock, never()).executeWithLock(any(), any(), any(), anyLong(), any());
     }
@@ -323,7 +323,7 @@ public class FileControllerMoveTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error.message").value("space mismatch for file_id and ancestor_id"));
+                .andExpect(jsonPath("$.error.message").value("space mismatch between context and file_id"));
 
         verify(fileUniquenessLock, never()).executeWithLock(any(), any(), any(), anyLong(), any());
     }

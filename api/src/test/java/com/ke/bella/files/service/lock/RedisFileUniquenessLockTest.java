@@ -2,6 +2,7 @@ package com.ke.bella.files.service.lock;
 
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -29,6 +30,8 @@ public class RedisFileUniquenessLockTest {
     private RLock readLock;
     @Mock
     private RLock writeLock;
+    @Mock
+    private RLock uniquenessLock;
     @InjectMocks
     private RedisFileUniquenessLock fileLock;
 
@@ -63,5 +66,19 @@ public class RedisFileUniquenessLockTest {
         verify(readLock).tryLock(TIMEOUT_MS, TimeUnit.MILLISECONDS);
         verify(readLock).unlock();
         verify(writeLock, never()).tryLock(TIMEOUT_MS, TimeUnit.MILLISECONDS);
+    }
+
+    @Test
+    public void rootAncestorVariantsUseSameUniquenessLockKey() throws Exception {
+        String key = "file-api:file:uniqueness:sp-a:null:name.txt";
+        when(redissonClient.getLock(key)).thenReturn(uniquenessLock);
+        when(uniquenessLock.tryLock(0, TIMEOUT_MS, TimeUnit.MILLISECONDS)).thenReturn(true);
+
+        fileLock.tryLock("sp-a", null, "name.txt", TIMEOUT_MS);
+        fileLock.tryLock("sp-a", "", "name.txt", TIMEOUT_MS);
+        fileLock.tryLock("sp-a", "  ", "name.txt", TIMEOUT_MS);
+
+        verify(redissonClient, times(3)).getLock(key);
+        verify(uniquenessLock, times(3)).tryLock(0, TIMEOUT_MS, TimeUnit.MILLISECONDS);
     }
 }
