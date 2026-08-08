@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
+import org.apache.commons.lang3.StringUtils;
 import org.redisson.api.RLock;
 import org.redisson.api.RReadWriteLock;
 import org.redisson.api.RedissonClient;
@@ -130,8 +131,9 @@ public class RedisFileUniquenessLock implements FileUniquenessLock {
 
     private String buildLockKey(String spaceCode, String ancestorId, String filename) {
         try {
+            String normalizedAncestorId = StringUtils.trimToNull(ancestorId);
             String encodedFilename = URLEncoder.encode(filename, StandardCharsets.UTF_8.name());
-            return LOCK_PREFIX + spaceCode + ":" + ancestorId + ":" + encodedFilename;
+            return LOCK_PREFIX + spaceCode + ":" + normalizedAncestorId + ":" + encodedFilename;
         } catch (Exception e) {
             LOGGER.error("Error encoding lock key parameters", e);
             throw new IllegalStateException("Failed to build lock key", e);

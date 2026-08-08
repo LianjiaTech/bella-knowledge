@@ -1204,37 +1204,37 @@ public class FileController {
         Assert.notNull(op, "invalid request body");
 
         String fileId = op.getFileId();
-        String targetAncestorId = op.getAncestorId();
+        String targetAncestorId = StringUtils.trimToNull(op.getAncestorId());
+        String spaceCode = BellaContextHelper.getOperateSpaceCode();
 
         Assert.hasText(fileId, "file_id is required and cannot be empty");
-        Assert.hasText(targetAncestorId, "ancestor_id is required and cannot be empty");
 
-        // validate and get ancestor (target directory)
-        FileDB ancestor = fileService.getFile0(targetAncestorId);
-        if(ancestor == null) {
-            throw new FileNotFoundException(targetAncestorId);
+        if(targetAncestorId != null) {
+            FileDB ancestor = fileService.getFile0(targetAncestorId);
+            if(ancestor == null) {
+                throw new FileNotFoundException(targetAncestorId);
+            }
+            Assert.isTrue(ancestor.getIsDir() == 1, "ancestor_id must refer to a directory");
+            Assert.isTrue(StringUtils.equals(spaceCode, ancestor.getSpaceCode()),
+                    "space_code mismatch between context and ancestor_id");
         }
-        Assert.isTrue(ancestor.getIsDir() == 1, "ancestor_id must refer to a directory");
-        Assert.isTrue(StringUtils.equals(BellaContextHelper.getOperateSpaceCode(), ancestor.getSpaceCode()),
-                "space_code mismatch between context and ancestor_id");
 
-        // validate file to move
         FileDB file = fileService.getFile0(fileId);
         if(file == null) {
             throw new FileNotFoundException(fileId);
         }
-        Assert.isTrue(StringUtils.equals(ancestor.getSpaceCode(), file.getSpaceCode()), "space mismatch for file_id and ancestor_id");
+        Assert.isTrue(StringUtils.equals(spaceCode, file.getSpaceCode()), "space mismatch between context and file_id");
 
         try {
             boolean directory = file.getIsDir() == 1;
-            return fl.executeWithMoveLock(ancestor.getSpaceCode(), directory, FILE_LOCK_TIMEOUT_MS,
-                    () -> fl.executeWithLock(ancestor.getSpaceCode(), targetAncestorId, file.getFilename(), FILE_LOCK_TIMEOUT_MS,
+            return fl.executeWithMoveLock(spaceCode, directory, FILE_LOCK_TIMEOUT_MS,
+                    () -> fl.executeWithLock(spaceCode, targetAncestorId, file.getFilename(), FILE_LOCK_TIMEOUT_MS,
                             () -> {
                                 String currentAncestorId = fileService.getDirectAncestorId(fileId);
                                 Assert.isTrue(!StringUtils.equals(currentAncestorId, targetAncestorId),
                                         "file already in target directory");
 
-                                boolean exists = fileService.exists(ancestor.getSpaceCode(), targetAncestorId, file.getFilename());
+                                boolean exists = fileService.exists(spaceCode, targetAncestorId, file.getFilename());
                                 Assert.isTrue(!exists, "filename already exists");
 
                                 return fileService.moveFile(fileId, targetAncestorId);

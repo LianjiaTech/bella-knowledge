@@ -142,6 +142,119 @@ public class FileControllerMoveTest {
     }
 
     @Test
+    public void moveToRootWhenAncestorIdMissing() throws Exception {
+        String spaceCode = "sp-a";
+        String fileId = "f-1";
+        FileDB source = buildFile(fileId, "name.txt", false, spaceCode);
+        OpenAIFile moved = OpenAIFile.builder()
+                .id(fileId)
+                .filename("name.txt")
+                .spaceCode(spaceCode)
+                .build();
+
+        when(fileService.getFile0(fileId)).thenReturn(source);
+        when(fileUniquenessLock.executeWithLock(eq(spaceCode), eq((String) null), eq("name.txt"), anyLong(), any()))
+                .thenAnswer(invocation -> ((Supplier<?>) invocation.getArgument(4)).get());
+        when(fileService.getDirectAncestorId(fileId)).thenReturn("parent-1");
+        when(fileService.moveFile(fileId, null)).thenReturn(moved);
+
+        BellaContext.setOperator(Operator.builder().userId(1L).userName("tester").spaceCode(spaceCode).build());
+        mockMvc.perform(post("/v1/files/move")
+                .header("X-BELLA-SPACE-CODE", spaceCode)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"file_id\":\"" + fileId + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(fileId));
+
+        verify(fileService).exists(spaceCode, null, "name.txt");
+        verify(fileService).moveFile(fileId, null);
+    }
+
+    @Test
+    public void moveToRootWhenAncestorIdEmpty() throws Exception {
+        String spaceCode = "sp-a";
+        String fileId = "dir-1";
+        FileDB source = buildFile(fileId, "source", true, spaceCode);
+
+        when(fileService.getFile0(fileId)).thenReturn(source);
+        when(fileUniquenessLock.executeWithLock(eq(spaceCode), eq((String) null), eq("source"), anyLong(), any()))
+                .thenAnswer(invocation -> ((Supplier<?>) invocation.getArgument(4)).get());
+        when(fileService.getDirectAncestorId(fileId)).thenReturn("parent-1");
+        when(fileService.moveFile(fileId, null)).thenReturn(OpenAIFile.builder().id(fileId).build());
+
+        BellaContext.setOperator(Operator.builder().userId(1L).userName("tester").spaceCode(spaceCode).build());
+        mockMvc.perform(post("/v1/files/move")
+                .header("X-BELLA-SPACE-CODE", spaceCode)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"file_id\":\"" + fileId + "\",\"ancestor_id\":\"\"}"))
+                .andExpect(status().isOk());
+
+        verify(fileUniquenessLock).executeWithMoveLock(eq(spaceCode), eq(true), anyLong(), any());
+        verify(fileService).moveFile(fileId, null);
+    }
+
+    @Test
+    public void moveToRootRejectsFileAlreadyAtRoot() throws Exception {
+        String spaceCode = "sp-a";
+        String fileId = "f-1";
+        FileDB source = buildFile(fileId, "name.txt", false, spaceCode);
+
+        when(fileService.getFile0(fileId)).thenReturn(source);
+        when(fileUniquenessLock.executeWithLock(eq(spaceCode), eq((String) null), eq("name.txt"), anyLong(), any()))
+                .thenAnswer(invocation -> ((Supplier<?>) invocation.getArgument(4)).get());
+        when(fileService.getDirectAncestorId(fileId)).thenReturn(null);
+
+        BellaContext.setOperator(Operator.builder().spaceCode(spaceCode).build());
+        mockMvc.perform(post("/v1/files/move")
+                .header("X-BELLA-SPACE-CODE", spaceCode)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"file_id\":\"" + fileId + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.message").value("file already in target directory"));
+
+        verify(fileService, never()).moveFile(any(), any());
+    }
+
+    @Test
+    public void moveToRootRejectsDuplicateName() throws Exception {
+        String spaceCode = "sp-a";
+        String fileId = "f-1";
+        FileDB source = buildFile(fileId, "name.txt", false, spaceCode);
+
+        when(fileService.getFile0(fileId)).thenReturn(source);
+        when(fileUniquenessLock.executeWithLock(eq(spaceCode), eq((String) null), eq("name.txt"), anyLong(), any()))
+                .thenAnswer(invocation -> ((Supplier<?>) invocation.getArgument(4)).get());
+        when(fileService.getDirectAncestorId(fileId)).thenReturn("parent-1");
+        when(fileService.exists(spaceCode, null, "name.txt")).thenReturn(true);
+
+        BellaContext.setOperator(Operator.builder().spaceCode(spaceCode).build());
+        mockMvc.perform(post("/v1/files/move")
+                .header("X-BELLA-SPACE-CODE", spaceCode)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"file_id\":\"" + fileId + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.message").value("filename already exists"));
+
+        verify(fileService, never()).moveFile(any(), any());
+    }
+
+    @Test
+    public void moveToRootRejectsSourceFromAnotherSpace() throws Exception {
+        String fileId = "f-1";
+        when(fileService.getFile0(fileId)).thenReturn(buildFile(fileId, "name.txt", false, "sp-b"));
+
+        BellaContext.setOperator(Operator.builder().spaceCode("sp-a").build());
+        mockMvc.perform(post("/v1/files/move")
+                .header("X-BELLA-SPACE-CODE", "sp-a")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"file_id\":\"" + fileId + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.message").value("space mismatch between context and file_id"));
+
+        verify(fileUniquenessLock, never()).executeWithLock(any(), any(), any(), anyLong(), any());
+    }
+
+    @Test
     public void moveCurrentDirectoryCheckedInsideLock() throws Exception {
         String ancestorId = "anc-1";
         String spaceCode = "sp-a";
@@ -210,7 +323,7 @@ public class FileControllerMoveTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error.message").value("space mismatch for file_id and ancestor_id"));
+                .andExpect(jsonPath("$.error.message").value("space mismatch between context and file_id"));
 
         verify(fileUniquenessLock, never()).executeWithLock(any(), any(), any(), anyLong(), any());
     }
@@ -336,19 +449,6 @@ public class FileControllerMoveTest {
                 .content(body))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.message").value("file_id is required and cannot be empty"));
-    }
-
-    @Test
-    public void moveMissingAncestorIdBadRequest() throws Exception {
-        String body = "{\"file_id\":\"f-1\"}";
-
-        BellaContext.setOperator(Operator.builder().spaceCode("sp-a").build());
-        mockMvc.perform(post("/v1/files/move")
-                .header("X-BELLA-SPACE-CODE", "sp-a")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(body))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error.message").value("ancestor_id is required and cannot be empty"));
     }
 
     @Test
