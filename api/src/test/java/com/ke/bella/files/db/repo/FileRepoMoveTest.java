@@ -154,6 +154,25 @@ public class FileRepoMoveTest {
     }
 
     @Test
+    public void entryReadFallsBackWithoutBackfillingMissingDirectory() {
+        fileRepo.setFileEntryReadMode("entry");
+
+        List<String> children = fileRepo.findFiles("sp-0", SOURCE).stream()
+                .map(FileDB::getFileId)
+                .collect(Collectors.toList());
+        Page<FileDB> page = fileRepo.pageFiles(PageFileOps.builder()
+                .ancestorId(SOURCE)
+                .page(1)
+                .pageSize(10)
+                .order("asc")
+                .build());
+
+        assertEquals(Collections.singletonList(CHILD), children);
+        assertEquals(1, page.getTotal());
+        assertEquals(0, dsl.fetchCount(DSL.table("file_entry_0")));
+    }
+
+    @Test
     public void pageTypeFiltersReturnMixedNodesAndMatchingTotals() {
         insertPageNode(PAGE_DIRECTORY, "page-directory", 1, NodeType.DIRECTORY, "");
         insertPageNode(PAGE_FILE, "page-file.txt", 0, NodeType.FILE, "");

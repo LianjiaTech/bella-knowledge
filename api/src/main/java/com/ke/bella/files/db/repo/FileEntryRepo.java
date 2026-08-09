@@ -16,7 +16,12 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
 import org.apache.commons.lang3.StringUtils;
+import org.jooq.Condition;
 import org.jooq.DSLContext;
+import org.jooq.Record;
+import org.jooq.Record2;
+import org.jooq.SelectConditionStep;
+import org.jooq.SortField;
 import org.jooq.exception.DataAccessException;
 import org.jooq.exception.SQLStateClass;
 import org.jooq.impl.DSL;
@@ -97,16 +102,16 @@ public class FileEntryRepo implements BaseRepo {
     }
 
     public boolean exists(String spaceCode, @Nullable String ancestorId, String filename) {
-        return queryActiveByName(spaceCode, resolveParentEntryId(spaceCode, ancestorId), filename) != null;
+        return queryActiveByName(spaceCode, resolveParentEntryIdForRead(spaceCode, ancestorId), filename) != null;
     }
 
     public FileDB queryFile(String spaceCode, @Nullable String ancestorId, String filename) {
-        FileEntryDB entry = queryActiveByName(spaceCode, resolveParentEntryId(spaceCode, ancestorId), filename);
+        FileEntryDB entry = queryActiveByName(spaceCode, resolveParentEntryIdForRead(spaceCode, ancestorId), filename);
         return entry == null ? null : queryActiveFile(entry.getFileId());
     }
 
     public List<FileDB> listFiles(String spaceCode, @Nullable String ancestorId) {
-        String parentEntryId = resolveParentEntryId(spaceCode, ancestorId);
+        String parentEntryId = resolveParentEntryIdForRead(spaceCode, ancestorId);
         List<FileEntryDB> entries = entryDb(spaceCode).selectFrom(FILE_ENTRY)
                 .where(FILE_ENTRY.SPACE_CODE.eq(spaceCode))
                 .and(FILE_ENTRY.PARENT_ENTRY_ID.eq(parentEntryId))
@@ -116,8 +121,50 @@ public class FileEntryRepo implements BaseRepo {
         return hydrate(entries);
     }
 
+    public List<FileDB> listFiles(String spaceCode, @Nullable String ancestorId, @Nullable String purpose,
+            int limit, String order, @Nullable FileDB afterFile) {
+        String parentEntryId = resolveParentEntryIdForRead(spaceCode, ancestorId);
+        List<String> fileIds = entryDb(spaceCode).select(FILE_ENTRY.FILE_ID)
+                .from(FILE_ENTRY)
+                .where(FILE_ENTRY.SPACE_CODE.eq(spaceCode))
+                .and(FILE_ENTRY.PARENT_ENTRY_ID.eq(parentEntryId))
+                .and(FILE_ENTRY.STATUS.eq(FileStatus.NOT_DELETED.getValue()))
+                .fetchInto(String.class);
+        if(fileIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        boolean isAsc = "asc".equalsIgnoreCase(order);
+        Comparator<FileDB> comparator = fileCursorComparator(isAsc);
+        Map<String, List<String>> idsByShard = fileIds.stream()
+                .collect(Collectors.groupingBy(FileRepo::getShardingKeyByFileIdStatic));
+        List<FileDB> candidates = new ArrayList<>();
+        idsByShard.forEach((shard, ids) -> {
+            Condition condition = FILE.FILE_ID.in(ids).and(FILE.STATUS.eq(FileStatus.NOT_DELETED.getValue()));
+            if(StringUtils.isNotEmpty(purpose)) {
+                condition = condition.and(FILE.PURPOSE.eq(purpose));
+            }
+            if(afterFile != null) {
+                Condition sameIdAfterFileId = FILE.ID.eq(afterFile.getId())
+                        .and(isAsc ? FILE.FILE_ID.gt(afterFile.getFileId()) : FILE.FILE_ID.lt(afterFile.getFileId()));
+                Condition sameTimeAfterId = FILE.CTIME.eq(afterFile.getCtime())
+                        .and((isAsc ? FILE.ID.gt(afterFile.getId()) : FILE.ID.lt(afterFile.getId())).or(sameIdAfterFileId));
+                condition = condition.and(isAsc ? FILE.CTIME.gt(afterFile.getCtime()).or(sameTimeAfterId)
+                        : FILE.CTIME.lt(afterFile.getCtime()).or(sameTimeAfterId));
+            }
+            SortField<?> ctimeOrder = isAsc ? FILE.CTIME.asc() : FILE.CTIME.desc();
+            SortField<?> idOrder = isAsc ? FILE.ID.asc() : FILE.ID.desc();
+            SortField<?> fileIdOrder = isAsc ? FILE.FILE_ID.asc() : FILE.FILE_ID.desc();
+            SelectConditionStep<Record> query = DSLContextHolder.get(shard, db).select(FILE.fields())
+                    .from(FILE)
+                    .where(condition);
+            candidates.addAll(query.orderBy(ctimeOrder, idOrder, fileIdOrder).limit(limit).fetchInto(FileDB.class));
+        });
+        return candidates.stream().sorted(comparator).limit(limit).collect(Collectors.toList());
+    }
+
     public Page<FileDB> pageFiles(String spaceCode, PageFileOps ops, @Nullable String normalizedFileId) {
-        String parentEntryId = resolveParentEntryId(spaceCode, ops.getAncestorId());
+        String parentEntryId = resolveParentEntryIdForRead(spaceCode, ops.getAncestorId());
         List<FileEntryDB> entries = entryDb(spaceCode).selectFrom(FILE_ENTRY)
                 .where(FILE_ENTRY.SPACE_CODE.eq(spaceCode))
                 .and(FILE_ENTRY.PARENT_ENTRY_ID.eq(parentEntryId))
@@ -157,6 +204,13 @@ public class FileEntryRepo implements BaseRepo {
             result.add(file);
         }
         return result;
+    }
+
+    private Comparator<FileDB> fileCursorComparator(boolean isAsc) {
+        Comparator<FileDB> comparator = Comparator.comparing(FileDB::getCtime)
+                .thenComparing(FileDB::getId)
+                .thenComparing(FileDB::getFileId);
+        return isAsc ? comparator : comparator.reversed();
     }
 
     private boolean matchesPageFilters(FileDB file, PageFileOps ops, @Nullable String normalizedFileId) {
@@ -231,6 +285,17 @@ public class FileEntryRepo implements BaseRepo {
             throw new IllegalStateException("insert file_entry failed, fileId: " + file.getFileId());
         }
         return queryActiveByFileId(spaceCode, file.getFileId());
+    }
+
+    private String resolveParentEntryIdForRead(String spaceCode, @Nullable String ancestorId) {
+        if(StringUtils.isEmpty(ancestorId)) {
+            return ROOT_ENTRY_ID;
+        }
+        FileEntryDB parent = queryActiveByFileId(spaceCode, ancestorId);
+        if(parent == null) {
+            throw new EntryReadNotReadyException(spaceCode, ancestorId);
+        }
+        return parent.getEntryId();
     }
 
     public String resolveParentEntryId(String spaceCode, @Nullable String ancestorId) {
@@ -422,8 +487,8 @@ public class FileEntryRepo implements BaseRepo {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public int backfillRange(String spaceCode, long minIdInclusive, long maxIdExclusive) {
-        List<String> fileIds = entryDb(spaceCode).select(FILE.FILE_ID)
+    public BackfillBatchResult backfillBatch(String spaceCode, long minIdInclusive, long maxIdExclusive, int batchSize) {
+        List<Record2<Long, String>> files = entryDb(spaceCode).select(FILE.ID, FILE.FILE_ID)
                 .from(FILE)
                 .where(FILE.SPACE_CODE.eq(spaceCode))
                 .and(FILE.STATUS.eq(FileStatus.NOT_DELETED.getValue()))
@@ -431,9 +496,11 @@ public class FileEntryRepo implements BaseRepo {
                 .and(FILE.ID.lt(maxIdExclusive))
                 .and(FILE.IS_DIR.in(0, 1))
                 .orderBy(FILE.ID.asc())
-                .fetchInto(String.class);
-        fileIds.forEach(fileId -> ensureLegacyEntry(spaceCode, fileId));
-        return fileIds.size();
+                .limit(batchSize)
+                .fetch();
+        files.forEach(file -> ensureLegacyEntry(spaceCode, file.value2()));
+        long nextMinId = files.isEmpty() ? maxIdExclusive : files.get(files.size() - 1).value1() + 1;
+        return new BackfillBatchResult(files.size(), nextMinId);
     }
 
     public EntryConsistencyReport compareSpace(String spaceCode) {
@@ -460,6 +527,32 @@ public class FileEntryRepo implements BaseRepo {
                 .and(parent.ENTRY_ID.isNull())
                 .fetch().size();
         return new EntryConsistencyReport(activeFileCount, activeEntryCount, duplicateFileCount, orphanParentCount);
+    }
+
+    public static class EntryReadNotReadyException extends IllegalStateException {
+        private static final long serialVersionUID = 1L;
+
+        EntryReadNotReadyException(String spaceCode, String ancestorId) {
+            super("file_entry parent is not backfilled, spaceCode: " + spaceCode + ", ancestorId: " + ancestorId);
+        }
+    }
+
+    public static class BackfillBatchResult {
+        private final int processed;
+        private final long nextMinId;
+
+        BackfillBatchResult(int processed, long nextMinId) {
+            this.processed = processed;
+            this.nextMinId = nextMinId;
+        }
+
+        public int getProcessed() {
+            return processed;
+        }
+
+        public long getNextMinId() {
+            return nextMinId;
+        }
     }
 
     public static class EntryConsistencyReport {

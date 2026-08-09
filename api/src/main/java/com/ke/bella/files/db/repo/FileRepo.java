@@ -16,6 +16,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import javax.annotation.Nullable;
@@ -36,6 +37,8 @@ import org.jooq.SortField;
 import org.jooq.Table;
 import org.jooq.UpdateSetMoreStep;
 import org.jooq.impl.DSL;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,6 +46,7 @@ import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
 
 import com.ke.bella.files.db.FileIdGenerator;
+import com.ke.bella.files.db.repo.FileEntryRepo.EntryReadNotReadyException;
 import com.ke.bella.files.db.tables.pojos.FileDB;
 import com.ke.bella.files.db.tables.pojos.FileProgressDB;
 import com.ke.bella.files.db.tables.pojos.FileShardingDB;
@@ -63,6 +67,7 @@ import com.ke.bella.files.utils.JsonUtils;
 
 @Component
 public class FileRepo implements BaseRepo {
+    private static final Logger LOGGER = LoggerFactory.getLogger(FileRepo.class);
     private final DSLContext db;
     private final FileEntryRepo fileEntryRepo;
 
@@ -178,7 +183,11 @@ public class FileRepo implements BaseRepo {
 
     public boolean exists(String spaceCode, @Nullable String ancestorId, @NotNull String filename) {
         if(useEntryRead()) {
-            return fileEntryRepo.exists(spaceCode, ancestorId, filename);
+            try {
+                return fileEntryRepo.exists(spaceCode, ancestorId, filename);
+            } catch (EntryReadNotReadyException e) {
+                logEntryReadFallback("exists", e);
+            }
         }
         String shardingKey = getShardingKeyBySpaceCode(spaceCode);
 
@@ -199,14 +208,22 @@ public class FileRepo implements BaseRepo {
 
         boolean closureResult = sql.limit(1).fetchOptional().isPresent();
         if(compareEntryRead()) {
-            fileEntryRepo.exists(spaceCode, ancestorId, filename);
+            try {
+                fileEntryRepo.exists(spaceCode, ancestorId, filename);
+            } catch (EntryReadNotReadyException e) {
+                logEntryReadFallback("exists-compare", e);
+            }
         }
         return closureResult;
     }
 
     public FileDB queryFile(String spaceCode, @Nullable String ancestorId, @NotNull String filename) {
         if(useEntryRead()) {
-            return fileEntryRepo.queryFile(spaceCode, ancestorId, filename);
+            try {
+                return fileEntryRepo.queryFile(spaceCode, ancestorId, filename);
+            } catch (EntryReadNotReadyException e) {
+                logEntryReadFallback("queryFile", e);
+            }
         }
         String shardingKey = getShardingKeyBySpaceCode(spaceCode);
 
@@ -227,7 +244,11 @@ public class FileRepo implements BaseRepo {
 
         FileDB closureResult = sql.limit(1).fetchOneInto(FileDB.class);
         if(compareEntryRead()) {
-            fileEntryRepo.queryFile(spaceCode, ancestorId, filename);
+            try {
+                fileEntryRepo.queryFile(spaceCode, ancestorId, filename);
+            } catch (EntryReadNotReadyException e) {
+                logEntryReadFallback("queryFile-compare", e);
+            }
         }
         return closureResult;
     }
@@ -259,7 +280,9 @@ public class FileRepo implements BaseRepo {
         String fileId = queryNewFileId(op.getFileId());
         String shardingKey = getShardingKeyByFileId(fileId);
         FileType fileType = FileType.fromFileId(fileId);
-        FileDB currentFile = fileType.needsDirectorySupport() ? queryFile(fileId, fileType) : null;
+        boolean renameEntry = op.getFilename() != null;
+        boolean deleteEntry = op.getStatus() == FileStatus.DELETED;
+        FileDB currentFile = fileType.needsDirectorySupport() && (renameEntry || deleteEntry) ? queryFile(fileId, fileType) : null;
         FileRecord rec = FILE.newRecord();
         rec.setFileId(fileId);
         if(op.getStatus() != null) {
@@ -322,7 +345,7 @@ public class FileRepo implements BaseRepo {
         if(updatedNum != 1) {
             throw new IllegalStateException("update file failed, fileId: " + fileId);
         }
-        if(currentFile != null && op.getFilename() != null) {
+        if(currentFile != null && renameEntry && !Objects.equals(currentFile.getFilename(), op.getFilename())) {
             fileEntryRepo.rename(currentFile.getSpaceCode(), fileId, op.getFilename());
         }
         if(currentFile != null && op.getStatus() == FileStatus.DELETED) {
@@ -343,27 +366,18 @@ public class FileRepo implements BaseRepo {
             String spaceCode,
             String ancestorId) {
         if(useEntryRead()) {
-            List<FileDB> files = fileEntryRepo.listFiles(spaceCode, ancestorId).stream()
-                    .filter(file -> StringUtils.isEmpty(purpose) || purpose.equals(file.getPurpose()))
-                    .collect(Collectors.toList());
-            boolean isAsc = "asc".equalsIgnoreCase(order);
-            Comparator<FileDB> cursorOrder = Comparator.comparing(FileDB::getCtime)
-                    .thenComparing(FileDB::getId);
-            if(!isAsc) {
-                cursorOrder = cursorOrder.reversed();
-            }
-            if(StringUtils.isNotEmpty(after)) {
-                FileDB afterFile = queryFile(after);
-                if(afterFile == null) {
-                    return Collections.emptyList();
+            try {
+                FileDB afterFile = null;
+                if(StringUtils.isNotEmpty(after)) {
+                    afterFile = queryFile(after);
+                    if(afterFile == null) {
+                        return Collections.emptyList();
+                    }
                 }
-                Comparator<FileDB> effectiveOrder = cursorOrder;
-                files = files.stream()
-                        .filter(file -> effectiveOrder.compare(file, afterFile) > 0)
-                        .collect(Collectors.toList());
+                return fileEntryRepo.listFiles(spaceCode, ancestorId, purpose, limit, order, afterFile);
+            } catch (EntryReadNotReadyException e) {
+                logEntryReadFallback("listFile", e);
             }
-            files.sort(cursorOrder);
-            return files.stream().limit(limit).collect(Collectors.toList());
         }
         String shardingKey = getShardingKeyBySpaceCode(spaceCode);
 
@@ -728,7 +742,11 @@ public class FileRepo implements BaseRepo {
 
     public List<FileDB> findFiles(String spaceCode, String ancestorId) {
         if(useEntryRead()) {
-            return fileEntryRepo.listFiles(spaceCode, ancestorId);
+            try {
+                return fileEntryRepo.listFiles(spaceCode, ancestorId);
+            } catch (EntryReadNotReadyException e) {
+                logEntryReadFallback("findFiles", e);
+            }
         }
         String shardingKey = getShardingKeyBySpaceCode(spaceCode);
 
@@ -763,6 +781,10 @@ public class FileRepo implements BaseRepo {
 
     void setFileEntryReadMode(String readMode) {
         this.fileEntryReadMode = readMode;
+    }
+
+    private void logEntryReadFallback(String operation, EntryReadNotReadyException e) {
+        LOGGER.warn("file_entry read is not ready, falling back to closure, operation: {}, reason: {}", operation, e.getMessage());
     }
 
     public List<FileDB> getPathFiles(String fileId) {
@@ -861,7 +883,11 @@ public class FileRepo implements BaseRepo {
                 entrySpaceCode = ancestor.getSpaceCode();
             }
             String normalizedFileId = ops.getFileId() == null ? null : queryNewFileId(ops.getFileId());
-            return fileEntryRepo.pageFiles(entrySpaceCode, ops, normalizedFileId);
+            try {
+                return fileEntryRepo.pageFiles(entrySpaceCode, ops, normalizedFileId);
+            } catch (EntryReadNotReadyException e) {
+                logEntryReadFallback("pageFiles", e);
+            }
         }
 
         String shardingKey;
