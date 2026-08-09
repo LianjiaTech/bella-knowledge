@@ -46,12 +46,14 @@ public class FileRepoMoveTest {
     private static Connection connection;
     private static DSLContext dsl;
     private static FileRepo fileRepo;
+    private static FileEntryRepo entryRepo;
 
     @BeforeClass
     public static void setupConnection() throws Exception {
         connection = DriverManager.getConnection("jdbc:h2:mem:fileRepoMove;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1", "sa", "");
         dsl = DSL.using(connection, SQLDialect.H2);
-        fileRepo = new FileRepo(dsl, new FileEntryRepo(dsl));
+        entryRepo = new FileEntryRepo(dsl);
+        fileRepo = new FileRepo(dsl, entryRepo);
     }
 
     @Before
@@ -264,6 +266,19 @@ public class FileRepoMoveTest {
                 .build());
         assertEquals(1, sourcePage.getTotal());
         assertEquals(CHILD, sourcePage.getData().get(0).getFileId());
+    }
+
+    @Test
+    public void backfillIncludesLegacyRowsWithNullDirectoryFlag() {
+        dsl.execute("alter table file_0 alter column is_dir drop not null");
+        dsl.execute("update file_0 set is_dir = null where file_id = ?", LEAF);
+
+        FileEntryRepo.BackfillBatchResult batch = entryRepo.backfillBatch("sp-0", 0, Long.MAX_VALUE, 100);
+        FileEntryRepo.EntryConsistencyReport report = entryRepo.compareSpace("sp-0");
+
+        assertEquals(6, batch.getProcessed());
+        assertTrue(report.isConsistent());
+        assertEquals(FileEntryRepo.TYPE_FILE, entryRepo.queryActiveByFileId("sp-0", LEAF).getType());
     }
 
     @Test

@@ -497,7 +497,6 @@ public class FileEntryRepo implements BaseRepo {
                 .and(FILE.STATUS.eq(FileStatus.NOT_DELETED.getValue()))
                 .and(FILE.ID.ge(minIdInclusive))
                 .and(FILE.ID.lt(maxIdExclusive))
-                .and(FILE.IS_DIR.in(0, 1))
                 .orderBy(FILE.ID.asc())
                 .limit(batchSize)
                 .fetch();
