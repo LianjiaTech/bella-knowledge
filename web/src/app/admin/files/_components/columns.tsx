@@ -12,6 +12,7 @@ import {
   FolderIcon,
   Pencil,
   MoreHorizontal,
+  Move,
   Trash2,
   Upload,
 } from "lucide-react";
@@ -46,6 +47,7 @@ import {
 type GetColumnsOptions = {
   onRename: (file: KnowledgeFile, filename: string) => Promise<boolean>;
   onDelete: (file: KnowledgeFile) => Promise<boolean>;
+  onMove: (file: KnowledgeFile) => void;
   onReUpload: (file: KnowledgeFile, newFile: File) => Promise<boolean>;
   siblingFiles?: KnowledgeFile[];
 };
@@ -55,6 +57,7 @@ const FilenameCell = ({
   displayName,
   onRename,
   onDelete,
+  onMove,
   onReUpload,
   siblingFiles,
 }: {
@@ -62,6 +65,7 @@ const FilenameCell = ({
   displayName: string;
   onRename: (file: KnowledgeFile, filename: string) => Promise<boolean>;
   onDelete: (file: KnowledgeFile) => Promise<boolean>;
+  onMove: (file: KnowledgeFile) => void;
   onReUpload: (file: KnowledgeFile, newFile: File) => Promise<boolean>;
   siblingFiles?: KnowledgeFile[];
 }) => {
@@ -293,6 +297,17 @@ const FilenameCell = ({
                   {isUploading ? "上传中..." : "重新上传"}
                 </DropdownMenuItem>
               )}
+              {isDir && (
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onMove(file);
+                  }}
+                >
+                  <Move className="mr-2 h-4 w-4" />
+                  移动
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem
                 onClick={(e) => {
                   e.stopPropagation();
@@ -343,7 +358,7 @@ const FilenameCell = ({
   );
 };
 
-export const getColumns = ({ onRename, onDelete, onReUpload, siblingFiles }: GetColumnsOptions): ColumnDef<KnowledgeFile>[] => [
+export const getColumns = ({ onRename, onDelete, onMove, onReUpload, siblingFiles }: GetColumnsOptions): ColumnDef<KnowledgeFile>[] => [
   {
     accessorKey: "filename",
     header: "名称",
@@ -353,6 +368,7 @@ export const getColumns = ({ onRename, onDelete, onReUpload, siblingFiles }: Get
         displayName={row.getValue("filename") as string}
         onRename={onRename}
         onDelete={onDelete}
+        onMove={onMove}
         onReUpload={onReUpload}
         siblingFiles={siblingFiles}
       />
