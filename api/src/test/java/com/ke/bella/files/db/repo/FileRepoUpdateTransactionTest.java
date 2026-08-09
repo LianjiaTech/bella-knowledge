@@ -65,7 +65,29 @@ public class FileRepoUpdateTransactionTest {
     }
 
     @Test
+    public void unchangedFilenameSkipsEntryRename() {
+        addCorruptEntry();
+
+        fileRepo.updateFile(FileOps.builder().fileId(SOURCE).filename("source.txt").build());
+
+        assertEquals("source.txt", queryFile(SOURCE).getFilename());
+        assertEquals(2, shardDsl.fetchCount(FILE_ENTRY,
+                FILE_ENTRY.FILE_ID.eq(SOURCE).and(FILE_ENTRY.STATUS.eq(FileStatus.NOT_DELETED.getValue()))));
+    }
+
+    @Test
     public void invalidMultipleEntriesRollBackFileDelete() {
+        addCorruptEntry();
+
+        assertThrows(RuntimeException.class,
+                () -> fileRepo.updateFile(FileOps.builder().fileId(SOURCE).status(FileStatus.DELETED).build()));
+
+        assertEquals(FileStatus.NOT_DELETED.getValue(), queryFile(SOURCE).getStatus());
+        assertEquals(2, shardDsl.fetchCount(FILE_ENTRY,
+                FILE_ENTRY.FILE_ID.eq(SOURCE).and(FILE_ENTRY.STATUS.eq(FileStatus.NOT_DELETED.getValue()))));
+    }
+
+    private void addCorruptEntry() {
         shardDsl.insertInto(FILE_ENTRY)
                 .set(FILE_ENTRY.ENTRY_ID, "entry-corrupt")
                 .set(FILE_ENTRY.SPACE_CODE, SPACE_CODE)
@@ -81,13 +103,6 @@ public class FileRepoUpdateTransactionTest {
                 .set(FILE_ENTRY.MU_NAME, "tester")
                 .set(FILE_ENTRY.MTIME, java.time.LocalDateTime.now())
                 .execute();
-
-        assertThrows(RuntimeException.class,
-                () -> fileRepo.updateFile(FileOps.builder().fileId(SOURCE).status(FileStatus.DELETED).build()));
-
-        assertEquals(FileStatus.NOT_DELETED.getValue(), queryFile(SOURCE).getStatus());
-        assertEquals(2, shardDsl.fetchCount(FILE_ENTRY,
-                FILE_ENTRY.FILE_ID.eq(SOURCE).and(FILE_ENTRY.STATUS.eq(FileStatus.NOT_DELETED.getValue()))));
     }
 
     private void addFile(String fileId, String filename) {
