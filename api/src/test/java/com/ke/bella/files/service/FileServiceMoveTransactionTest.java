@@ -40,6 +40,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import com.ke.bella.files.FileShardingCountUpdator;
 import com.ke.bella.files.configuration.BucketConfig;
+import com.ke.bella.files.db.repo.FileEntryRepo;
 import com.ke.bella.files.db.repo.FileRepo;
 import com.ke.bella.files.db.repo.FileRepoTestFixture;
 import com.ke.bella.files.protocol.FileOps;
@@ -231,8 +232,13 @@ public class FileServiceMoveTransactionTest {
         }
 
         @Bean
-        public FileRepo fileRepo(DSLContext dslContext) {
-            return new FailingFileRepo(dslContext);
+        public FileEntryRepo fileEntryRepo(DSLContext dslContext) {
+            return new FileEntryRepo(dslContext);
+        }
+
+        @Bean
+        public FileRepo fileRepo(DSLContext dslContext, FileEntryRepo fileEntryRepo) {
+            return new FailingFileRepo(dslContext, fileEntryRepo);
         }
 
         @Bean
@@ -262,8 +268,8 @@ public class FileServiceMoveTransactionTest {
     }
 
     private static class FailingFileRepo extends FileRepo {
-        FailingFileRepo(DSLContext dslContext) {
-            super(dslContext);
+        FailingFileRepo(DSLContext dslContext, FileEntryRepo fileEntryRepo) {
+            super(dslContext, fileEntryRepo);
         }
 
         @Override
