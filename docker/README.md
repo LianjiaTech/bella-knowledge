@@ -244,14 +244,41 @@ npm run dev
 
 ### 本地后端源码启动环境变量
 
-后端源码本地启动时需要指定端口：
+后端源码本地启动推荐使用 `local` profile。该 profile 默认连接：
+
+- MySQL: `127.0.0.1:3306`，数据库 `bella_file_api`，用户 `bella_user/123456`
+- Redis: `127.0.0.1:6380`，密码 `bella123`
+- MinIO: `http://127.0.0.1:9000`，bucket `bella-file-api`，账号 `minioadmin/minioadmin`
+- 本地开发认证: `Authorization: Bearer local-dev`
 
 ```bash
-# 使用默认端口8080启动
-mvn spring-boot:run -Dserver.port=8080
+# 启动后端本地 profile
+cd api
+SPRING_PROFILES_ACTIVE=local mvn spring-boot:run
 
-# 或使用自定义端口
-mvn spring-boot:run -Dserver.port=8081
+# 健康检查
+curl http://localhost:18081/actuator/health
+```
+
+如需覆盖端口或中间件地址，可以设置环境变量：
+
+```bash
+SERVER_PORT=8081 \
+MYSQL_PORT=3306 \
+REDIS_PORT=6379 \
+SPRING_PROFILES_ACTIVE=local \
+mvn spring-boot:run
+```
+
+前端本地联调时启用 dev auth：
+
+```bash
+cd web
+BELLA_DEV_AUTH=true \
+BELLA_DEV_AUTH_TOKEN=local-dev \
+NEXT_PUBLIC_BELLA_FILE_API_URL=http://localhost:18081 \
+NEXT_PUBLIC_BELLA_OPENAPI_URL=https://api.bella.top \
+pnpm dev
 ```
 
 ## 🔗 服务访问地址

@@ -1,0 +1,61 @@
+#-------------------------------------------------------
+# 本地源码开发配置
+#-------------------------------------------------------
+server:
+  port: ${SERVER_PORT:18081}
+
+spring:
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:bella_file_api}?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+    username: ${MYSQL_USER:bella_user}
+    password: ${MYSQL_PASSWORD:123456}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      connection-init-sql: SET NAMES utf8mb4
+      minimum-idle: 5
+      maximum-pool-size: 15
+      auto-commit: true
+      idle-timeout: 30000
+      pool-name: HikariCP
+      max-lifetime: 1800000
+      connection-timeout: 30000
+  redis:
+    host: ${REDIS_HOST:127.0.0.1}
+    port: ${REDIS_PORT:6380}
+    password: ${REDIS_PASSWORD:bella123}
+  kafka:
+    producer:
+      bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+
+bella:
+  open-api-base: ${BELLA_OPEN_API_BASE:https://api.bella.top}
+  dev-auth:
+    enabled: ${BELLA_DEV_AUTH_ENABLED:true}
+    token: ${BELLA_DEV_AUTH_TOKEN:local-dev}
+    user-id: ${BELLA_DEV_AUTH_USER_ID:1}
+    user-name: ${BELLA_DEV_AUTH_USER_NAME:Local Dev}
+    space-code: ${BELLA_DEV_AUTH_SPACE_CODE:local-dev}
+    manager-ak: ${BELLA_DEV_AUTH_MANAGER_AK:local-dev-ak}
+  file-api:
+    file:
+      tmp-file-dir: ${BELLA_TMP_FILE_DIR:.local-cache}
+    bucket-name:
+      public: ${BELLA_STORAGE_S3_BUCKET:bella-file-api}
+      private: ${BELLA_STORAGE_S3_BUCKET:bella-file-api}
+    storage:
+      type: ${BELLA_STORAGE_TYPE:s3}
+      s3:
+        ak: ${S3_ACCESS_KEY:minioadmin}
+        sk: ${S3_SECRET_KEY:minioadmin}
+        endpoint: ${S3_ENDPOINT:http://127.0.0.1:9000}
+        region: ${S3_REGION:us-east-1}
+  login:
+    type: ${BELLA_LOGIN_TYPE:local}
+    openapi-base: ${BELLA_OPENAPI_URL:https://api.bella.top}
+
+logging:
+  level:
+    root: INFO
+    org:
+      springframework: INFO
+      jooq: INFO
