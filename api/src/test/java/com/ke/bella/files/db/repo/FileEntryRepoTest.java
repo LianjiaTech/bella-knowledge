@@ -25,6 +25,7 @@ import com.ke.bella.files.db.tables.pojos.FileEntryDB;
 import com.ke.bella.files.enums.FileType;
 import com.ke.bella.files.protocol.FileOps;
 import com.ke.bella.files.protocol.FileStatus;
+import com.ke.bella.files.protocol.PageFileOps;
 import com.ke.bella.files.utils.CustomStringUtils;
 import com.ke.bella.openapi.BellaContext;
 import com.ke.bella.openapi.Operator;
@@ -57,8 +58,8 @@ public class FileEntryRepoTest {
         dsl.execute("create table file_closure_" + targetShard + " as select * from file_closure_" + sourceShard + " where 1 = 0");
         dsl.execute("create table file_entry_" + targetShard + " as select * from file_entry_" + sourceShard + " where 1 = 0");
         IDGenerator.setInstanceId(1L);
-        fileRepo = new FileRepo(dsl);
         entryRepo = new FileEntryRepo(dsl);
+        fileRepo = new FileRepo(dsl, entryRepo);
         setOperator(SOURCE_SPACE);
     }
 
@@ -98,12 +99,15 @@ public class FileEntryRepoTest {
     @Test
     public void crossSpaceMoveRebuildsEntryAndClosureWithoutMovingFileRow() {
         FileDB source = addFile(SOURCE_SPACE, "cross.txt", null, "cross");
+        FileDB movedDirectory = addDirectory(SOURCE_SPACE, "moved-dir", null, "moved-dir");
         setOperator(TARGET_SPACE);
         FileDB targetParent = addDirectory(TARGET_SPACE, "target", null, "target");
         String sourceEntryId = entryRepo.queryActiveByFileId(SOURCE_SPACE, source.getFileId()).getEntryId();
 
         entryRepo.setCrossSpaceMoveEnabled(true);
         FileEntryDB target = entryRepo.moveAcrossSpace(source.getFileId(), TARGET_SPACE, targetParent.getFileId());
+        entryRepo.moveAcrossSpace(movedDirectory.getFileId(), TARGET_SPACE, targetParent.getFileId());
+        FileDB child = addFile(TARGET_SPACE, "child.txt", movedDirectory.getFileId(), "child");
 
         assertNotEquals(sourceEntryId, target.getEntryId());
         assertEquals(entryRepo.queryActiveByFileId(TARGET_SPACE, targetParent.getFileId()).getEntryId(), target.getParentEntryId());
@@ -114,6 +118,25 @@ public class FileEntryRepoTest {
         assertEquals(source.getPath(), unchanged.getPath());
         assertFalse(hasClosure(SOURCE_SPACE, source.getFileId(), source.getFileId()));
         assertTrue(hasClosure(TARGET_SPACE, targetParent.getFileId(), source.getFileId()));
+
+        fileRepo.setFileEntryReadMode("entry");
+        Page<FileDB> targetPage = fileRepo.pageFiles(PageFileOps.builder()
+                .spaceCode(TARGET_SPACE)
+                .ancestorId(targetParent.getFileId())
+                .page(1)
+                .pageSize(10)
+                .build());
+        assertEquals(2, targetPage.getTotal());
+        assertTrue(targetPage.getData().stream().anyMatch(file -> source.getFileId().equals(file.getFileId())));
+        assertTrue(targetPage.getData().stream().anyMatch(file -> movedDirectory.getFileId().equals(file.getFileId())));
+
+        Page<FileDB> movedDirectoryPage = fileRepo.pageFiles(PageFileOps.builder()
+                .ancestorId(movedDirectory.getFileId())
+                .page(1)
+                .pageSize(10)
+                .build());
+        assertEquals(1, movedDirectoryPage.getTotal());
+        assertEquals(child.getFileId(), movedDirectoryPage.getData().get(0).getFileId());
     }
 
     private FileDB addDirectory(String spaceCode, String filename, String ancestorId, String seed) {

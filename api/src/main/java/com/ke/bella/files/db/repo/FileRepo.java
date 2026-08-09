@@ -2,7 +2,6 @@ package com.ke.bella.files.db.repo;
 
 import static com.ke.bella.files.db.Tables.FILE;
 import static com.ke.bella.files.db.Tables.FILE_CLOSURE;
-import static com.ke.bella.files.db.Tables.FILE_ENTRY;
 import static com.ke.bella.files.db.Tables.FILE_MAPPING;
 import static com.ke.bella.files.db.Tables.FILE_PROGRESS;
 import static com.ke.bella.files.db.Tables.FILE_SHARDING;
@@ -19,8 +18,6 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import javax.annotation.Nullable;
-import javax.annotation.Resource;
-
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jooq.Condition;
@@ -65,17 +62,15 @@ import com.ke.bella.files.utils.JsonUtils;
 
 @Component
 public class FileRepo implements BaseRepo {
-    @Resource
-    private DSLContext db;
-
-    private FileEntryRepo fileEntryRepo;
+    private final DSLContext db;
+    private final FileEntryRepo fileEntryRepo;
 
     @Value("${bella.file-api.file-entry.read-mode:closure}")
     private String fileEntryReadMode;
 
-    public FileRepo(DSLContext db) {
+    public FileRepo(DSLContext db, FileEntryRepo fileEntryRepo) {
         this.db = db;
-        this.fileEntryRepo = new FileEntryRepo(db);
+        this.fileEntryRepo = fileEntryRepo;
     }
 
     public String getShardingKeyByFileId(String fileId, FileType fileType) {
@@ -258,17 +253,12 @@ public class FileRepo implements BaseRepo {
         return shardingKey;
     }
 
+    @Transactional(rollbackFor = Exception.class)
     public void updateFile(FileOps op, boolean increaseVersion) {
         String fileId = queryNewFileId(op.getFileId());
         String shardingKey = getShardingKeyByFileId(fileId);
         FileType fileType = FileType.fromFileId(fileId);
         FileDB currentFile = fileType.needsDirectorySupport() ? queryFile(fileId, fileType) : null;
-        if(currentFile != null && op.getFilename() != null) {
-            fileEntryRepo.rename(currentFile.getSpaceCode(), fileId, op.getFilename());
-        }
-        if(currentFile != null && op.getStatus() == FileStatus.DELETED) {
-            fileEntryRepo.delete(currentFile.getSpaceCode(), fileId);
-        }
         FileRecord rec = FILE.newRecord();
         rec.setFileId(fileId);
         if(op.getStatus() != null) {
@@ -331,8 +321,15 @@ public class FileRepo implements BaseRepo {
         if(updatedNum != 1) {
             throw new IllegalStateException("update file failed, fileId: " + fileId);
         }
+        if(currentFile != null && op.getFilename() != null) {
+            fileEntryRepo.rename(currentFile.getSpaceCode(), fileId, op.getFilename());
+        }
+        if(currentFile != null && op.getStatus() == FileStatus.DELETED) {
+            fileEntryRepo.delete(currentFile.getSpaceCode(), fileId);
+        }
     }
 
+    @Transactional(rollbackFor = Exception.class)
     public void updateFile(FileOps op) {
         updateFile(op, false);
     }
@@ -756,6 +753,10 @@ public class FileRepo implements BaseRepo {
         return "compare".equalsIgnoreCase(fileEntryReadMode);
     }
 
+    void setFileEntryReadMode(String readMode) {
+        this.fileEntryReadMode = readMode;
+    }
+
     public List<FileDB> getPathFiles(String fileId) {
         fileId = queryNewFileId(fileId);
         String shardingKey = getShardingKeyByFileId(fileId);
@@ -842,15 +843,6 @@ public class FileRepo implements BaseRepo {
     }
 
     public Page<FileDB> pageFiles(PageFileOps ops) {
-        String shardingKey;
-        if(StringUtils.isNotEmpty(ops.getAncestorId())) {
-            shardingKey = getShardingKeyByFileId(ops.getAncestorId());
-        } else {
-            shardingKey = getShardingKeyBySpaceCode(ops.getSpaceCode());
-        }
-
-        Condition whereCondition = buildWhereConditionForPageFiles(ops);
-
         if(useEntryRead()) {
             String entrySpaceCode = ops.getSpaceCode();
             if(StringUtils.isEmpty(entrySpaceCode)) {
@@ -860,20 +852,18 @@ public class FileRepo implements BaseRepo {
                 }
                 entrySpaceCode = ancestor.getSpaceCode();
             }
-            String parentEntryId = fileEntryRepo.resolveParentEntryId(entrySpaceCode, ops.getAncestorId());
-            Condition entryCondition = FILE_ENTRY.SPACE_CODE.eq(entrySpaceCode)
-                    .and(FILE_ENTRY.PARENT_ENTRY_ID.eq(parentEntryId))
-                    .and(FILE_ENTRY.STATUS.eq(FileStatus.NOT_DELETED.getValue()));
-            SelectConditionStep<Record> entrySql = db(shardingKey).select(FILE.fields())
-                    .from(FILE_ENTRY)
-                    .innerJoin(FILE)
-                    .on(FILE_ENTRY.FILE_ID.eq(FILE.FILE_ID))
-                    .where(entryCondition.and(buildFileConditionForPageFiles(ops)));
-            boolean entryAsc = "asc".equalsIgnoreCase(ops.getOrder());
-            entrySql.orderBy(FILE.IS_DIR.desc(), entryAsc ? FILE.CTIME.asc() : FILE.CTIME.desc(),
-                    entryAsc ? FILE.ID.asc() : FILE.ID.desc());
-            return queryPage(db(shardingKey), entrySql, ops.getPage(), ops.getPageSize(), FileDB.class);
+            String normalizedFileId = ops.getFileId() == null ? null : queryNewFileId(ops.getFileId());
+            return fileEntryRepo.pageFiles(entrySpaceCode, ops, normalizedFileId);
         }
+
+        String shardingKey;
+        if(StringUtils.isNotEmpty(ops.getAncestorId())) {
+            shardingKey = getShardingKeyByFileId(ops.getAncestorId());
+        } else {
+            shardingKey = getShardingKeyBySpaceCode(ops.getSpaceCode());
+        }
+
+        Condition whereCondition = buildWhereConditionForPageFiles(ops);
 
         SelectConditionStep<Record> sql = db(shardingKey).select(FILE.fields())
                 .from(FILE_CLOSURE)

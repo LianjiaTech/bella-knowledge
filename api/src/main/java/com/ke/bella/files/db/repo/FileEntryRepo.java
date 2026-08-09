@@ -6,9 +6,11 @@ import static com.ke.bella.files.db.Tables.FILE_ENTRY;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import javax.annotation.Nullable;
@@ -21,15 +23,18 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.ke.bella.files.db.IDGenerator;
+import com.ke.bella.files.db.tables.FileEntry;
 import com.ke.bella.files.db.tables.pojos.FileDB;
 import com.ke.bella.files.db.tables.pojos.FileEntryDB;
-import com.ke.bella.files.db.tables.records.FileEntryRecord;
 import com.ke.bella.files.db.tables.records.FileClosureRecord;
-import com.ke.bella.files.db.tables.FileEntry;
+import com.ke.bella.files.db.tables.records.FileEntryRecord;
 import com.ke.bella.files.enums.FileType;
 import com.ke.bella.files.protocol.FileStatus;
+import com.ke.bella.files.protocol.PageFileOps;
 import com.ke.bella.files.utils.DigestUtils;
+import com.ke.bella.files.utils.JsonUtils;
 
 @Component
 public class FileEntryRepo implements BaseRepo {
@@ -110,6 +115,25 @@ public class FileEntryRepo implements BaseRepo {
         return hydrate(entries);
     }
 
+    public Page<FileDB> pageFiles(String spaceCode, PageFileOps ops, @Nullable String normalizedFileId) {
+        String parentEntryId = resolveParentEntryId(spaceCode, ops.getAncestorId());
+        List<FileEntryDB> entries = entryDb(spaceCode).selectFrom(FILE_ENTRY)
+                .where(FILE_ENTRY.SPACE_CODE.eq(spaceCode))
+                .and(FILE_ENTRY.PARENT_ENTRY_ID.eq(parentEntryId))
+                .and(FILE_ENTRY.STATUS.eq(FileStatus.NOT_DELETED.getValue()))
+                .fetchInto(FileEntryDB.class);
+
+        List<FileDB> filtered = hydrate(entries).stream()
+                .filter(file -> matchesPageFilters(file, ops, normalizedFileId))
+                .sorted(pageComparator(ops.getOrder()))
+                .collect(Collectors.toList());
+        int fromIndex = Math.min((ops.getPage() - 1) * ops.getPageSize(), filtered.size());
+        int toIndex = Math.min(fromIndex + ops.getPageSize(), filtered.size());
+        return Page.<FileDB>from(ops.getPage(), ops.getPageSize())
+                .total(filtered.size())
+                .list(new ArrayList<>(filtered.subList(fromIndex, toIndex)));
+    }
+
     public List<FileDB> hydrate(List<FileEntryDB> entries) {
         if(entries.isEmpty()) {
             return Collections.emptyList();
@@ -132,6 +156,60 @@ public class FileEntryRepo implements BaseRepo {
             result.add(file);
         }
         return result;
+    }
+
+    private boolean matchesPageFilters(FileDB file, PageFileOps ops, @Nullable String normalizedFileId) {
+        if("dir".equals(ops.getType()) && !Integer.valueOf(1).equals(file.getIsDir())) {
+            return false;
+        }
+        if("file".equals(ops.getType()) && !Integer.valueOf(0).equals(file.getIsDir())) {
+            return false;
+        }
+        if(ops.getPurpose() != null && !ops.getPurpose().equals(file.getPurpose())) {
+            return false;
+        }
+        if(normalizedFileId != null && !normalizedFileId.equals(file.getFileId())) {
+            return false;
+        }
+        if(ops.getFilename() != null && (file.getFilename() == null || !file.getFilename().startsWith(ops.getFilename()))) {
+            return false;
+        }
+        if(ops.getExtension() != null && !ops.getExtension().equals(file.getExtension())) {
+            return false;
+        }
+        if(ops.getCuid() != null && !ops.getCuid().equals(file.getCuid())) {
+            return false;
+        }
+        if(ops.getMuid() != null && !ops.getMuid().equals(file.getMuid())) {
+            return false;
+        }
+        return matchesJsonFilter(file.getTags(), ops.getTags()) && matchesJsonFilter(file.getCities(), ops.getCities());
+    }
+
+    private boolean matchesJsonFilter(String rawValue, @Nullable List<String> expectedValues) {
+        if(expectedValues == null) {
+            return true;
+        }
+        if(expectedValues.isEmpty()) {
+            return "[]".equals(rawValue);
+        }
+        List<String> actualValues = JsonUtils.fromJson(rawValue, new TypeReference<List<String>>() {
+        });
+        return actualValues != null && expectedValues.stream().anyMatch(actualValues::contains);
+    }
+
+    private Comparator<FileDB> pageComparator(String order) {
+        Comparator<FileDB> ctimeComparator = Comparator.comparing(FileDB::getCtime,
+                Comparator.nullsLast(Comparator.naturalOrder()));
+        Comparator<FileDB> idComparator = Comparator.comparing(FileDB::getId,
+                Comparator.nullsLast(Comparator.naturalOrder()));
+        if(!"asc".equalsIgnoreCase(order)) {
+            ctimeComparator = ctimeComparator.reversed();
+            idComparator = idComparator.reversed();
+        }
+        return Comparator.comparingInt((FileDB file) -> Objects.equals(file.getIsDir(), 1) ? 0 : 1)
+                .thenComparing(ctimeComparator)
+                .thenComparing(idComparator);
     }
 
     @Transactional(rollbackFor = Exception.class)
