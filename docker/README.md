@@ -251,6 +251,14 @@ npm run dev
 - MinIO: `http://127.0.0.1:9000`，bucket `bella-file-api`，账号 `minioadmin/minioadmin`
 - 本地开发认证: `Authorization: Bearer local-dev`
 
+推荐从仓库根目录使用一键脚本启动本地开发环境：
+
+```bash
+./start-local-dev.sh
+```
+
+该脚本会启动或复用 MySQL、Redis、MinIO，并同时启动后端和前端。前端使用 `pnpm dev`，会实时监听文件变化并自动重编译；如果 dev server 异常退出，脚本会自动重启前端进程。
+
 ```bash
 # 启动后端本地 profile
 cd api

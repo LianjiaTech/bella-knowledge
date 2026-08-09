@@ -38,6 +38,7 @@ build/
 api/config-cache/bella-file-api/config-cache/
 
 api/logs/
+api/.local-cache/
 
 mysql/data/
 
