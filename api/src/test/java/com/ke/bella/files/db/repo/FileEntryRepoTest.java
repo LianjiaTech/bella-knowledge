@@ -1,5 +1,6 @@
 package com.ke.bella.files.db.repo;
 
+import static com.ke.bella.files.db.Tables.FILE;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
@@ -10,9 +11,13 @@ import static org.junit.Assert.assertTrue;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.time.LocalDateTime;
+import java.util.List;
 
 import org.jooq.DSLContext;
 import org.jooq.SQLDialect;
+import org.jooq.exception.DataAccessException;
 import org.jooq.impl.DSL;
 import org.junit.Before;
 import org.junit.AfterClass;
@@ -137,6 +142,36 @@ public class FileEntryRepoTest {
                 .build());
         assertEquals(1, movedDirectoryPage.getTotal());
         assertEquals(child.getFileId(), movedDirectoryPage.getData().get(0).getFileId());
+    }
+
+    @Test
+    public void legacyEntryOnlyConvergesOnIntegrityConstraintViolation() {
+        DataAccessException duplicateKey = new DataAccessException("duplicate", new SQLException("duplicate", "23505"));
+        DataAccessException connectionFailure = new DataAccessException("connection", new SQLException("connection", "08006"));
+
+        assertTrue(FileEntryRepo.isIntegrityConstraintViolation(duplicateKey));
+        assertFalse(FileEntryRepo.isIntegrityConstraintViolation(connectionFailure));
+    }
+
+    @Test
+    public void entryListUsesStableCursorAndHandlesMissingAfter() {
+        FileDB first = addFile(SOURCE_SPACE, "first.txt", null, "cursor-first");
+        FileDB second = addFile(SOURCE_SPACE, "second.txt", null, "cursor-second");
+        FileDB third = addFile(SOURCE_SPACE, "third.txt", null, "cursor-third");
+        String missingCursorId = first.getFileId().replaceFirst("260808", "260807");
+        DSLContext shardDsl = DSLContextHolder.get(FileRepo.getShardingKeyBySpaceCode(SOURCE_SPACE), dsl);
+        LocalDateTime sharedCtime = LocalDateTime.of(2026, 8, 9, 0, 0);
+        shardDsl.update(FILE).set(FILE.CTIME, sharedCtime).execute();
+        fileRepo.setFileEntryReadMode("entry");
+
+        List<FileDB> firstPage = fileRepo.listFile(null, 2, "asc", null, SOURCE_SPACE, null);
+        assertEquals(first.getFileId(), firstPage.get(0).getFileId());
+        assertEquals(second.getFileId(), firstPage.get(1).getFileId());
+
+        List<FileDB> secondPage = fileRepo.listFile(null, 2, "asc", second.getFileId(), SOURCE_SPACE, null);
+        assertEquals(1, secondPage.size());
+        assertEquals(third.getFileId(), secondPage.get(0).getFileId());
+        assertTrue(fileRepo.listFile(null, 2, "asc", missingCursorId, SOURCE_SPACE, null).isEmpty());
     }
 
     private FileDB addDirectory(String spaceCode, String filename, String ancestorId, String seed) {

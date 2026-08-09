@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -345,16 +346,23 @@ public class FileRepo implements BaseRepo {
             List<FileDB> files = fileEntryRepo.listFiles(spaceCode, ancestorId).stream()
                     .filter(file -> StringUtils.isEmpty(purpose) || purpose.equals(file.getPurpose()))
                     .collect(Collectors.toList());
+            boolean isAsc = "asc".equalsIgnoreCase(order);
+            Comparator<FileDB> cursorOrder = Comparator.comparing(FileDB::getCtime)
+                    .thenComparing(FileDB::getId);
+            if(!isAsc) {
+                cursorOrder = cursorOrder.reversed();
+            }
             if(StringUtils.isNotEmpty(after)) {
                 FileDB afterFile = queryFile(after);
+                if(afterFile == null) {
+                    return Collections.emptyList();
+                }
+                Comparator<FileDB> effectiveOrder = cursorOrder;
                 files = files.stream()
-                        .filter(file -> "asc".equalsIgnoreCase(order) ? file.getCtime().isAfter(afterFile.getCtime())
-                                : file.getCtime().isBefore(afterFile.getCtime()))
+                        .filter(file -> effectiveOrder.compare(file, afterFile) > 0)
                         .collect(Collectors.toList());
             }
-            files.sort("asc".equalsIgnoreCase(order)
-                    ? java.util.Comparator.comparing(FileDB::getCtime)
-                    : java.util.Comparator.comparing(FileDB::getCtime).reversed());
+            files.sort(cursorOrder);
             return files.stream().limit(limit).collect(Collectors.toList());
         }
         String shardingKey = getShardingKeyBySpaceCode(spaceCode);
