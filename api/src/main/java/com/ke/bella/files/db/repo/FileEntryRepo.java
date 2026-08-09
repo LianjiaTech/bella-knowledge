@@ -19,7 +19,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.jooq.Condition;
 import org.jooq.DSLContext;
 import org.jooq.Record;
-import org.jooq.Record2;
 import org.jooq.SelectConditionStep;
 import org.jooq.SortField;
 import org.jooq.exception.DataAccessException;
@@ -31,7 +30,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.ke.bella.files.db.IDGenerator;
-import com.ke.bella.files.db.tables.FileEntry;
 import com.ke.bella.files.db.tables.pojos.FileDB;
 import com.ke.bella.files.db.tables.pojos.FileEntryDB;
 import com.ke.bella.files.db.tables.records.FileClosureRecord;
@@ -339,7 +337,7 @@ public class FileEntryRepo implements BaseRepo {
             if(!isIntegrityConstraintViolation(e)) {
                 throw e;
             }
-            // Concurrent backfill/create converges on the deterministic legacy ID.
+            // Concurrent legacy-entry creation converges on the deterministic ID.
         }
         FileEntryDB created = queryActiveByFileId(spaceCode, fileId);
         validateEntry(created, spaceCode, fileId);
@@ -489,91 +487,11 @@ public class FileEntryRepo implements BaseRepo {
         }
     }
 
-    @Transactional(rollbackFor = Exception.class)
-    public BackfillBatchResult backfillBatch(String spaceCode, long minIdInclusive, long maxIdExclusive, int batchSize) {
-        List<Record2<Long, String>> files = entryDb(spaceCode).select(FILE.ID, FILE.FILE_ID)
-                .from(FILE)
-                .where(FILE.SPACE_CODE.eq(spaceCode))
-                .and(FILE.STATUS.eq(FileStatus.NOT_DELETED.getValue()))
-                .and(FILE.ID.ge(minIdInclusive))
-                .and(FILE.ID.lt(maxIdExclusive))
-                .orderBy(FILE.ID.asc())
-                .limit(batchSize)
-                .fetch();
-        files.forEach(file -> ensureLegacyEntry(spaceCode, file.value2()));
-        long nextMinId = files.isEmpty() ? maxIdExclusive : files.get(files.size() - 1).value1() + 1;
-        return new BackfillBatchResult(files.size(), nextMinId);
-    }
-
-    public EntryConsistencyReport compareSpace(String spaceCode) {
-        DSLContext dsl = entryDb(spaceCode);
-        FileEntry parent = FILE_ENTRY.as("parent");
-        int activeFileCount = dsl.fetchCount(FILE,
-                FILE.SPACE_CODE.eq(spaceCode).and(FILE.STATUS.eq(FileStatus.NOT_DELETED.getValue())));
-        int activeEntryCount = dsl.fetchCount(FILE_ENTRY,
-                FILE_ENTRY.SPACE_CODE.eq(spaceCode).and(FILE_ENTRY.STATUS.eq(FileStatus.NOT_DELETED.getValue())));
-        int duplicateFileCount = dsl.fetchCount(dsl.select(FILE_ENTRY.FILE_ID)
-                .from(FILE_ENTRY)
-                .where(FILE_ENTRY.SPACE_CODE.eq(spaceCode))
-                .and(FILE_ENTRY.STATUS.eq(FileStatus.NOT_DELETED.getValue()))
-                .groupBy(FILE_ENTRY.FILE_ID)
-                .having(DSL.count().ne(1)));
-        int orphanParentCount = dsl.fetchCount(dsl.select(FILE_ENTRY.ENTRY_ID)
-                .from(FILE_ENTRY)
-                .leftJoin(parent)
-                .on(FILE_ENTRY.PARENT_ENTRY_ID.eq(parent.ENTRY_ID))
-                .where(FILE_ENTRY.SPACE_CODE.eq(spaceCode))
-                .and(FILE_ENTRY.STATUS.eq(FileStatus.NOT_DELETED.getValue()))
-                .and(FILE_ENTRY.PARENT_ENTRY_ID.ne(ROOT_ENTRY_ID))
-                .and(parent.ENTRY_ID.isNull()));
-        return new EntryConsistencyReport(activeFileCount, activeEntryCount, duplicateFileCount, orphanParentCount);
-    }
-
     public static class EntryReadNotReadyException extends IllegalStateException {
         private static final long serialVersionUID = 1L;
 
         EntryReadNotReadyException(String spaceCode, String ancestorId) {
-            super("file_entry parent is not backfilled, spaceCode: " + spaceCode + ", ancestorId: " + ancestorId);
-        }
-    }
-
-    public static class BackfillBatchResult {
-        private final int processed;
-        private final long nextMinId;
-
-        BackfillBatchResult(int processed, long nextMinId) {
-            this.processed = processed;
-            this.nextMinId = nextMinId;
-        }
-
-        public int getProcessed() {
-            return processed;
-        }
-
-        public long getNextMinId() {
-            return nextMinId;
-        }
-    }
-
-    public static class EntryConsistencyReport {
-        private final int activeFileCount;
-        private final int activeEntryCount;
-        private final int duplicateFileCount;
-        private final int orphanParentCount;
-
-        public EntryConsistencyReport(int activeFileCount, int activeEntryCount, int duplicateFileCount, int orphanParentCount) {
-            this.activeFileCount = activeFileCount;
-            this.activeEntryCount = activeEntryCount;
-            this.duplicateFileCount = duplicateFileCount;
-            this.orphanParentCount = orphanParentCount;
-        }
-
-        public int getActiveFileCount() { return activeFileCount; }
-        public int getActiveEntryCount() { return activeEntryCount; }
-        public int getDuplicateFileCount() { return duplicateFileCount; }
-        public int getOrphanParentCount() { return orphanParentCount; }
-        public boolean isConsistent() {
-            return activeFileCount == activeEntryCount && duplicateFileCount == 0 && orphanParentCount == 0;
+            super("file_entry parent is not initialized, spaceCode: " + spaceCode + ", ancestorId: " + ancestorId);
         }
     }
 

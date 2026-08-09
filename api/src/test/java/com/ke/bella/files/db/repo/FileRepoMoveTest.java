@@ -156,7 +156,7 @@ public class FileRepoMoveTest {
     }
 
     @Test
-    public void entryReadFallsBackWithoutBackfillingMissingDirectory() {
+    public void entryReadFallsBackWhenDirectoryEntryIsMissing() {
         fileRepo.setFileEntryReadMode("entry");
 
         List<String> children = fileRepo.findFiles("sp-0", SOURCE).stream()
@@ -175,7 +175,7 @@ public class FileRepoMoveTest {
     }
 
     @Test
-    public void compareReadUsesClosureWithoutBackfillingMissingDirectory() {
+    public void compareReadUsesClosureWhenDirectoryEntryIsMissing() {
         fileRepo.setFileEntryReadMode("compare");
 
         assertTrue(fileRepo.exists("sp-0", SOURCE, "child"));
