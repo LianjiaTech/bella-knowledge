@@ -173,6 +173,15 @@ public class FileRepoMoveTest {
     }
 
     @Test
+    public void compareReadUsesClosureWithoutBackfillingMissingDirectory() {
+        fileRepo.setFileEntryReadMode("compare");
+
+        assertTrue(fileRepo.exists("sp-0", SOURCE, "child"));
+        assertEquals(CHILD, fileRepo.queryFile("sp-0", SOURCE, "child").getFileId());
+        assertEquals(0, dsl.fetchCount(DSL.table("file_entry_0")));
+    }
+
+    @Test
     public void pageTypeFiltersReturnMixedNodesAndMatchingTotals() {
         insertPageNode(PAGE_DIRECTORY, "page-directory", 1, NodeType.DIRECTORY, "");
         insertPageNode(PAGE_FILE, "page-file.txt", 0, NodeType.FILE, "");

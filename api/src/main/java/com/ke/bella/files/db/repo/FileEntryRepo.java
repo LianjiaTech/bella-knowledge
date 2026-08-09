@@ -36,7 +36,6 @@ import com.ke.bella.files.db.tables.pojos.FileDB;
 import com.ke.bella.files.db.tables.pojos.FileEntryDB;
 import com.ke.bella.files.db.tables.records.FileClosureRecord;
 import com.ke.bella.files.db.tables.records.FileEntryRecord;
-import com.ke.bella.files.enums.FileType;
 import com.ke.bella.files.protocol.FileStatus;
 import com.ke.bella.files.protocol.PageFileOps;
 import com.ke.bella.files.utils.DigestUtils;
@@ -413,7 +412,8 @@ public class FileEntryRepo implements BaseRepo {
         String sourceSpaceCode = file.getSpaceCode();
         FileEntryDB source = ensureLegacyEntry(sourceSpaceCode, fileId);
         if(TYPE_DIR.equals(source.getType()) && entryDb(sourceSpaceCode).fetchCount(FILE_ENTRY,
-                FILE_ENTRY.PARENT_ENTRY_ID.eq(source.getEntryId()).and(FILE_ENTRY.STATUS.eq(0))) > 0) {
+                FILE_ENTRY.PARENT_ENTRY_ID.eq(source.getEntryId())
+                        .and(FILE_ENTRY.STATUS.eq(FileStatus.NOT_DELETED.getValue()))) > 0) {
             throw new IllegalArgumentException("cross-space move of non-empty directories is not supported");
         }
         String targetParentEntryId = resolveParentEntryId(targetSpaceCode, targetAncestorId);
@@ -425,17 +425,20 @@ public class FileEntryRepo implements BaseRepo {
         target.setFileId(fileId);
         target.setFilename(source.getFilename());
         target.setType(source.getType());
-        target.setStatus(0);
+        target.setStatus(FileStatus.NOT_DELETED.getValue());
         fillCreatorInfo(target);
         entryDb(targetSpaceCode).insertInto(FILE_ENTRY).set(target).execute();
-        int sourceUpdated = entryDb(sourceSpaceCode).update(FILE_ENTRY).set(FILE_ENTRY.STATUS, -1)
-                .where(FILE_ENTRY.ENTRY_ID.eq(source.getEntryId())).and(FILE_ENTRY.STATUS.eq(0)).execute();
+        int sourceUpdated = entryDb(sourceSpaceCode).update(FILE_ENTRY)
+                .set(FILE_ENTRY.STATUS, FileStatus.DELETED.getValue())
+                .where(FILE_ENTRY.ENTRY_ID.eq(source.getEntryId()))
+                .and(FILE_ENTRY.STATUS.eq(FileStatus.NOT_DELETED.getValue()))
+                .execute();
         if(sourceUpdated != 1) {
             throw new IllegalStateException("delete source file_entry failed, fileId: " + fileId);
         }
         moveLeafClosureAcrossSpace(fileId, sourceSpaceCode, targetSpaceCode, targetAncestorId);
         int updated = fileDb(fileId).update(FILE).set(FILE.SPACE_CODE, targetSpaceCode)
-                .where(FILE.FILE_ID.eq(fileId)).and(FILE.STATUS.eq(0)).execute();
+                .where(FILE.FILE_ID.eq(fileId)).and(FILE.STATUS.eq(FileStatus.NOT_DELETED.getValue())).execute();
         if(updated != 1) {
             throw new IllegalStateException("update file space cache failed, fileId: " + fileId);
         }
@@ -510,22 +513,20 @@ public class FileEntryRepo implements BaseRepo {
                 FILE.SPACE_CODE.eq(spaceCode).and(FILE.STATUS.eq(FileStatus.NOT_DELETED.getValue())));
         int activeEntryCount = dsl.fetchCount(FILE_ENTRY,
                 FILE_ENTRY.SPACE_CODE.eq(spaceCode).and(FILE_ENTRY.STATUS.eq(FileStatus.NOT_DELETED.getValue())));
-        int duplicateFileCount = dsl.select(FILE_ENTRY.FILE_ID)
+        int duplicateFileCount = dsl.fetchCount(dsl.select(FILE_ENTRY.FILE_ID)
                 .from(FILE_ENTRY)
                 .where(FILE_ENTRY.SPACE_CODE.eq(spaceCode))
                 .and(FILE_ENTRY.STATUS.eq(FileStatus.NOT_DELETED.getValue()))
                 .groupBy(FILE_ENTRY.FILE_ID)
-                .having(DSL.count().ne(1))
-                .fetch().size();
-        int orphanParentCount = dsl.select(FILE_ENTRY.ENTRY_ID)
+                .having(DSL.count().ne(1)));
+        int orphanParentCount = dsl.fetchCount(dsl.select(FILE_ENTRY.ENTRY_ID)
                 .from(FILE_ENTRY)
                 .leftJoin(parent)
                 .on(FILE_ENTRY.PARENT_ENTRY_ID.eq(parent.ENTRY_ID))
                 .where(FILE_ENTRY.SPACE_CODE.eq(spaceCode))
-                .and(FILE_ENTRY.STATUS.eq(0))
+                .and(FILE_ENTRY.STATUS.eq(FileStatus.NOT_DELETED.getValue()))
                 .and(FILE_ENTRY.PARENT_ENTRY_ID.ne(ROOT_ENTRY_ID))
-                .and(parent.ENTRY_ID.isNull())
-                .fetch().size();
+                .and(parent.ENTRY_ID.isNull()));
         return new EntryConsistencyReport(activeFileCount, activeEntryCount, duplicateFileCount, orphanParentCount);
     }
 

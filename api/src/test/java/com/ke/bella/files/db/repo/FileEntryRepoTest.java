@@ -135,6 +135,10 @@ public class FileEntryRepoTest {
         assertTrue(targetPage.getData().stream().anyMatch(file -> source.getFileId().equals(file.getFileId())));
         assertTrue(targetPage.getData().stream().anyMatch(file -> movedDirectory.getFileId().equals(file.getFileId())));
 
+        List<FileDB> targetList = fileRepo.listFile(null, 10, "asc", null, TARGET_SPACE, targetParent.getFileId());
+        assertTrue(targetList.stream().anyMatch(file -> source.getFileId().equals(file.getFileId())));
+        assertTrue(targetList.stream().anyMatch(file -> movedDirectory.getFileId().equals(file.getFileId())));
+
         Page<FileDB> movedDirectoryPage = fileRepo.pageFiles(PageFileOps.builder()
                 .ancestorId(movedDirectory.getFileId())
                 .page(1)
