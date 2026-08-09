@@ -18,6 +18,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.jooq.DSLContext;
 import org.jooq.exception.DataAccessException;
+import org.jooq.exception.SQLStateClass;
 import org.jooq.impl.DSL;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -270,7 +271,10 @@ public class FileEntryRepo implements BaseRepo {
         fillCreatorInfo(record);
         try {
             entryDb(spaceCode).insertInto(FILE_ENTRY).set(record).execute();
-        } catch (DataAccessException ignored) {
+        } catch (DataAccessException e) {
+            if(!isIntegrityConstraintViolation(e)) {
+                throw e;
+            }
             // Concurrent backfill/create converges on the deterministic legacy ID.
         }
         FileEntryDB created = queryActiveByFileId(spaceCode, fileId);
@@ -279,6 +283,10 @@ public class FileEntryRepo implements BaseRepo {
             throw new IllegalStateException("legacy file_entry conflicts with closure/file state, fileId: " + fileId);
         }
         return created;
+    }
+
+    static boolean isIntegrityConstraintViolation(DataAccessException e) {
+        return e.sqlStateClass() == SQLStateClass.C23_INTEGRITY_CONSTRAINT_VIOLATION;
     }
 
     public void rename(String spaceCode, String fileId, String filename) {
