@@ -42,12 +42,6 @@ bella:
     file-entry:
       read-mode: ${BELLA_FILE_ENTRY_READ_MODE:closure}
       cross-space-move-enabled: ${BELLA_FILE_ENTRY_CROSS_SPACE_MOVE_ENABLED:false}
-      backfill:
-        enabled: ${BELLA_FILE_ENTRY_BACKFILL_ENABLED:false}
-        space-code: ${BELLA_FILE_ENTRY_BACKFILL_SPACE_CODE:}
-        min-id: ${BELLA_FILE_ENTRY_BACKFILL_MIN_ID:0}
-        max-id: ${BELLA_FILE_ENTRY_BACKFILL_MAX_ID:9223372036854775807}
-        batch-size: ${BELLA_FILE_ENTRY_BACKFILL_BATCH_SIZE:1000}
     file:
       tmp-file-dir: ${BELLA_TMP_FILE_DIR:.}
     bucket-name:
