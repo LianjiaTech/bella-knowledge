@@ -22,11 +22,11 @@ type Directory = {
 
 type MoveFolderDialogProps = {
   open: boolean;
-  folder: KnowledgeFile | null;
+  file: KnowledgeFile | null;
   currentAncestorId: string;
   spaceCode?: string;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (folder: KnowledgeFile, ancestorId: string) => Promise<boolean>;
+  onConfirm: (file: KnowledgeFile, ancestorId: string) => Promise<boolean>;
 };
 
 const ROOT_DIRECTORY: Directory = {
@@ -36,7 +36,7 @@ const ROOT_DIRECTORY: Directory = {
 
 export function MoveFolderDialog({
   open,
-  folder,
+  file,
   currentAncestorId,
   spaceCode,
   onOpenChange,
@@ -81,7 +81,7 @@ export function MoveFolderDialog({
   }, [isCurrentParent]);
 
   const enterDirectory = async (directory: KnowledgeFile) => {
-    if (directory.id === folder?.id) {
+    if (directory.id === file?.id) {
       return;
     }
     setDirectoryStack((stack) => [
@@ -98,11 +98,11 @@ export function MoveFolderDialog({
   };
 
   const handleConfirm = async () => {
-    if (!folder || invalidMessage || moving) {
+    if (!file || invalidMessage || moving) {
       return;
     }
     setMoving(true);
-    const success = await onConfirm(folder, currentDirectory.id);
+    const success = await onConfirm(file, currentDirectory.id);
     setMoving(false);
     if (success) {
       onOpenChange(false);
@@ -116,9 +116,9 @@ export function MoveFolderDialog({
     >
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>移动文件夹</DialogTitle>
+          <DialogTitle>移动</DialogTitle>
           <DialogDescription>
-            为 &ldquo;{folder?.filename}&rdquo; 选择新的上级目录。
+            为 &ldquo;{file?.filename}&rdquo; 选择新的上级目录。
           </DialogDescription>
         </DialogHeader>
 
@@ -151,7 +151,7 @@ export function MoveFolderDialog({
               </div>
             ) : directories.length > 0 ? (
               directories.map((directory) => {
-                const isSource = directory.id === folder?.id;
+                const isSource = directory.id === file?.id;
                 return (
                   <Button
                     type="button"
@@ -200,7 +200,7 @@ export function MoveFolderDialog({
           </Button>
           <Button
             type="button"
-            disabled={!folder || loading || moving || Boolean(invalidMessage)}
+            disabled={!file || loading || moving || Boolean(invalidMessage)}
             onClick={handleConfirm}
           >
             {moving ? "移动中..." : "确认移动"}

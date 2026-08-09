@@ -4,8 +4,9 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { fileId: string } },
+  { params }: { params: Promise<{ fileId: string }> },
 ) {
+  const { fileId } = await params;
   const filename = req.nextUrl.searchParams.get("filename");
   if (!filename) {
     return NextResponse.json({
@@ -15,7 +16,7 @@ export async function POST(
   }
 
   const res = await backendRequest(req, {
-    url: `${FILE_API_URL}/v1/files/${params.fileId}/rename`,
+    url: `${FILE_API_URL}/v1/files/${fileId}/rename`,
     method: "POST",
     query: {
       filename,

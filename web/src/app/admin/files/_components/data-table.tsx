@@ -51,7 +51,6 @@ export function DataTable<TValue>({
 }: DataTableProps<TValue>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const [selectOpen, setSelectOpen] = useState(false);
   const allExtensions = Array.from(
     new Set(
       data.map((row) => {
@@ -92,20 +91,11 @@ export function DataTable<TValue>({
   });
 
   useEffect(() => {
-    table.resetColumnFilters();
-  }, [data, table]);
+    setColumnFilters([]);
+  }, [data]);
 
-  const onClickSelectItem = (
-    e: React.MouseEvent<HTMLDivElement>,
-    value: string,
-  ) => {
-    e.preventDefault();
-    table.getColumn("extension")?.setFilterValue(value);
-  };
-
-  const onDoubleClickSelectItem = () => {
-    setSelectOpen(false);
-  };
+  const extensionFilter =
+    (table.getColumn("extension")?.getFilterValue() as string) ?? "";
 
   return (
     <>
@@ -126,26 +116,17 @@ export function DataTable<TValue>({
         <div className="flex items-center gap-2">
           <span className="flex-shrink-0 text-sm text-gray-500">筛选类型</span>
           <Select
-            value={
-              (table.getColumn("extension")?.getFilterValue() as string) ?? ""
-            }
-            open={selectOpen}
-            onOpenChange={setSelectOpen}
+            value={extensionFilter}
+            onValueChange={(value) => {
+              table.getColumn("extension")?.setFilterValue(value);
+            }}
           >
-            <SelectTrigger
-              className="w-[160px]"
-              onClick={() => setSelectOpen(true)}
-            >
+            <SelectTrigger className="w-[160px]">
               <SelectValue placeholder="请选择文件类型" />
             </SelectTrigger>
             <SelectContent>
               {allExtensions.includes("文件夹") && (
-                <SelectItem
-                  onClick={(e) => onClickSelectItem(e, "文件夹")}
-                  onPointerUp={(e) => onClickSelectItem(e, "文件夹")}
-                  onDoubleClick={onDoubleClickSelectItem}
-                  value="文件夹"
-                >
+                <SelectItem value="文件夹">
                   文件夹
                 </SelectItem>
               )}
@@ -158,9 +139,6 @@ export function DataTable<TValue>({
                       <SelectItem
                         value={item}
                         key={index}
-                        onClick={(e) => onClickSelectItem(e, item)}
-                        onPointerUp={(e) => onClickSelectItem(e, item)}
-                        onDoubleClick={onDoubleClickSelectItem}
                       >
                         {item}
                       </SelectItem>
@@ -173,7 +151,7 @@ export function DataTable<TValue>({
         <Button
           size="sm"
           onClick={() => {
-            table.resetColumnFilters();
+            setColumnFilters([]);
           }}
         >
           重置

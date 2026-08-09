@@ -21,7 +21,7 @@ const store = create<{
       return;
     }
     const res = await getUserInfo();
-    if (res.data.userId) {
+    if (res.data?.userId) {
       localStorage.setItem("user_id", res.data.userId);
       set({ userInfo: res.data });
     }

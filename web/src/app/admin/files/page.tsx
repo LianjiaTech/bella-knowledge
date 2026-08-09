@@ -70,7 +70,7 @@ const Page = () => {
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [open, setOpen] = useState(false);
   const [previewFileUrl, setPreviewFileUrl] = useState<string | null>(null);
-  const [movingFolder, setMovingFolder] = useState<KnowledgeFile | null>(null);
+  const [movingFile, setMovingFile] = useState<KnowledgeFile | null>(null);
 
   const createFolderForm = useForm<z.infer<typeof createFolderFormSchema>>({
     resolver: zodResolver(createFolderFormSchema),
@@ -152,7 +152,7 @@ const Page = () => {
   );
 
   const handleMove = useCallback((file: KnowledgeFile) => {
-    setMovingFolder(file);
+    setMovingFile(file);
   }, []);
 
   const handleMoveConfirm = useCallback(
@@ -300,13 +300,13 @@ const Page = () => {
         }}
       />
       <MoveFolderDialog
-        open={Boolean(movingFolder)}
-        folder={movingFolder}
+        open={Boolean(movingFile)}
+        file={movingFile}
         currentAncestorId={currentDir.id}
         spaceCode={currentWorkspace?.spaceCode}
         onOpenChange={(nextOpen) => {
           if (!nextOpen) {
-            setMovingFolder(null);
+            setMovingFile(null);
           }
         }}
         onConfirm={handleMoveConfirm}

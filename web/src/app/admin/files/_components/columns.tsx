@@ -251,7 +251,7 @@ const FilenameCell = ({
           </div>
         )}
         
-        {/* 操作按钮区域 - 始终占位，透明度控制显示 */}
+        {/* 操作按钮区域 */}
         <div className="flex items-center gap-1 flex-shrink-0">
           <Button
             size="icon"
@@ -261,9 +261,8 @@ const FilenameCell = ({
               setIsEditing(true);
             }}
             disabled={isRenaming}
-            className={`h-8 w-8 transition-opacity duration-200 ${
-              isEditing ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-            }`}
+            className="h-8 w-8"
+            title="重命名"
           >
             <Pencil size={14} />
           </Button>
@@ -274,9 +273,8 @@ const FilenameCell = ({
                 size="icon"
                 variant="ghost"
                 onClick={(e) => e.stopPropagation()}
-                className={`h-8 w-8 transition-opacity duration-200 ${
-                  isEditing ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                }`}
+                className="h-8 w-8"
+                title="更多操作"
               >
                 <MoreHorizontal size={14} />
               </Button>
@@ -297,17 +295,15 @@ const FilenameCell = ({
                   {isUploading ? "上传中..." : "重新上传"}
                 </DropdownMenuItem>
               )}
-              {isDir && (
-                <DropdownMenuItem
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onMove(file);
-                  }}
-                >
-                  <Move className="mr-2 h-4 w-4" />
-                  移动
-                </DropdownMenuItem>
-              )}
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onMove(file);
+                }}
+              >
+                <Move className="mr-2 h-4 w-4" />
+                移动
+              </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={(e) => {
                   e.stopPropagation();

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { LogUtils } from "@/lib/utils/log-utils";
 
 const isProd = process.env.NODE_ENV === "production";
+const devAuthEnabled = process.env.BELLA_DEV_AUTH === "true";
+const devAuthToken = process.env.BELLA_DEV_AUTH_TOKEN || "local-dev";
 
 export async function backendRequest(
   req: NextRequest,
@@ -23,6 +25,7 @@ export async function backendRequest(
           "X-BELLA-SPACE-CODE": workspace || "",
           "Content-Type": "application/json",
           cookie: req.cookies.toString(),
+          ...(devAuthEnabled && { Authorization: `Bearer ${devAuthToken}` }),
         },
         method,
         body: JSON.stringify(body),
@@ -98,6 +101,7 @@ export async function backendRequestFormData(
       "X-BELLA-CONSOLE": "true",
       "X-BELLA-SPACE-CODE": workspace || "",
       cookie: req.cookies.toString(),
+      ...(devAuthEnabled && { Authorization: `Bearer ${devAuthToken}` }),
     },
     body: formData,
     method,
