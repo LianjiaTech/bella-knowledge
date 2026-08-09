@@ -4,9 +4,9 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { fileId: string } }
+  { params }: { params: Promise<{ fileId: string }> },
 ) {
-  const { fileId } = params;
+  const { fileId } = await params;
 
   const res = await backendRequest(req, {
     url: `${FILE_API_URL}/v1/files/${fileId}`,
@@ -22,9 +22,9 @@ export async function DELETE(
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { fileId: string } }
+  { params }: { params: Promise<{ fileId: string }> },
 ) {
-  const { fileId } = params;
+  const { fileId } = await params;
   const reqFormData = await req.formData();
   
   const file = reqFormData.get("file");

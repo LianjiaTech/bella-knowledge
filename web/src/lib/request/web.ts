@@ -1,5 +1,8 @@
 import { toast } from "sonner";
 
+const fallbackLoginUrl =
+  process.env.NEXT_PUBLIC_BELLA_OPENAPI_URL || "https://api.bella.top";
+
 interface WebResponse<T> {
   code: number;
   data: T;
@@ -12,6 +15,15 @@ interface WebRequestParams {
   body?: Record<string, unknown>;
   headers?: Record<string, string>;
 }
+
+function redirectToLogin(redirectUrl: string | null | undefined) {
+  const target =
+    redirectUrl && !redirectUrl.startsWith("null")
+      ? redirectUrl
+      : `${fallbackLoginUrl}/console/login?redirect=`;
+  window.location.href = target + encodeURIComponent(window.location.href);
+}
+
 export async function webRequest<T>(
   params: WebRequestParams,
 ): Promise<WebResponse<T>> {
@@ -36,8 +48,7 @@ export async function webRequest<T>(
 
   const data = await response.json();
   if (data.code === 401) {
-    window.location.href =
-      data.data.redirectUrl + encodeURIComponent(window.location.href);
+    redirectToLogin(data.data?.redirectUrl);
   }
   if (data.code === 500) {
     const errorMessage = data.error?.message || data.message;
@@ -89,8 +100,7 @@ export async function webRequestFormData<T>(params: {
   });
   const responseData = await response.json();
   if (responseData.code === 401) {
-    window.location.href =
-      responseData.data.redirectUrl + encodeURIComponent(window.location.href);
+    redirectToLogin(responseData.data?.redirectUrl);
     return {
       code: 401,
       data: null,

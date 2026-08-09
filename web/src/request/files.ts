@@ -92,6 +92,22 @@ export async function postRenameFile(fileId: string, filename: string) {
   return null;
 }
 
+export async function postMoveFile(fileId: string, ancestorId: string) {
+  const res = await webRequest<KnowledgeFile>({
+    path: "/api/files/move",
+    method: "POST",
+    body: {
+      file_id: fileId,
+      ancestor_id: ancestorId,
+    },
+  });
+  if (res.code === 200) {
+    return res.data;
+  }
+  toast.error(res.message || "移动失败");
+  return null;
+}
+
 export async function getFileProgress(fileId: string) {
   const res = await webRequest<{
     percent: number;

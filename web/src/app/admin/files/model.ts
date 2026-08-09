@@ -3,6 +3,7 @@ import {
   findFiles,
   postCreateFolder,
   postRenameFile,
+  postMoveFile,
   postUploadFile,
   deleteFile,
   updateFileContent,
@@ -35,6 +36,12 @@ type Action = {
     ancestorId: string,
   ) => Promise<boolean>;
   deleteFile: (file: KnowledgeFile, ancestorId: string) => Promise<boolean>;
+  moveFile: (
+    file: KnowledgeFile,
+    ancestorId: string,
+    currentAncestorId: string,
+    spaceCode?: string,
+  ) => Promise<boolean>;
   reUploadFile: (fileId: string, file: File, ancestorId: string) => Promise<boolean>;
 };
 export const store = create<State & Action>()((set, get) => ({
@@ -196,6 +203,29 @@ export const store = create<State & Action>()((set, get) => ({
       return true;
     }
     return false;
+  },
+  moveFile: async (
+    file: KnowledgeFile,
+    ancestorId: string,
+    currentAncestorId: string,
+    spaceCode?: string,
+  ) => {
+    const res = await postMoveFile(file.id, ancestorId);
+    if (!res) {
+      return false;
+    }
+
+    const fileRes = await findFiles({
+      ancestor_id: currentAncestorId,
+      space_code: spaceCode,
+    });
+    set((state) => ({
+      files: {
+        ...state.files,
+        [currentAncestorId]: fileRes.data,
+      },
+    }));
+    return true;
   },
   reUploadFile: async (fileId: string, file: File, ancestorId: string) => {
     const res = await updateFileContent(fileId, file);

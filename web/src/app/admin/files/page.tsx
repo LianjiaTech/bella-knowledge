@@ -39,6 +39,7 @@ import { toast } from "sonner";
 import dynamic from "next/dynamic";
 import { useUserStore } from "@/store/user";
 import { useRouter } from "next/navigation";
+import { MoveFolderDialog } from "./_components/move-folder-dialog";
 
 const FileViewer = dynamic(() => import("@/components/file-viewer"), {
   ssr: false,
@@ -61,12 +62,15 @@ const Page = () => {
     uploadFile,
     renameFile,
     deleteFile,
+    moveFile,
     reUploadFile,
   } = useModel();
+  const { currentWorkspace } = useUserStore();
   const currentDir = currentDirStack[currentDirStack.length - 1];
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [open, setOpen] = useState(false);
   const [previewFileUrl, setPreviewFileUrl] = useState<string | null>(null);
+  const [movingFile, setMovingFile] = useState<KnowledgeFile | null>(null);
 
   const createFolderForm = useForm<z.infer<typeof createFolderFormSchema>>({
     resolver: zodResolver(createFolderFormSchema),
@@ -147,14 +151,42 @@ const Page = () => {
     [reUploadFile, currentDir.id],
   );
 
+  const handleMove = useCallback((file: KnowledgeFile) => {
+    setMovingFile(file);
+  }, []);
+
+  const handleMoveConfirm = useCallback(
+    async (file: KnowledgeFile, ancestorId: string) => {
+      const success = await moveFile(
+        file,
+        ancestorId,
+        currentDir.id,
+        currentWorkspace?.spaceCode,
+      );
+      if (success) {
+        toast.success("移动成功");
+      }
+      return success;
+    },
+    [currentDir.id, currentWorkspace?.spaceCode, moveFile],
+  );
+
   const columns = useMemo(() => {
     return getColumns({
       onRename: handleRename,
       onDelete: handleDelete,
+      onMove: handleMove,
       onReUpload: handleReUpload,
       siblingFiles: files[currentDir.id] || [],
     });
-  }, [handleRename, handleDelete, handleReUpload, files, currentDir.id]);
+  }, [
+    handleRename,
+    handleDelete,
+    handleMove,
+    handleReUpload,
+    files,
+    currentDir.id,
+  ]);
   const handleCreateFolder = async (
     values: z.infer<typeof createFolderFormSchema>,
   ) => {
@@ -164,7 +196,6 @@ const Page = () => {
       createFolderForm.reset();
     }
   };
-  const { currentWorkspace } = useUserStore();
   useEffect(() => {
     if (currentWorkspace) {
       initPage(currentWorkspace.spaceCode);
@@ -267,6 +298,18 @@ const Page = () => {
           setPreviewModalOpen(false);
           setPreviewFileUrl(null);
         }}
+      />
+      <MoveFolderDialog
+        open={Boolean(movingFile)}
+        file={movingFile}
+        currentAncestorId={currentDir.id}
+        spaceCode={currentWorkspace?.spaceCode}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            setMovingFile(null);
+          }
+        }}
+        onConfirm={handleMoveConfirm}
       />
     </>
   );
