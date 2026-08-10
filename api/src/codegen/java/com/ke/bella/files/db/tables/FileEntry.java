@@ -41,8 +41,6 @@ public class FileEntry extends TableImpl<FileEntryRecord> {
     public final TableField<FileEntryRecord, String> FILE_ID = createField(DSL.name("file_id"), SQLDataType.VARCHAR(256).nullable(false), this, "");
     public final TableField<FileEntryRecord, String> FILENAME = createField(DSL.name("filename"), SQLDataType.VARCHAR(512).nullable(false), this, "");
     public final TableField<FileEntryRecord, String> TYPE = createField(DSL.name("type"), SQLDataType.VARCHAR(16).nullable(false), this, "");
-    public final TableField<FileEntryRecord, Integer> STATUS = createField(DSL.name("status"), SQLDataType.INTEGER.nullable(false), this, "");
-    public final TableField<FileEntryRecord, Integer> ACTIVE_FLAG = createField(DSL.name("active_flag"), SQLDataType.INTEGER, this, "");
     public final TableField<FileEntryRecord, Long> CUID = createField(DSL.name("cuid"), SQLDataType.BIGINT.nullable(false), this, "");
     public final TableField<FileEntryRecord, String> CU_NAME = createField(DSL.name("cu_name"), SQLDataType.VARCHAR(32).nullable(false), this, "");
     public final TableField<FileEntryRecord, LocalDateTime> CTIME = createField(DSL.name("ctime"), SQLDataType.LOCALDATETIME(0).nullable(false), this, "");
@@ -73,8 +71,7 @@ public class FileEntry extends TableImpl<FileEntryRecord> {
 
     @Override
     public List<Index> getIndexes() {
-        return Arrays.asList(Indexes.FILE_ENTRY_IDX_FILE_ID, Indexes.FILE_ENTRY_IDX_PARENT_ENTRY_ID,
-                Indexes.FILE_ENTRY_IDX_SPACE_PARENT_STATUS);
+        return Arrays.asList(Indexes.FILE_ENTRY_IDX_FILE_ID, Indexes.FILE_ENTRY_IDX_PARENT_ENTRY_ID);
     }
 
     @Override
@@ -90,7 +87,7 @@ public class FileEntry extends TableImpl<FileEntryRecord> {
     @Override
     public List<UniqueKey<FileEntryRecord>> getKeys() {
         return Arrays.asList(Keys.KEY_FILE_ENTRY_PRIMARY, Keys.KEY_FILE_ENTRY_UK_SPACE_ENTRY,
-                Keys.KEY_FILE_ENTRY_UK_SPACE_PARENT_NAME_ACTIVE);
+                Keys.KEY_FILE_ENTRY_UK_SPACE_FILE, Keys.KEY_FILE_ENTRY_UK_SPACE_PARENT_NAME);
     }
 
     @Override

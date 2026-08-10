@@ -3,6 +3,7 @@ package com.ke.bella.files.db.repo;
 import static com.ke.bella.files.db.Tables.FILE;
 import static com.ke.bella.files.db.Tables.FILE_ENTRY;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 
 import javax.sql.DataSource;
@@ -10,6 +11,7 @@ import javax.sql.DataSource;
 import org.h2.jdbcx.JdbcDataSource;
 import org.jooq.DSLContext;
 import org.jooq.SQLDialect;
+import org.jooq.exception.DataAccessException;
 import org.jooq.impl.DefaultConfiguration;
 import org.jooq.impl.DefaultDSLContext;
 import org.junit.Before;
@@ -65,44 +67,45 @@ public class FileRepoUpdateTransactionTest {
     }
 
     @Test
-    public void unchangedFilenameSkipsEntryRename() {
-        addCorruptEntry();
+    public void unchangedFilenameLeavesEntryUntouched() {
+        String entryId = queryEntryId(SOURCE);
 
         fileRepo.updateFile(FileOps.builder().fileId(SOURCE).filename("source.txt").build());
 
         assertEquals("source.txt", queryFile(SOURCE).getFilename());
-        assertEquals(2, shardDsl.fetchCount(FILE_ENTRY,
-                FILE_ENTRY.FILE_ID.eq(SOURCE).and(FILE_ENTRY.STATUS.eq(FileStatus.NOT_DELETED.getValue()))));
+        assertEquals(entryId, queryEntryId(SOURCE));
+        assertEquals(1, shardDsl.fetchCount(FILE_ENTRY, FILE_ENTRY.FILE_ID.eq(SOURCE)));
     }
 
     @Test
-    public void invalidMultipleEntriesRollBackFileDelete() {
-        addCorruptEntry();
+    public void deleteHardDeletesEntry() {
+        fileRepo.updateFile(FileOps.builder().fileId(SOURCE).status(FileStatus.DELETED).build());
 
-        assertThrows(RuntimeException.class,
-                () -> fileRepo.updateFile(FileOps.builder().fileId(SOURCE).status(FileStatus.DELETED).build()));
-
-        assertEquals(FileStatus.NOT_DELETED.getValue(), queryFile(SOURCE).getStatus());
-        assertEquals(2, shardDsl.fetchCount(FILE_ENTRY,
-                FILE_ENTRY.FILE_ID.eq(SOURCE).and(FILE_ENTRY.STATUS.eq(FileStatus.NOT_DELETED.getValue()))));
+        assertEquals(FileStatus.DELETED.getValue(), queryFile(SOURCE).getStatus());
+        assertEquals(0, shardDsl.fetchCount(FILE_ENTRY, FILE_ENTRY.FILE_ID.eq(SOURCE)));
+        assertNull(queryEntryFilename(SOURCE));
     }
 
-    private void addCorruptEntry() {
-        shardDsl.insertInto(FILE_ENTRY)
-                .set(FILE_ENTRY.ENTRY_ID, "entry-corrupt")
+    @Test
+    public void missingLegacyEntryDoesNotBlockFileDelete() {
+        shardDsl.deleteFrom(FILE_ENTRY).where(FILE_ENTRY.FILE_ID.eq(SOURCE)).execute();
+
+        fileRepo.updateFile(FileOps.builder().fileId(SOURCE).status(FileStatus.DELETED).build());
+
+        assertEquals(FileStatus.DELETED.getValue(), queryFile(SOURCE).getStatus());
+        assertEquals(0, shardDsl.fetchCount(FILE_ENTRY, FILE_ENTRY.FILE_ID.eq(SOURCE)));
+    }
+
+    @Test
+    public void duplicateFileEntryIsRejectedBySchema() {
+        assertThrows(DataAccessException.class, () -> shardDsl.insertInto(FILE_ENTRY)
+                .set(FILE_ENTRY.ENTRY_ID, "entry-duplicate-file")
                 .set(FILE_ENTRY.SPACE_CODE, SPACE_CODE)
                 .set(FILE_ENTRY.PARENT_ENTRY_ID, "")
                 .set(FILE_ENTRY.FILE_ID, SOURCE)
-                .set(FILE_ENTRY.FILENAME, "corrupt.txt")
+                .set(FILE_ENTRY.FILENAME, "duplicate-file.txt")
                 .set(FILE_ENTRY.TYPE, FileEntryRepo.TYPE_FILE)
-                .set(FILE_ENTRY.STATUS, FileStatus.NOT_DELETED.getValue())
-                .set(FILE_ENTRY.CUID, 1L)
-                .set(FILE_ENTRY.CU_NAME, "tester")
-                .set(FILE_ENTRY.CTIME, java.time.LocalDateTime.now())
-                .set(FILE_ENTRY.MUID, 1L)
-                .set(FILE_ENTRY.MU_NAME, "tester")
-                .set(FILE_ENTRY.MTIME, java.time.LocalDateTime.now())
-                .execute();
+                .execute());
     }
 
     private void addFile(String fileId, String filename) {
@@ -123,7 +126,12 @@ public class FileRepoUpdateTransactionTest {
     private String queryEntryFilename(String fileId) {
         return shardDsl.select(FILE_ENTRY.FILENAME).from(FILE_ENTRY)
                 .where(FILE_ENTRY.FILE_ID.eq(fileId))
-                .and(FILE_ENTRY.STATUS.eq(FileStatus.NOT_DELETED.getValue()))
+                .fetchOneInto(String.class);
+    }
+
+    private String queryEntryId(String fileId) {
+        return shardDsl.select(FILE_ENTRY.ENTRY_ID).from(FILE_ENTRY)
+                .where(FILE_ENTRY.FILE_ID.eq(fileId))
                 .fetchOneInto(String.class);
     }
 

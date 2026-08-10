@@ -32,19 +32,16 @@ public class FileEntryRecord extends UpdatableRecordImpl<FileEntryRecord> implem
     public String getFilename() { return (String) get(5); }
     public void setType(String value) { set(6, value); }
     public String getType() { return (String) get(6); }
-    public void setStatus(Integer value) { set(7, value); }
-    public Integer getStatus() { return (Integer) get(7); }
-    public Integer getActiveFlag() { return (Integer) get(8); }
-    public void setCuid(Long value) { set(9, value); }
-    public Long getCuid() { return (Long) get(9); }
-    public void setCuName(String value) { set(10, value); }
-    public String getCuName() { return (String) get(10); }
-    public void setCtime(LocalDateTime value) { set(11, value); }
-    public LocalDateTime getCtime() { return (LocalDateTime) get(11); }
-    public void setMuid(Long value) { set(12, value); }
-    public Long getMuid() { return (Long) get(12); }
-    public void setMuName(String value) { set(13, value); }
-    public String getMuName() { return (String) get(13); }
-    public void setMtime(LocalDateTime value) { set(14, value); }
-    public LocalDateTime getMtime() { return (LocalDateTime) get(14); }
+    public void setCuid(Long value) { set(7, value); }
+    public Long getCuid() { return (Long) get(7); }
+    public void setCuName(String value) { set(8, value); }
+    public String getCuName() { return (String) get(8); }
+    public void setCtime(LocalDateTime value) { set(9, value); }
+    public LocalDateTime getCtime() { return (LocalDateTime) get(9); }
+    public void setMuid(Long value) { set(10, value); }
+    public Long getMuid() { return (Long) get(10); }
+    public void setMuName(String value) { set(11, value); }
+    public String getMuName() { return (String) get(11); }
+    public void setMtime(LocalDateTime value) { set(12, value); }
+    public LocalDateTime getMtime() { return (LocalDateTime) get(12); }
 }

@@ -74,7 +74,6 @@ public class FileEntryRepo implements BaseRepo {
         return entryDb(spaceCode).selectFrom(FILE_ENTRY)
                 .where(FILE_ENTRY.SPACE_CODE.eq(spaceCode))
                 .and(FILE_ENTRY.FILE_ID.eq(fileId))
-                .and(FILE_ENTRY.STATUS.eq(FileStatus.NOT_DELETED.getValue()))
                 .fetchOneInto(FileEntryDB.class);
     }
 
@@ -85,7 +84,6 @@ public class FileEntryRepo implements BaseRepo {
         return entryDb(spaceCode).selectFrom(FILE_ENTRY)
                 .where(FILE_ENTRY.SPACE_CODE.eq(spaceCode))
                 .and(FILE_ENTRY.ENTRY_ID.eq(entryId))
-                .and(FILE_ENTRY.STATUS.eq(FileStatus.NOT_DELETED.getValue()))
                 .fetchOneInto(FileEntryDB.class);
     }
 
@@ -94,7 +92,6 @@ public class FileEntryRepo implements BaseRepo {
                 .where(FILE_ENTRY.SPACE_CODE.eq(spaceCode))
                 .and(FILE_ENTRY.PARENT_ENTRY_ID.eq(parentEntryId))
                 .and(FILE_ENTRY.FILENAME.eq(filename))
-                .and(FILE_ENTRY.STATUS.eq(FileStatus.NOT_DELETED.getValue()))
                 .fetchOneInto(FileEntryDB.class);
     }
 
@@ -112,7 +109,6 @@ public class FileEntryRepo implements BaseRepo {
         List<FileEntryDB> entries = entryDb(spaceCode).selectFrom(FILE_ENTRY)
                 .where(FILE_ENTRY.SPACE_CODE.eq(spaceCode))
                 .and(FILE_ENTRY.PARENT_ENTRY_ID.eq(parentEntryId))
-                .and(FILE_ENTRY.STATUS.eq(FileStatus.NOT_DELETED.getValue()))
                 .orderBy(DSL.when(FILE_ENTRY.TYPE.eq(TYPE_DIR), 1).otherwise(0).desc(), FILE_ENTRY.CTIME.desc())
                 .fetchInto(FileEntryDB.class);
         return hydrate(entries);
@@ -125,7 +121,6 @@ public class FileEntryRepo implements BaseRepo {
                 .from(FILE_ENTRY)
                 .where(FILE_ENTRY.SPACE_CODE.eq(spaceCode))
                 .and(FILE_ENTRY.PARENT_ENTRY_ID.eq(parentEntryId))
-                .and(FILE_ENTRY.STATUS.eq(FileStatus.NOT_DELETED.getValue()))
                 .fetchInto(String.class);
         if(fileIds.isEmpty()) {
             return Collections.emptyList();
@@ -165,7 +160,6 @@ public class FileEntryRepo implements BaseRepo {
         List<FileEntryDB> entries = entryDb(spaceCode).selectFrom(FILE_ENTRY)
                 .where(FILE_ENTRY.SPACE_CODE.eq(spaceCode))
                 .and(FILE_ENTRY.PARENT_ENTRY_ID.eq(parentEntryId))
-                .and(FILE_ENTRY.STATUS.eq(FileStatus.NOT_DELETED.getValue()))
                 .fetchInto(FileEntryDB.class);
 
         List<FileDB> filtered = hydrate(entries).stream()
@@ -275,7 +269,6 @@ public class FileEntryRepo implements BaseRepo {
         record.setFileId(file.getFileId());
         record.setFilename(file.getFilename());
         record.setType(Integer.valueOf(1).equals(file.getIsDir()) ? TYPE_DIR : TYPE_FILE);
-        record.setStatus(FileStatus.NOT_DELETED.getValue());
         fillCreatorInfo(record);
         int inserted = entryDb(spaceCode).insertInto(FILE_ENTRY).set(record).execute();
         if(inserted != 1) {
@@ -329,7 +322,6 @@ public class FileEntryRepo implements BaseRepo {
         record.setFileId(fileId);
         record.setFilename(file.getFilename());
         record.setType(Integer.valueOf(1).equals(file.getIsDir()) ? TYPE_DIR : TYPE_FILE);
-        record.setStatus(FileStatus.NOT_DELETED.getValue());
         fillCreatorInfo(record);
         try {
             entryDb(spaceCode).insertInto(FILE_ENTRY).set(record).execute();
@@ -357,7 +349,6 @@ public class FileEntryRepo implements BaseRepo {
         int updated = entryDb(spaceCode).update(FILE_ENTRY)
                 .set(FILE_ENTRY.FILENAME, filename)
                 .where(FILE_ENTRY.ENTRY_ID.eq(entry.getEntryId()))
-                .and(FILE_ENTRY.STATUS.eq(FileStatus.NOT_DELETED.getValue()))
                 .execute();
         if(updated != 1) {
             throw new IllegalStateException("rename file_entry failed, fileId: " + fileId);
@@ -374,7 +365,6 @@ public class FileEntryRepo implements BaseRepo {
         int updated = entryDb(spaceCode).update(FILE_ENTRY)
                 .set(FILE_ENTRY.PARENT_ENTRY_ID, parentEntryId)
                 .where(FILE_ENTRY.ENTRY_ID.eq(entry.getEntryId()))
-                .and(FILE_ENTRY.STATUS.eq(FileStatus.NOT_DELETED.getValue()))
                 .execute();
         if(updated != 1) {
             throw new IllegalStateException("move file_entry failed, fileId: " + fileId);
@@ -382,19 +372,12 @@ public class FileEntryRepo implements BaseRepo {
     }
 
     public void delete(String spaceCode, String fileId) {
-        FileEntryDB entry = ensureLegacyEntry(spaceCode, fileId);
-        int activeCount = entryDb(spaceCode).fetchCount(FILE_ENTRY,
-                FILE_ENTRY.FILE_ID.eq(fileId).and(FILE_ENTRY.STATUS.eq(FileStatus.NOT_DELETED.getValue())));
-        if(activeCount != 1) {
-            throw new IllegalStateException("file must have exactly one active entry, fileId: " + fileId);
-        }
-        int updated = entryDb(spaceCode).update(FILE_ENTRY)
-                .set(FILE_ENTRY.STATUS, FileStatus.DELETED.getValue())
-                .where(FILE_ENTRY.ENTRY_ID.eq(entry.getEntryId()))
-                .and(FILE_ENTRY.STATUS.eq(FileStatus.NOT_DELETED.getValue()))
+        int deleted = entryDb(spaceCode).deleteFrom(FILE_ENTRY)
+                .where(FILE_ENTRY.SPACE_CODE.eq(spaceCode))
+                .and(FILE_ENTRY.FILE_ID.eq(fileId))
                 .execute();
-        if(updated != 1) {
-            throw new IllegalStateException("delete file_entry failed, fileId: " + fileId);
+        if(deleted > 1) {
+            throw new IllegalStateException("multiple file_entry rows deleted, fileId: " + fileId);
         }
     }
 
@@ -410,8 +393,7 @@ public class FileEntryRepo implements BaseRepo {
         String sourceSpaceCode = file.getSpaceCode();
         FileEntryDB source = ensureLegacyEntry(sourceSpaceCode, fileId);
         if(TYPE_DIR.equals(source.getType()) && entryDb(sourceSpaceCode).fetchCount(FILE_ENTRY,
-                FILE_ENTRY.PARENT_ENTRY_ID.eq(source.getEntryId())
-                        .and(FILE_ENTRY.STATUS.eq(FileStatus.NOT_DELETED.getValue()))) > 0) {
+                FILE_ENTRY.PARENT_ENTRY_ID.eq(source.getEntryId())) > 0) {
             throw new IllegalArgumentException("cross-space move of non-empty directories is not supported");
         }
         String targetParentEntryId = resolveParentEntryId(targetSpaceCode, targetAncestorId);
@@ -423,13 +405,12 @@ public class FileEntryRepo implements BaseRepo {
         target.setFileId(fileId);
         target.setFilename(source.getFilename());
         target.setType(source.getType());
-        target.setStatus(FileStatus.NOT_DELETED.getValue());
         fillCreatorInfo(target);
         entryDb(targetSpaceCode).insertInto(FILE_ENTRY).set(target).execute();
-        int sourceUpdated = entryDb(sourceSpaceCode).update(FILE_ENTRY)
-                .set(FILE_ENTRY.STATUS, FileStatus.DELETED.getValue())
-                .where(FILE_ENTRY.ENTRY_ID.eq(source.getEntryId()))
-                .and(FILE_ENTRY.STATUS.eq(FileStatus.NOT_DELETED.getValue()))
+        int sourceUpdated = entryDb(sourceSpaceCode).deleteFrom(FILE_ENTRY)
+                .where(FILE_ENTRY.SPACE_CODE.eq(sourceSpaceCode))
+                .and(FILE_ENTRY.ENTRY_ID.eq(source.getEntryId()))
+                .and(FILE_ENTRY.FILE_ID.eq(fileId))
                 .execute();
         if(sourceUpdated != 1) {
             throw new IllegalStateException("delete source file_entry failed, fileId: " + fileId);

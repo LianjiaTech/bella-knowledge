@@ -7,8 +7,6 @@ CREATE TABLE IF NOT EXISTS `file_entry`
     `file_id`         varchar(256)     NOT NULL DEFAULT '',
     `filename`        varchar(512)     NOT NULL DEFAULT '',
     `type`            varchar(16)      NOT NULL DEFAULT 'file',
-    `status`          tinyint(1)       NOT NULL DEFAULT 0,
-    `active_flag`     tinyint(1) GENERATED ALWAYS AS (IF(`status` = 0, 1, NULL)) STORED,
     `cuid`            bigint           NOT NULL DEFAULT 0,
     `cu_name`         varchar(32)      NOT NULL DEFAULT '',
     `ctime`           datetime         NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -17,8 +15,8 @@ CREATE TABLE IF NOT EXISTS `file_entry`
     `mtime`           datetime         NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_space_entry` (`space_code`, `entry_id`),
-    UNIQUE KEY `uk_space_parent_name_active` (`space_code`, `parent_entry_id`, `filename`, `active_flag`),
-    KEY `idx_space_parent_status` (`space_code`, `parent_entry_id`, `status`),
+    UNIQUE KEY `uk_space_parent_name` (`space_code`, `parent_entry_id`, `filename`),
+    UNIQUE KEY `uk_space_file` (`space_code`, `file_id`),
     KEY `idx_file_id` (`file_id`),
     KEY `idx_parent_entry_id` (`parent_entry_id`)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
