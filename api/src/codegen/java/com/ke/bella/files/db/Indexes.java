@@ -38,7 +38,6 @@ public class Indexes {
     public static final Index FILE_CLOSURE_IDX_ANCESTOR_DEPTH_STATUS = Internal.createIndex(DSL.name("idx_ancestor_depth_status"), FileClosure.FILE_CLOSURE, new OrderField[] { FileClosure.FILE_CLOSURE.ANCESTOR_ID, FileClosure.FILE_CLOSURE.DEPTH }, false);
     public static final Index FILE_ENTRY_IDX_FILE_ID = Internal.createIndex(DSL.name("idx_file_id"), FileEntry.FILE_ENTRY, new OrderField[] { FileEntry.FILE_ENTRY.FILE_ID }, false);
     public static final Index FILE_ENTRY_IDX_PARENT_ENTRY_ID = Internal.createIndex(DSL.name("idx_parent_entry_id"), FileEntry.FILE_ENTRY, new OrderField[] { FileEntry.FILE_ENTRY.PARENT_ENTRY_ID }, false);
-    public static final Index FILE_ENTRY_IDX_SPACE_PARENT_STATUS = Internal.createIndex(DSL.name("idx_space_parent_status"), FileEntry.FILE_ENTRY, new OrderField[] { FileEntry.FILE_ENTRY.SPACE_CODE, FileEntry.FILE_ENTRY.PARENT_ENTRY_ID, FileEntry.FILE_ENTRY.STATUS }, false);
     public static final Index DATASET_IDX_CTIME = Internal.createIndex(DSL.name("idx_ctime"), Dataset.DATASET, new OrderField[] { Dataset.DATASET.CTIME }, false);
     public static final Index DATASET_DOCUMENT_IDX_CTIME = Internal.createIndex(DSL.name("idx_ctime"), DatasetDocument.DATASET_DOCUMENT, new OrderField[] { DatasetDocument.DATASET_DOCUMENT.CTIME }, false);
     public static final Index DATASET_QA_IDX_CTIME = Internal.createIndex(DSL.name("idx_ctime"), DatasetQa.DATASET_QA, new OrderField[] { DatasetQa.DATASET_QA.CTIME }, false);

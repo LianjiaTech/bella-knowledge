@@ -1,6 +1,7 @@
 package com.ke.bella.files.db.repo;
 
 import static com.ke.bella.files.db.Tables.FILE;
+import static com.ke.bella.files.db.Tables.FILE_ENTRY;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
@@ -97,6 +98,8 @@ public class FileEntryRepoTest {
         fileRepo.updateFile(FileOps.builder().fileId(file.getFileId()).status(FileStatus.DELETED).build());
         fileRepo.deleteFileClosure(file.getFileId(), FileType.USER);
         assertNull(entryRepo.queryActiveByFileId(SOURCE_SPACE, file.getFileId()));
+        assertEquals(0, DSLContextHolder.get(FileRepo.getShardingKeyBySpaceCode(SOURCE_SPACE), dsl)
+                .fetchCount(FILE_ENTRY, FILE_ENTRY.FILE_ID.eq(file.getFileId())));
         FileDB recreated = addFile(SOURCE_SPACE, "renamed.txt", secondParent.getFileId(), "recreated");
         assertNotEquals(original.getEntryId(), entryRepo.queryActiveByFileId(SOURCE_SPACE, recreated.getFileId()).getEntryId());
     }
@@ -117,6 +120,8 @@ public class FileEntryRepoTest {
         assertNotEquals(sourceEntryId, target.getEntryId());
         assertEquals(entryRepo.queryActiveByFileId(TARGET_SPACE, targetParent.getFileId()).getEntryId(), target.getParentEntryId());
         assertNull(entryRepo.queryActiveByFileId(SOURCE_SPACE, source.getFileId()));
+        assertEquals(0, DSLContextHolder.get(FileRepo.getShardingKeyBySpaceCode(SOURCE_SPACE), dsl)
+                .fetchCount(FILE_ENTRY, FILE_ENTRY.FILE_ID.eq(source.getFileId())));
         FileDB unchanged = fileRepo.queryFile(source.getFileId());
         assertEquals(TARGET_SPACE, unchanged.getSpaceCode());
         assertEquals(source.getBucket(), unchanged.getBucket());

@@ -18,8 +18,6 @@ public class FileEntryDB implements Serializable, Operator {
     private String fileId;
     private String filename;
     private String type;
-    private Integer status;
-    private Integer activeFlag;
     private Long cuid;
     private String cuName;
     private LocalDateTime ctime;
@@ -41,10 +39,6 @@ public class FileEntryDB implements Serializable, Operator {
     public void setFilename(String filename) { this.filename = filename; }
     public String getType() { return type; }
     public void setType(String type) { this.type = type; }
-    public Integer getStatus() { return status; }
-    public void setStatus(Integer status) { this.status = status; }
-    public Integer getActiveFlag() { return activeFlag; }
-    public void setActiveFlag(Integer activeFlag) { this.activeFlag = activeFlag; }
     public Long getCuid() { return cuid; }
     public void setCuid(Long cuid) { this.cuid = cuid; }
     public String getCuName() { return cuName; }

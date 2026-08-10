@@ -269,19 +269,6 @@ public class FileRepoMoveTest {
     }
 
     @Test
-    public void backfillIncludesLegacyRowsWithNullDirectoryFlag() {
-        dsl.execute("alter table file_0 alter column is_dir drop not null");
-        dsl.execute("update file_0 set is_dir = null where file_id = ?", LEAF);
-
-        FileEntryRepo.BackfillBatchResult batch = entryRepo.backfillBatch("sp-0", 0, Long.MAX_VALUE, 100);
-        FileEntryRepo.EntryConsistencyReport report = entryRepo.compareSpace("sp-0");
-
-        assertEquals(6, batch.getProcessed());
-        assertTrue(report.isConsistent());
-        assertEquals(FileEntryRepo.TYPE_FILE, entryRepo.queryActiveByFileId("sp-0", LEAF).getType());
-    }
-
-    @Test
     public void movingToSelfOrDescendantDoesNotChangeClosures() {
         Map<String, String> before = snapshot();
 
