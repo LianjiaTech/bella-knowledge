@@ -1058,6 +1058,10 @@ public class FileController {
         });
     }
 
+    /**
+     * 创建业务资源引用。resource_id 有意不做唯一性校验，支持将同一业务资源登记到多个目录位置；
+     * 删除其中一个节点只移除该处引用，不影响其他引用或业务系统中的原始资源。
+     */
     @PostMapping("/resources")
     public OpenAIFile createResource(@RequestBody CreateResourceOp op) {
         Assert.notNull(op, "invalid request body");
