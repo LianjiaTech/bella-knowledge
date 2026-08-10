@@ -39,6 +39,7 @@ public class FileSystemOps {
         private String ancestorId;
         private String name;
         private String resourceId;
+        private String purpose;
     }
 
     @Data

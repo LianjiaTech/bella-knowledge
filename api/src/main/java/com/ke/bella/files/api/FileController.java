@@ -1061,12 +1061,19 @@ public class FileController {
     /**
      * 创建业务资源引用。resource_id 有意不做唯一性校验，支持将同一业务资源登记到多个目录位置；
      * 删除其中一个节点只移除该处引用，不影响其他引用或业务系统中的原始资源。
+     * purpose 为可选字段，取值范围与文件和目录创建接口一致。
      */
     @PostMapping("/resources")
     public OpenAIFile createResource(@RequestBody CreateResourceOp op) {
         Assert.notNull(op, "invalid request body");
         validateDirectoryName(op.getName());
         validateResourceId(op.getResourceId());
+        if(op.getPurpose() != null && !FilePurposeClassifier.allowedPurposes().contains(op.getPurpose())) {
+            throw new IllegalArgumentException(
+                    String.format("Unsupported purpose: '%s'. Supported purposes are: %s",
+                            op.getPurpose(),
+                            String.join(", ", FilePurposeClassifier.allowedPurposes())));
+        }
 
         String spaceCode = BellaContextHelper.getOperateSpaceCode();
         validateAncestorDirectory(spaceCode, op.getAncestorId());
@@ -1076,7 +1083,7 @@ public class FileController {
                 throw new IllegalArgumentException(
                         String.format("Resource '%s' already exists in current directory, ancestor_id: '%s'", op.getName(), op.getAncestorId()));
             }
-            return fileService.createResource(op.getName(), op.getResourceId(), op.getAncestorId());
+            return fileService.createResource(op.getName(), op.getResourceId(), op.getAncestorId(), op.getPurpose());
         });
     }
 

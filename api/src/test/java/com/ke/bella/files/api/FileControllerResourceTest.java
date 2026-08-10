@@ -65,22 +65,24 @@ public class FileControllerResourceTest {
         when(fileService.getFile0("file-parent-1-d")).thenReturn(ancestor);
         when(fileUniquenessLock.executeWithLock(eq("sp-a"), eq("file-parent-1-d"), eq("Sales dataset"), anyLong(), any()))
                 .thenAnswer(invocation -> ((Supplier<?>) invocation.getArgument(4)).get());
-        when(fileService.createResource("Sales dataset", "dataset:12345", "file-parent-1-d"))
+        when(fileService.createResource("Sales dataset", "dataset:12345", "file-parent-1-d", "assistants"))
                 .thenReturn(OpenAIFile.builder()
                         .id("file-resource-1")
                         .filename("Sales dataset")
                         .nodeType(NodeType.RESOURCE.getValue())
                         .resourceId("dataset:12345")
+                        .purpose("assistants")
                         .isDir(false)
                         .bytes(0L)
                         .build());
 
         mockMvc.perform(post("/v1/files/resources")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"Sales dataset\",\"resource_id\":\"dataset:12345\",\"ancestor_id\":\"file-parent-1-d\"}"))
+                .content("{\"name\":\"Sales dataset\",\"resource_id\":\"dataset:12345\",\"ancestor_id\":\"file-parent-1-d\",\"purpose\":\"assistants\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.node_type").value("resource"))
                 .andExpect(jsonPath("$.resource_id").value("dataset:12345"))
+                .andExpect(jsonPath("$.purpose").value("assistants"))
                 .andExpect(jsonPath("$.is_dir").value(false));
     }
 
@@ -91,7 +93,17 @@ public class FileControllerResourceTest {
                 .content("{\"name\":\"Sales dataset\",\"resource_id\":\"dataset\"}"))
                 .andExpect(status().isBadRequest());
 
-        verify(fileService, never()).createResource(any(), any(), any());
+        verify(fileService, never()).createResource(any(), any(), any(), any());
+    }
+
+    @Test
+    public void rejectUnsupportedPurpose() throws Exception {
+        mockMvc.perform(post("/v1/files/resources")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Sales dataset\",\"resource_id\":\"dataset:12345\",\"purpose\":\"unsupported\"}"))
+                .andExpect(status().isBadRequest());
+
+        verify(fileService, never()).createResource(any(), any(), any(), any());
     }
 
     @Test
@@ -108,7 +120,7 @@ public class FileControllerResourceTest {
                 .content("{\"name\":\"Child\",\"resource_id\":\"dataset:2\",\"ancestor_id\":\"file-resource-1\"}"))
                 .andExpect(status().isBadRequest());
 
-        verify(fileService, never()).createResource(any(), any(), any());
+        verify(fileService, never()).createResource(any(), any(), any(), any());
     }
 
     @Test

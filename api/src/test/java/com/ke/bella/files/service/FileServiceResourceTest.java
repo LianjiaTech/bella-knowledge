@@ -69,10 +69,11 @@ public class FileServiceResourceTest {
         });
         when(fileRepo.queryFile(anyString(), any(FileType.class))).thenAnswer(invocation -> inserted.get());
 
-        OpenAIFile resource = fileService.createResource("Sales dataset", "dataset:12345", "file-parent-1-d");
+        OpenAIFile resource = fileService.createResource("Sales dataset", "dataset:12345", "file-parent-1-d", "assistants");
 
         assertEquals(NodeType.RESOURCE.getValue(), resource.getNodeType());
         assertEquals("dataset:12345", resource.getResourceId());
+        assertEquals("assistants", resource.getPurpose());
         assertFalse(resource.getIsDir());
         assertEquals(Long.valueOf(0L), resource.getBytes());
         verify(fileRepo).addFile(any(FileDB.class), org.mockito.ArgumentMatchers.eq("file-parent-1-d"),

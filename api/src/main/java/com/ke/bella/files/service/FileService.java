@@ -660,7 +660,7 @@ public class FileService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public OpenAIFile createResource(String name, String resourceId, String ancestorId) {
+    public OpenAIFile createResource(String name, String resourceId, String ancestorId, String purpose) {
         String spaceCode = BellaContextHelper.getOperateSpaceCode();
         String fileId = FILE_ID_GENERATOR.generateWithType(FileType.USER);
 
@@ -674,7 +674,7 @@ public class FileService {
         fileDB.setPath("");
         fileDB.setBytes(0L);
         fileDB.setSpaceCode(spaceCode);
-        fileDB.setPurpose("");
+        fileDB.setPurpose(StringUtils.defaultString(purpose));
         fileDB.setMetaData("{}");
         fileDB.setAkCode(BellaContextHelper.getOperatorAkCode());
         fileDB.setIsDir(0);
