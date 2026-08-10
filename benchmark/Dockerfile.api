@@ -1,0 +1,25 @@
+# syntax=docker/dockerfile:1
+FROM maven:3.9.9-eclipse-temurin-8 AS builder
+
+WORKDIR /build
+COPY api/ ./
+
+ARG MAVEN_MIRROR=central
+ARG MAVEN_ARGS="-Dmaven.test.skip=true -Dmaven.build.cache.enabled=false"
+
+RUN --mount=type=cache,target=/root/.m2 \
+    mkdir -p /root/.m2 \
+    && cp "settings-${MAVEN_MIRROR}.xml" /root/.m2/settings.xml \
+    && mvn clean package ${MAVEN_ARGS}
+
+FROM eclipse-temurin:8-jre-jammy
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /opt/bella-file-api/htdocs/lib /opt/bella-file-api/cache
+
+COPY --from=builder /build/target/*.jar /opt/bella-file-api/htdocs/lib/
+
+WORKDIR /opt/bella-file-api/htdocs
+EXPOSE 8081

@@ -104,6 +104,7 @@ docker-compose up -d
 ### 📚 快速导航
 
 - **[🚀 部署与开发指南](./docker/README.md)** - Docker部署、开发环境、生产运维完整指南
+- **[⚡ 本地性能 Benchmark](./benchmark/README.md)** - 一键运行文件、目录和数据集性能测试
 - **[🤝 贡献指南](./CONTRIBUTING.md)** - 代码规范、提交流程、如何参与项目贡献
 
 ### 🐛 问题反馈
@@ -119,6 +120,25 @@ docker-compose up -d
 
 详细的开发环境搭建、配置说明和部署指南，请参考：
 - **[部署与开发指南](./docker/README.md)** - 包含开发环境配置、Docker部署、生产运维等完整指南
+
+## ⚡ 本地性能 Benchmark
+
+项目内置基于 Docker 和 k6 的本地性能测试，覆盖 `smoke`、`files-read`、`files-upload`、`files-move`、`datasets` 和 `mixed` 六组场景。测试使用独立的 MySQL、Redis 和 MinIO 数据卷，不会修改本地开发数据。
+
+在仓库根目录一键运行全部场景：
+
+```bash
+./benchmark/bench
+```
+
+也可以单独运行指定场景或调整并发数、持续时间：
+
+```bash
+./benchmark/bench run files-read
+BENCH_VUS=8 BENCH_DURATION=60s ./benchmark/bench run mixed
+```
+
+运行结果保存在 `benchmark/results/`。环境变量、指标门禁和其他命令请查看 **[Benchmark 使用说明](./benchmark/README.md)**。
 
 ## 📄 许可协议
 

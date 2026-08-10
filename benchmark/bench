@@ -1,0 +1,207 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+BENCH_DIR="$ROOT_DIR/benchmark"
+COMPOSE_FILE="$BENCH_DIR/docker-compose.yml"
+SCENARIOS=(smoke files-read files-upload files-move datasets mixed)
+
+log() {
+  printf '[benchmark] %s\n' "$*"
+}
+
+die() {
+  printf '[benchmark] ERROR: %s\n' "$*" >&2
+  exit 1
+}
+
+compose() {
+  docker compose -f "$COMPOSE_FILE" "$@"
+}
+
+require_tools() {
+  command -v docker >/dev/null 2>&1 || die "docker is required"
+  command -v curl >/dev/null 2>&1 || die "curl is required"
+  command -v jq >/dev/null 2>&1 || die "jq is required"
+  docker info >/dev/null 2>&1 || die "docker daemon is not running"
+}
+
+is_scenario() {
+  local candidate="$1"
+  local scenario
+  for scenario in "${SCENARIOS[@]}"; do
+    if [[ "$candidate" == "$scenario" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+ensure_directories() {
+  mkdir -p "$BENCH_DIR/fixtures" "$BENCH_DIR/results"
+  chmod ugo+rwx "$BENCH_DIR/results"
+}
+
+ensure_fixture() {
+  local bytes="${BENCH_UPLOAD_BYTES:-1048576}"
+  local fixture="$BENCH_DIR/fixtures/upload.bin"
+
+  [[ "$bytes" =~ ^[1-9][0-9]*$ ]] || die "BENCH_UPLOAD_BYTES must be a positive integer"
+  if [[ ! -f "$fixture" ]] || [[ "$(wc -c < "$fixture" | tr -d ' ')" != "$bytes" ]]; then
+    log "generating upload fixture (${bytes} bytes)"
+    dd if=/dev/zero of="$fixture" bs="$bytes" count=1 status=none
+  fi
+}
+
+wait_for_api() {
+  local url="http://127.0.0.1:${BENCH_API_PORT:-18082}/actuator/health"
+  local attempt
+  for attempt in $(seq 1 90); do
+    if curl -fsS -H "Authorization: Bearer ${BENCH_AUTH_TOKEN:-local-dev}" "$url" >/dev/null 2>&1; then
+      log "API is ready: $url"
+      return 0
+    fi
+    sleep 2
+  done
+  compose logs --tail=160 api >&2 || true
+  die "API did not become ready"
+}
+
+up() {
+  require_tools
+  ensure_directories
+  ensure_fixture
+  if [[ "${BENCH_BUILD:-1}" == "1" ]]; then
+    log "starting isolated benchmark stack"
+    compose up -d --build mysql redis minio minio-init api
+  else
+    log "starting isolated benchmark stack without rebuilding the API image"
+    compose up -d mysql redis minio minio-init api
+  fi
+  wait_for_api
+}
+
+down() {
+  log "stopping benchmark stack"
+  compose --profile tools down --remove-orphans
+}
+
+clean() {
+  log "removing benchmark containers and data volumes"
+  compose --profile tools down --volumes --remove-orphans
+}
+
+clear_results() {
+  ensure_directories
+  find "$BENCH_DIR/results" -maxdepth 1 -type f \
+    \( -name '*.json' -o -name 'report.md' \) -delete
+}
+
+run_scenario() {
+  local scenario="$1"
+  is_scenario "$scenario" || die "unknown scenario: $scenario"
+  ensure_directories
+  ensure_fixture
+  export BENCH_RUN_ID="${scenario}-$(date '+%Y%m%d-%H%M%S')"
+  log "running $scenario (run_id=$BENCH_RUN_ID)"
+  compose --profile tools run --rm k6 run "/scripts/scenarios/${scenario}.js"
+}
+
+report() {
+  local output="$BENCH_DIR/results/report.md"
+  local files=("$BENCH_DIR"/results/*.json)
+  local file
+
+  if [[ ! -e "${files[0]}" ]]; then
+    die "no benchmark JSON results found"
+  fi
+
+  {
+    printf '# Bella Knowledge benchmark report\n\n'
+    printf 'Generated: %s\n\n' "$(date '+%Y-%m-%d %H:%M:%S %Z')"
+    printf '| Scenario | Requests/s | p50 (ms) | p95 (ms) | p99 (ms) | Failed | Checks |\n'
+    printf '|---|---:|---:|---:|---:|---:|---:|\n'
+    for file in "${files[@]}"; do
+      jq -r '[
+        (.root_group.name // (.state.testRunDurationMs | tostring)),
+        (.metrics.http_reqs.values.rate // 0),
+        (.metrics.http_req_duration.values.med // 0),
+        (.metrics.http_req_duration.values["p(95)"] // 0),
+        (.metrics.http_req_duration.values["p(99)"] // 0),
+        (.metrics.http_req_failed.values.rate // 0),
+        (.metrics.checks.values.rate // 0)
+      ] | @tsv' "$file" | awk -v name="$(basename "$file" .json)" -F '\t' \
+        '{printf "| %s | %.2f | %.2f | %.2f | %.2f | %.4f | %.4f |\n", name, $2, $3, $4, $5, $6, $7}'
+    done
+  } > "$output"
+  log "report written to $output"
+}
+
+run_all() {
+  local scenario
+  if [[ "${BENCH_FRESH:-1}" == "1" ]]; then
+    clean
+    clear_results
+  fi
+  up
+  for scenario in "${SCENARIOS[@]}"; do
+    run_scenario "$scenario"
+  done
+  report
+}
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  ./benchmark/bench                 Run all six scenarios
+  ./benchmark/bench all             Run all six scenarios
+  ./benchmark/bench run <scenario>  Run one scenario
+  ./benchmark/bench up              Start the isolated stack
+  ./benchmark/bench report          Rebuild results/report.md
+  ./benchmark/bench down            Stop containers, keep data
+  ./benchmark/bench clean           Stop containers and delete benchmark data
+
+Scenarios:
+  smoke, files-read, files-upload, files-move, datasets, mixed
+
+Common overrides:
+  BENCH_DURATION=60s BENCH_VUS=8 ./benchmark/bench run files-read
+  BENCH_UPLOAD_BYTES=16777216 BENCH_VUS=4 ./benchmark/bench run files-upload
+  BENCH_BUILD=0 ./benchmark/bench all
+USAGE
+}
+
+main() {
+  local command="${1:-all}"
+  case "$command" in
+    all)
+      run_all
+      ;;
+    run)
+      [[ $# -eq 2 ]] || die "run requires exactly one scenario"
+      up
+      run_scenario "$2"
+      report
+      ;;
+    up)
+      up
+      ;;
+    report)
+      report
+      ;;
+    down)
+      down
+      ;;
+    clean)
+      clean
+      ;;
+    help|-h|--help)
+      usage
+      ;;
+    *)
+      die "unknown command: $command (try --help)"
+      ;;
+  esac
+}
+
+main "$@"

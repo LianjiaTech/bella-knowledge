@@ -63,3 +63,8 @@ docker/volumes/kafka/data
 docker/volumes/minio/data
 docker/volumes/api
 .DS_Store
+
+# Local benchmark artifacts
+benchmark/fixtures/*.bin
+benchmark/results/*
+!benchmark/results/.gitkeep

@@ -1,0 +1,154 @@
+name: bella-knowledge-benchmark
+
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: bella_file_api
+      MYSQL_USER: bella_user
+      MYSQL_PASSWORD: "123456"
+    command:
+      - --default-authentication-plugin=mysql_native_password
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+    ports:
+      - "${BENCH_MYSQL_PORT:-13306}:3306"
+    volumes:
+      - bench-mysql:/var/lib/mysql
+      - ../api/sql:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-ubella_user", "-p123456"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+      start_period: 20s
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "no", "--requirepass", "bella123"]
+    ports:
+      - "${BENCH_REDIS_PORT:-16380}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "bella123", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  minio:
+    image: minio/minio:latest
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: ["server", "/data", "--console-address", ":9001"]
+    ports:
+      - "${BENCH_MINIO_PORT:-19000}:9000"
+      - "${BENCH_MINIO_CONSOLE_PORT:-19001}:9001"
+    volumes:
+      - bench-minio:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9000/minio/health/live"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        mc alias set bench http://minio:9000 minioadmin minioadmin &&
+        mc mb --ignore-existing bench/bella-file-api
+    restart: "no"
+
+  api:
+    build:
+      context: ..
+      dockerfile: benchmark/Dockerfile.api
+      args:
+        MAVEN_MIRROR: ${MAVEN_MIRROR:-central}
+        MAVEN_ARGS: "-Dmaven.test.skip=true -Dmaven.build.cache.enabled=false"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      MYSQL_DATABASE: bella_file_api
+      MYSQL_USER: bella_user
+      MYSQL_PASSWORD: "123456"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: bella123
+      BELLA_STORAGE_TYPE: s3
+      BELLA_STORAGE_S3_BUCKET: bella-file-api
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_REGION: us-east-1
+      BELLA_DEV_AUTH_ENABLED: "true"
+      BELLA_DEV_AUTH_TOKEN: ${BENCH_AUTH_TOKEN:-local-dev}
+      BELLA_DEV_AUTH_SPACE_CODE: ${BENCH_SPACE_CODE:-local-dev}
+      BELLA_DEV_AUTH_USER_ID: "1"
+      BELLA_DEV_AUTH_USER_NAME: Benchmark
+      BELLA_DEV_AUTH_MANAGER_AK: benchmark-ak
+      KAFKA_ENABLED: "false"
+      SERVER_PORT: "8081"
+    command:
+      - /bin/bash
+      - -lc
+      - >-
+        exec java -server
+        -Xms${BENCH_API_HEAP:-1024m} -Xmx${BENCH_API_HEAP:-1024m}
+        -XX:+UseG1GC -Djava.awt.headless=true -Dfile.encoding=UTF-8
+        -Dspring.profiles.active=docker
+        -jar "$$(find /opt/bella-file-api/htdocs/lib -name '*.jar' -print -quit)"
+    ports:
+      - "${BENCH_API_PORT:-18082}:8081"
+    volumes:
+      - bench-api-cache:/opt/bella-file-api/cache
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS -H 'Authorization: Bearer '$$BELLA_DEV_AUTH_TOKEN http://127.0.0.1:8081/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
+      start_period: 30s
+
+  k6:
+    image: grafana/k6:0.49.0
+    profiles: ["tools"]
+    environment:
+      BASE_URL: http://api:8081
+      AUTH_TOKEN: ${BENCH_AUTH_TOKEN:-local-dev}
+      SPACE_CODE: ${BENCH_SPACE_CODE:-local-dev}
+      RESULT_DIR: /results
+      RUN_ID: ${BENCH_RUN_ID:-manual}
+      BENCH_DURATION: ${BENCH_DURATION:-30s}
+      BENCH_VUS: ${BENCH_VUS:-4}
+      BENCH_P95_MS: ${BENCH_P95_MS:-1000}
+      SEED_FILES: ${BENCH_SEED_FILES:-40}
+      DATASET_SEED_QAS: ${BENCH_DATASET_SEED_QAS:-30}
+      MOVE_WORKERS: ${BENCH_MOVE_WORKERS:-4}
+      MOVE_SUBTREE_SIZE: ${BENCH_MOVE_SUBTREE_SIZE:-10}
+      MOVE_TARGET_DEPTH: ${BENCH_MOVE_TARGET_DEPTH:-3}
+      MIXED_WORKERS: ${BENCH_MIXED_WORKERS:-4}
+    volumes:
+      - ./k6:/scripts:ro
+      - ./fixtures:/fixtures:ro
+      - ./results:/results
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  bench-mysql:
+  bench-minio:
+  bench-api-cache:
