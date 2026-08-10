@@ -1,5 +1,7 @@
 package com.ke.bella.files.api;
 
+import static com.ke.bella.files.api.FileControllerTestFixture.stubDirectory;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.verify;
@@ -23,8 +25,6 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ke.bella.files.api.interceptor.FileApiResponseAdvice;
 import com.ke.bella.files.db.repo.Page;
-import com.ke.bella.files.db.tables.pojos.FileDB;
-import com.ke.bella.files.enums.NodeType;
 import com.ke.bella.files.protocol.OpenAIFile;
 import com.ke.bella.files.protocol.PageFileOps;
 import com.ke.bella.files.service.FileService;
@@ -44,11 +44,7 @@ public class FileControllerPageFilesTest {
         ReflectionTestUtils.setField(fileController, "fileService", fileService);
         ReflectionTestUtils.setField(fileController, "fl", fileUniquenessLock);
 
-        FileDB ancestor = new FileDB();
-        ancestor.setFileId("dir-1");
-        ancestor.setIsDir(1);
-        ancestor.setNodeType(NodeType.DIRECTORY.getValue());
-        when(fileService.getFile0("dir-1")).thenReturn(ancestor);
+        stubDirectory(fileService, "dir-1");
 
         mockMvc = MockMvcBuilders
                 .standaloneSetup(fileController)
@@ -100,12 +96,6 @@ public class FileControllerPageFilesTest {
 
         when(fileService.pageFiles(any(PageFileOps.class)))
                 .thenReturn(Page.<OpenAIFile>from(page, pageSize).total(total).list(data));
-        FileDB ancestor = new FileDB();
-        ancestor.setFileId("dir-1");
-        ancestor.setIsDir(1);
-        ancestor.setNodeType("file");
-        when(fileService.getFile0("dir-1")).thenReturn(ancestor);
-
         // When & Then
         mockMvc.perform(post("/v1/files/page")
                 .contentType(MediaType.APPLICATION_JSON)
