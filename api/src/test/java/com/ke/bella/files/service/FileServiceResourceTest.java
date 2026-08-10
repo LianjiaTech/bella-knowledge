@@ -27,7 +27,10 @@ import com.ke.bella.files.enums.FileType;
 import com.ke.bella.files.enums.NodeType;
 import com.ke.bella.files.protocol.EventType;
 import com.ke.bella.files.protocol.FileBroadcasting;
+import com.ke.bella.files.protocol.FileOps;
+import com.ke.bella.files.protocol.FileStatus;
 import com.ke.bella.files.protocol.OpenAIFile;
+import com.ke.bella.files.protocol.Scope;
 import com.ke.bella.files.service.broadcast.BroadcastService;
 import com.ke.bella.files.service.storage.StorageService;
 import com.ke.bella.openapi.BellaContext;
@@ -83,15 +86,7 @@ public class FileServiceResourceTest {
 
     @Test
     public void resourceCannotResolveContentUrl() {
-        FileDB resource = new FileDB();
-        resource.setFileId("file-resource-1");
-        resource.setFilename("Sales dataset");
-        resource.setNodeType(NodeType.RESOURCE.getValue());
-        resource.setResourceId("dataset:12345");
-        resource.setIsDir(0);
-        resource.setBytes(0L);
-        resource.setCtime(LocalDateTime.now());
-        resource.setMtime(LocalDateTime.now());
+        FileDB resource = resourceFile();
         when(fileRepo.queryFile("file-resource-1", FileType.USER)).thenReturn(resource);
 
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
@@ -99,5 +94,56 @@ public class FileServiceResourceTest {
 
         assertTrue(error.getMessage().contains("no file content"));
         verifyNoInteractions(storageService);
+    }
+
+    @Test
+    public void updateResourceBroadcastsUpdatedEvent() {
+        FileDB resource = resourceFile();
+        when(fileRepo.queryFile("file-resource-1", FileType.USER)).thenReturn(resource);
+
+        OpenAIFile updated = fileService.updateFile(FileOps.builder()
+                .fileId("file-resource-1")
+                .filename("Renamed dataset")
+                .build(), false, Scope.FILENAME);
+
+        ArgumentCaptor<FileBroadcasting> messageCaptor = ArgumentCaptor.forClass(FileBroadcasting.class);
+        verify(broadcastService).broadcast(messageCaptor.capture(), any(Runnable.class), any(Runnable.class));
+        assertEquals(EventType.FILE_UPDATED.getValue(), messageCaptor.getValue().getEvent());
+        assertEquals(Scope.FILENAME.getValue(), messageCaptor.getValue().getScope());
+        assertEquals(updated, messageCaptor.getValue().getData());
+        verifyNoInteractions(storageService);
+    }
+
+    @Test
+    public void deleteResourceBroadcastsDeletedEvent() {
+        FileDB resource = resourceFile();
+
+        fileService.delete(resource);
+
+        ArgumentCaptor<FileBroadcasting> messageCaptor = ArgumentCaptor.forClass(FileBroadcasting.class);
+        verify(broadcastService).broadcast(messageCaptor.capture(), any(Runnable.class), any(Runnable.class));
+        assertEquals(EventType.FILE_DELETED.getValue(), messageCaptor.getValue().getEvent());
+        OpenAIFile deleted = (OpenAIFile) messageCaptor.getValue().getData();
+        assertEquals(NodeType.RESOURCE.getValue(), deleted.getNodeType());
+        assertEquals("dataset:12345", deleted.getResourceId());
+        verify(fileRepo).updateFile(org.mockito.ArgumentMatchers.argThat(op -> op.getStatus() == FileStatus.DELETED),
+                org.mockito.ArgumentMatchers.eq(false));
+        verify(fileRepo).deleteFileClosure("file-resource-1", FileType.USER);
+        verifyNoInteractions(storageService);
+    }
+
+    private FileDB resourceFile() {
+        FileDB resource = new FileDB();
+        resource.setFileId("file-resource-1");
+        resource.setFilename("Sales dataset");
+        resource.setNodeType(NodeType.RESOURCE.getValue());
+        resource.setResourceId("dataset:12345");
+        resource.setIsDir(0);
+        resource.setBytes(0L);
+        resource.setPurpose("");
+        resource.setMetaData("{}");
+        resource.setCtime(LocalDateTime.now());
+        resource.setMtime(LocalDateTime.now());
+        return resource;
     }
 }

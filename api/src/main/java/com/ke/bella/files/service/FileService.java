@@ -472,10 +472,6 @@ public class FileService {
         FileDB fileDB = fileRepo.queryFile(ops.getFileId(), fileType);
         OpenAIFile finalOpenAIFile = buildOpenAIFileWithSource(fileDB);
 
-        if(NodeType.from(fileDB) == NodeType.RESOURCE) {
-            return finalOpenAIFile;
-        }
-
         FileBroadcasting<OpenAIFile> message = new FileBroadcasting<>();
         message.setEvent(EventType.FILE_UPDATED);
         message.setScope(actionType.getValue());
@@ -503,8 +499,7 @@ public class FileService {
         String fileId = fileDB.getFileId();
         FileType fileType = FileType.fromFileId(fileId);
 
-        boolean resource = NodeType.from(fileDB) == NodeType.RESOURCE;
-        OpenAIFile fileToDelete = resource ? null : buildOpenAIFileWithSource(fileDB);
+        OpenAIFile fileToDelete = buildOpenAIFileWithSource(fileDB);
 
         // 只标记status字段，不删除文件，不删除数据库记录
         FileOps op = new FileOps();
@@ -517,18 +512,16 @@ public class FileService {
             }
 
             // 文件删除后的广播机制
-            if(!resource) {
-                FileBroadcasting<OpenAIFile> message = new FileBroadcasting<>();
-                message.setEvent(EventType.FILE_DELETED);
-                message.setData(fileToDelete);
-                message.setMetadata(fileDB.getMetaData());
-                message.setUserId(BellaContextHelper.getOperatorUserId());
-                message.setUserName(BellaContextHelper.getOperatorUserName());
-                message.setAkCode(BellaContextHelper.getOperatorAkCode());
-                broadcastService.broadcast(message,
-                        () -> updateBroadcastStatus(fileId, BroadcastStatus.SUCCESS),
-                        () -> updateBroadcastStatus(fileId, BroadcastStatus.FAILED));
-            }
+            FileBroadcasting<OpenAIFile> message = new FileBroadcasting<>();
+            message.setEvent(EventType.FILE_DELETED);
+            message.setData(fileToDelete);
+            message.setMetadata(fileDB.getMetaData());
+            message.setUserId(BellaContextHelper.getOperatorUserId());
+            message.setUserName(BellaContextHelper.getOperatorUserName());
+            message.setAkCode(BellaContextHelper.getOperatorAkCode());
+            broadcastService.broadcast(message,
+                    () -> updateBroadcastStatus(fileId, BroadcastStatus.SUCCESS),
+                    () -> updateBroadcastStatus(fileId, BroadcastStatus.FAILED));
         } catch (Exception e) {
             throw new IllegalStateException("Failed to update file status (indicating deletion), fileId: "
                     + fileId + ", status: " + FileStatus.DELETED, e);
