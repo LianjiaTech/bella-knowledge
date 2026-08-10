@@ -50,7 +50,7 @@
 | `files-upload` | 不同文件名的并发流式上传 |
 | `files-move` | 不同目标深度、指定子树规模下的并发目录移动 |
 | `datasets` | dataset 分页、QA 查询/分页以及并发写入 |
-| `mixed` | 文件读、分页、上传、建目录、移动、QA 读写的混合负载 |
+| `mixed` | 文件读、分页、上传、建目录和移动的混合负载 |
 
 ## 调整负载
 
@@ -80,9 +80,11 @@ BENCH_BUILD=0 ./benchmark/bench run smoke
 | `BENCH_P95_MS` | `1000` | 通用 p95 门禁，单位毫秒 |
 | `BENCH_UPLOAD_BYTES` | `1048576` | 上传样本大小 |
 | `BENCH_SEED_FILES` | `40` | files-read 预置文件条数 |
-| `BENCH_DATASET_SEED_QAS` | `30` | datasets/mixed 预置 QA 条数 |
+| `BENCH_DATASET_SEED_QAS` | `30` | datasets 预置 QA 条数 |
 | `BENCH_MOVE_SUBTREE_SIZE` | `10` | files-move 子树节点总数 |
 | `BENCH_MOVE_TARGET_DEPTH` | `3` | files-move 目标目录深度 |
+| `BENCH_TASK_THREADS` | `16` | API 后台任务工作线程数 |
+| `BENCH_TASK_QUEUE_CAPACITY` | `1000` | API 后台任务队列容量 |
 | `BENCH_API_HEAP` | `1024m` | API 的固定 Xms/Xmx |
 | `BENCH_BUILD` | `1` | 是否重新构建 API 镜像 |
 | `BENCH_FRESH` | `1` | `all` 执行前是否删除旧数据卷 |

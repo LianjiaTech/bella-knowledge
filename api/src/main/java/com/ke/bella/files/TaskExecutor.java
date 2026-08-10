@@ -4,8 +4,9 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -32,10 +33,23 @@ public class TaskExecutor {
                     Configs.TASK_THREAD_NUMS,
                     0L,
                     TimeUnit.MILLISECONDS,
-                    new SynchronousQueue<>(),
-                    tf);
+                    new LinkedBlockingQueue<>(Configs.TASK_QUEUE_CAPACITY),
+                    tf,
+                    TaskExecutor::enqueueOnSaturation);
         }
         return executor;
+    }
+
+    private static void enqueueOnSaturation(Runnable task, ThreadPoolExecutor executor) {
+        if(executor.isShutdown()) {
+            throw new RejectedExecutionException("task executor is shut down");
+        }
+        try {
+            executor.getQueue().put(task);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RejectedExecutionException("interrupted while waiting for task queue", e);
+        }
     }
 
     private static synchronized ScheduledExecutorService getScheduledExecutor() {

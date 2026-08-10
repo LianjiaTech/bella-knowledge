@@ -46,7 +46,8 @@ bella:
     initializer:
       enabled: true
   task:
-    thread-nums: 1000
+    thread-nums: ${BELLA_TASK_THREAD_NUMS:16}
+    queue-capacity: ${BELLA_TASK_QUEUE_CAPACITY:1000}
   login:
     type: ${BELLA_LOGIN_TYPE:client}
     openapi-base: ${BELLA_OPENAPI_URL:http://localhost}

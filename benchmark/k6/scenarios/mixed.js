@@ -1,6 +1,5 @@
 import {
   createDirectory,
-  createQa,
   expectSuccess,
   get,
   mustSucceed,
@@ -8,14 +7,21 @@ import {
   unique,
   uploadFile,
 } from '../lib/client.js';
+import { Trend } from 'k6/metrics';
 import { VUS, loadOptions, numberEnv } from '../lib/config.js';
-import { seedDirectories, seedQaDataset } from '../lib/fixtures.js';
+import { seedDirectories } from '../lib/fixtures.js';
 import { handleSummary } from '../lib/summary.js';
 
 const uploadBody = open('/fixtures/upload.bin', 'b');
 
 export const options = loadOptions();
 let moveToTargetB = true;
+
+const readDuration = new Trend('mixed_read_duration', true);
+const pageDuration = new Trend('mixed_page_duration', true);
+const uploadDuration = new Trend('mixed_upload_duration', true);
+const mkdirDuration = new Trend('mixed_mkdir_duration', true);
+const moveDuration = new Trend('mixed_move_duration', true);
 
 export function setup() {
   const workerCount = Math.max(numberEnv('MIXED_WORKERS', VUS), VUS);
@@ -30,13 +36,10 @@ export function setup() {
     workers.push({ targetA: targetA.id, targetB: targetB.id, movingId: moving.id });
   }
 
-  const dataset = seedQaDataset(numberEnv('DATASET_SEED_QAS', 30), unique('mixed'));
   return {
     workspaceId: workspace.id,
     readIds,
     workers,
-    datasetId: dataset.datasetId,
-    itemIds: dataset.itemIds,
   };
 }
 
@@ -44,56 +47,49 @@ export default function (fixture) {
   const roll = Math.random();
   const worker = fixture.workers[(__VU - 1) % fixture.workers.length];
 
-  if (roll < 0.3) {
+  if (roll < 0.4) {
     const id = fixture.readIds[Math.floor(Math.random() * fixture.readIds.length)];
-    expectSuccess(get(`/v1/files/${id}`, 'GET /v1/files/{id} [mixed]'), 'mixed read file', (value) => value && value.id === id);
+    const response = get(`/v1/files/${id}`, 'GET /v1/files/{id} [mixed]');
+    readDuration.add(response.timings.duration);
+    expectSuccess(response, 'mixed read file', (value) => value && value.id === id);
     return;
   }
 
-  if (roll < 0.45) {
-    expectSuccess(postJson('/v1/files/page', {
+  if (roll < 0.6) {
+    const response = postJson('/v1/files/page', {
       ancestor_id: fixture.workspaceId,
       page: 1,
       page_size: 50,
-    }, 'POST /v1/files/page [mixed]'), 'mixed page files', (value) => value && Array.isArray(value.data));
+    }, 'POST /v1/files/page [mixed]');
+    pageDuration.add(response.timings.duration);
+    expectSuccess(response, 'mixed page files', (value) => value && Array.isArray(value.data));
     return;
   }
 
-  if (roll < 0.58) {
-    expectSuccess(uploadFile(uploadBody, `${unique('mixed-upload')}.bin`, fixture.workspaceId, 'POST /v1/files [mixed]'),
-      'mixed upload', (value) => value && value.id);
+  if (roll < 0.75) {
+    const response = uploadFile(uploadBody, `${unique('mixed-upload')}.bin`, fixture.workspaceId, 'POST /v1/files [mixed]');
+    uploadDuration.add(response.timings.duration);
+    expectSuccess(response, 'mixed upload', (value) => value && value.id);
     return;
   }
 
-  if (roll < 0.68) {
-    expectSuccess(createDirectory(unique('mixed-mkdir'), fixture.workspaceId), 'mixed mkdir', (value) => value && value.id);
+  if (roll < 0.875) {
+    const response = createDirectory(unique('mixed-mkdir'), fixture.workspaceId);
+    mkdirDuration.add(response.timings.duration);
+    expectSuccess(response, 'mixed mkdir', (value) => value && value.id);
     return;
   }
 
-  if (roll < 0.78) {
-    const destination = moveToTargetB ? worker.targetB : worker.targetA;
-    const moved = expectSuccess(postJson('/v1/files/move', {
-      file_id: worker.movingId,
-      ancestor_id: destination,
-    }, 'POST /v1/files/move [mixed]'), 'mixed move', (value) => value && value.id === worker.movingId);
-    if (moved) {
-      moveToTargetB = !moveToTargetB;
-    }
-    return;
+  const destination = moveToTargetB ? worker.targetB : worker.targetA;
+  const response = postJson('/v1/files/move', {
+    file_id: worker.movingId,
+    ancestor_id: destination,
+  }, 'POST /v1/files/move [mixed]');
+  moveDuration.add(response.timings.duration);
+  const moved = expectSuccess(response, 'mixed move', (value) => value && value.id === worker.movingId);
+  if (moved) {
+    moveToTargetB = !moveToTargetB;
   }
-
-  if (roll < 0.93) {
-    expectSuccess(postJson('/v1/datasets/qa/page', {
-      dataset_id: fixture.datasetId,
-      page: 1,
-      page_size: 20,
-      order: 'desc',
-      order_by: 'ctime',
-    }, 'POST /v1/datasets/qa/page [mixed]'), 'mixed page QA', (value) => value && Array.isArray(value.data));
-    return;
-  }
-
-  expectSuccess(createQa(fixture.datasetId, unique('mixed-qa')), 'mixed create QA', (value) => value && value.item_id);
 }
 
 export { handleSummary };
