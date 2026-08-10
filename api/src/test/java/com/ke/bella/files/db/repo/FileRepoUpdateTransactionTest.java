@@ -62,10 +62,11 @@ public class FileRepoUpdateTransactionTest {
     }
 
     @Test
-    public void renameConflictDegradesEntryWriteAndKeepsFileUpdate() {
-        fileRepo.updateFile(FileOps.builder().fileId(SOURCE).filename("conflict.txt").build());
+    public void renameConflictRollsBackFileUpdateInDualMode() {
+        assertThrows(IllegalStateException.class,
+                () -> fileRepo.updateFile(FileOps.builder().fileId(SOURCE).filename("conflict.txt").build()));
 
-        assertEquals("conflict.txt", queryFile(SOURCE).getFilename());
+        assertEquals("source.txt", queryFile(SOURCE).getFilename());
         assertEquals("source.txt", queryEntryFilename(SOURCE));
     }
 
@@ -77,6 +78,16 @@ public class FileRepoUpdateTransactionTest {
                 () -> fileRepo.updateFile(FileOps.builder().fileId(SOURCE).filename("conflict.txt").build()));
 
         assertEquals("source.txt", queryFile(SOURCE).getFilename());
+        assertEquals("source.txt", queryEntryFilename(SOURCE));
+    }
+
+    @Test
+    public void closureModeSkipsEntryWritesAndKeepsFileUpdate() {
+        fileEntryRepo.setFileEntryWriteMode("closure");
+
+        fileRepo.updateFile(FileOps.builder().fileId(SOURCE).filename("conflict.txt").build());
+
+        assertEquals("conflict.txt", queryFile(SOURCE).getFilename());
         assertEquals("source.txt", queryEntryFilename(SOURCE));
     }
 

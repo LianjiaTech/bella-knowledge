@@ -90,10 +90,9 @@ public class FileEntryRepoTest {
         assertNotNull(original);
         assertEquals(entryRepo.queryActiveByFileId(SOURCE_SPACE, firstParent.getFileId()).getEntryId(), original.getParentEntryId());
         assertTrue(entryRepo.exists(SOURCE_SPACE, firstParent.getFileId(), "report.txt"));
-        // 重名文件的 entry 写降级：file 行照常创建，entry 缺失待迁移修复
-        FileDB duplicate = addFile(SOURCE_SPACE, "report.txt", firstParent.getFileId(), "duplicate");
-        assertNotNull(duplicate);
-        assertNull(entryRepo.queryActiveByFileId(SOURCE_SPACE, duplicate.getFileId()));
+        // dual 模式下 entry 写不再降级：重名冲突直接失败
+        assertThrows(IllegalStateException.class,
+                () -> addFile(SOURCE_SPACE, "report.txt", firstParent.getFileId(), "duplicate"));
 
         fileRepo.moveFileClosures(file.getFileId(), secondParent.getFileId());
         FileEntryDB moved = entryRepo.queryActiveByFileId(SOURCE_SPACE, file.getFileId());
@@ -230,6 +229,30 @@ public class FileEntryRepoTest {
         fileRepo.deleteFileClosure(leaf.getFileId(), FileType.USER);
         assertNull(entryRepo.queryActiveByFileId(SOURCE_SPACE, leaf.getFileId()));
         assertEquals(0, shardDsl.fetchCount(FILE_CLOSURE));
+    }
+
+    @Test
+    public void closureModeStopsEntryWritesAndKeepsClosureAuthoritative() {
+        entryRepo.setFileEntryWriteMode("closure");
+        DSLContext shardDsl = DSLContextHolder.get(FileRepo.getShardingKeyBySpaceCode(SOURCE_SPACE), dsl);
+
+        FileDB root = addDirectory(SOURCE_SPACE, "cm-root", null, "cm-root");
+        FileDB leaf = addFile(SOURCE_SPACE, "cm-leaf.txt", root.getFileId(), "cm-leaf");
+
+        // entry 零写入，闭包链路完整可用
+        assertEquals(0, shardDsl.fetchCount(FILE_ENTRY));
+        assertEquals(root.getFileId(), fileRepo.getDirectAncestorId(leaf.getFileId()));
+
+        fileRepo.moveFileClosures(leaf.getFileId(), null);
+        assertNull(fileRepo.getDirectAncestorId(leaf.getFileId()));
+        fileRepo.updateFile(FileOps.builder().fileId(leaf.getFileId()).filename("cm-renamed.txt").build());
+        fileRepo.updateFile(FileOps.builder().fileId(leaf.getFileId()).status(FileStatus.DELETED).build());
+        assertEquals(0, shardDsl.fetchCount(FILE_ENTRY));
+
+        // 跨空间移动依赖 entry 记录，closure 模式下必须拒绝
+        entryRepo.setCrossSpaceMoveEnabled(true);
+        assertThrows(IllegalStateException.class,
+                () -> entryRepo.moveAcrossSpace(root.getFileId(), TARGET_SPACE, null));
     }
 
     @Test
