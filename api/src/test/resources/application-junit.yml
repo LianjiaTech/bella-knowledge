@@ -2,6 +2,7 @@ bella:
   file-api:
     file-entry:
       read-mode: closure
+      write-mode: dual
       cross-space-move-enabled: false
     file:
       tmp-file-dir: .

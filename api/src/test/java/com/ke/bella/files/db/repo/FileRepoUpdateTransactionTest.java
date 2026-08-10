@@ -48,8 +48,12 @@ public class FileRepoUpdateTransactionTest {
     @javax.annotation.Resource
     private FileRepo fileRepo;
 
+    @javax.annotation.Resource
+    private FileEntryRepo fileEntryRepo;
+
     @Before
     public void setup() {
+        fileEntryRepo.setFileEntryWriteMode("dual");
         FileRepoTestFixture.recreateUserFileTables(dsl, "1");
         shardDsl = DSLContextHolder.get("1", dsl);
         BellaContext.setOperator(Operator.builder().userId(1L).userName("tester").spaceCode(SPACE_CODE).build());
@@ -58,7 +62,17 @@ public class FileRepoUpdateTransactionTest {
     }
 
     @Test
-    public void renameConflictRollsBackFileUpdate() {
+    public void renameConflictDegradesEntryWriteAndKeepsFileUpdate() {
+        fileRepo.updateFile(FileOps.builder().fileId(SOURCE).filename("conflict.txt").build());
+
+        assertEquals("conflict.txt", queryFile(SOURCE).getFilename());
+        assertEquals("source.txt", queryEntryFilename(SOURCE));
+    }
+
+    @Test
+    public void renameConflictRollsBackFileUpdateWhenClosureWriteStopped() {
+        fileEntryRepo.setFileEntryWriteMode("entry");
+
         assertThrows(IllegalStateException.class,
                 () -> fileRepo.updateFile(FileOps.builder().fileId(SOURCE).filename("conflict.txt").build()));
 
