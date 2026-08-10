@@ -43,6 +43,7 @@ import com.ke.bella.files.annotations.FileAPI;
 import com.ke.bella.files.db.repo.Page;
 import com.ke.bella.files.db.tables.pojos.FileDB;
 import com.ke.bella.files.enums.FilePurpose;
+import com.ke.bella.files.enums.NodeType;
 import com.ke.bella.files.protocol.DomTreeOps.DomTreeUploadOp;
 import com.ke.bella.files.protocol.FileAncestorIdsOps;
 import com.ke.bella.files.protocol.FileCropOps;
@@ -53,6 +54,7 @@ import com.ke.bella.files.protocol.FileExists;
 import com.ke.bella.files.protocol.FileMoveOps;
 import com.ke.bella.files.protocol.FileOps;
 import com.ke.bella.files.protocol.FileSystemOps.MkdirOp;
+import com.ke.bella.files.protocol.FileSystemOps.CreateResourceOp;
 import com.ke.bella.files.protocol.FileUrl;
 import com.ke.bella.files.protocol.ListFileOps;
 import com.ke.bella.files.protocol.OpenAIFile;
@@ -96,6 +98,8 @@ public class FileController {
 
     private static final Pattern UNIX_INVALID_CHARS = Pattern.compile("[\\x00/]");
 
+    private static final Pattern RESOURCE_ID_PATTERN = Pattern.compile("^[^:]+:.+$");
+
     @Autowired
     FileService fileService;
     @Autowired
@@ -134,6 +138,7 @@ public class FileController {
         TmpFileInfo tmpFileInfo = null;
         final String spaceCode = BellaContextHelper.getOperateSpaceCode();
         final String filename = file.getOriginalFilename();
+        validateAncestorDirectory(spaceCode, ancestorId);
 
         // 提取文件元数据
         MediaType mimeTypeSource = Optional.ofNullable(file.getContentType()).map(MediaType::parse).orElse(null);
@@ -431,6 +436,27 @@ public class FileController {
 
     }
 
+    private void validateResourceId(String resourceId) {
+        Assert.hasText(resourceId, "resource_id is required");
+        Assert.isTrue(resourceId.length() <= 256, "resource_id cannot exceed 256 characters");
+        Assert.isTrue(resourceId.equals(resourceId.trim()), "resource_id cannot start or end with whitespace");
+        Assert.isTrue(RESOURCE_ID_PATTERN.matcher(resourceId).matches(),
+                "resource_id must match '<namespace>:<business-id>'");
+    }
+
+    private void validateAncestorDirectory(String spaceCode, String ancestorId) {
+        if(StringUtils.isEmpty(ancestorId)) {
+            return;
+        }
+        FileDB ancestor = fileService.getFile0(ancestorId);
+        if(ancestor == null) {
+            throw new FileNotFoundException(ancestorId);
+        }
+        Assert.isTrue(NodeType.from(ancestor) == NodeType.DIRECTORY, "ancestor_id must refer to a directory");
+        Assert.isTrue(StringUtils.equals(spaceCode, ancestor.getSpaceCode()),
+                "space_code mismatch between context and ancestor_id");
+    }
+
     @GetMapping("/{file_id}")
     public OpenAIFile get(@PathVariable("file_id") String fileId,
             @RequestParam(value = "get_url", required = false, defaultValue = "false") boolean getUrl,
@@ -492,7 +518,7 @@ public class FileController {
                             String.format("File '%s' already exists in current directory, %s", filename, location));
                 }
 
-                String extension = FileUtils.getFileExtension(filename);
+                String extension = NodeType.RESOURCE.getValue().equals(existingFile.getNodeType()) ? "" : FileUtils.getFileExtension(filename);
 
                 FileOps ops = FileOps.builder()
                         .fileId(fileId)
@@ -517,10 +543,7 @@ public class FileController {
             throw new IllegalArgumentException("file_id is required, but not provided");
         }
 
-        OpenAIFile existingFile = fileService.getFile(fileId);
-        if(existingFile == null) {
-            throw new FileNotFoundException(fileId);
-        }
+        FileDB existingFile = fileService.requireContentFile(fileId);
 
         // 提取文件元数据
         MediaType mimeTypeSource = Optional.ofNullable(file.getContentType()).map(MediaType::parse).orElse(null);
@@ -536,8 +559,8 @@ public class FileController {
         String extension = FileUtils.getFileExtension(filename);
 
         try (InputStream inputStream = file.getInputStream()) {
-            return updateFileFromStream(fileId, inputStream, file.getSize(), existingFile.getFilename(),
-                    type, mimeType, extension, charset, existingFile.getMetadata(), existingFile.getPurpose());
+            return updateFileFromStream(existingFile, inputStream, file.getSize(), existingFile.getFilename(),
+                    type, mimeType, extension, charset, existingFile.getMetaData(), existingFile.getPurpose());
         } catch (Exception e) {
             LOGGER.error("File update failed, file_id: {}, error: {}", fileId, e.getMessage(), e);
             throw new IllegalStateException("File update failed", e);
@@ -566,8 +589,14 @@ public class FileController {
 
     private OpenAIFile updateFileFromStream(String fileId, InputStream inputStream, long contentLength, String filename,
             String type, String mimeType, String extension, String charset, String metadata, String purpose) {
+        return updateFileFromStream(fileService.requireContentFile(fileId), inputStream, contentLength, filename,
+                type, mimeType, extension, charset, metadata, purpose);
+    }
 
-        String fileKey = fileService.updateRealFileFromStream(fileId, filename, inputStream, contentLength, mimeType, charset);
+    private OpenAIFile updateFileFromStream(FileDB file, InputStream inputStream, long contentLength, String filename,
+            String type, String mimeType, String extension, String charset, String metadata, String purpose) {
+        String fileId = file.getFileId();
+        String fileKey = fileService.updateRealFileFromStream(file, filename, inputStream, contentLength, mimeType, charset);
 
         FileOps ops = FileOps.builder()
                 .fileId(fileId)
@@ -591,6 +620,7 @@ public class FileController {
         if(StringUtils.isEmpty(sourceFileId)) {
             throw new IllegalArgumentException("file_id is required, but not provided");
         }
+        fileService.requireContentFile(sourceFileId);
 
         final String filename = String.format("dom_tree_%s.json", sourceFileId);
         final String spaceCode = BellaContextHelper.getOperateSpaceCode();
@@ -629,6 +659,7 @@ public class FileController {
         if(StringUtils.isEmpty(domTreeUploadOp.getFileId())) {
             throw new IllegalArgumentException("file_id is required, but not provided");
         }
+        fileService.requireContentFile(domTreeUploadOp.getFileId());
         if(domTreeUploadOp.getDomTree() == null) {
             throw new IllegalArgumentException("dom_tree_content is required, but not provided");
         }
@@ -659,14 +690,11 @@ public class FileController {
     public void retrieveDomTreeContent(
             HttpServletResponse response,
             @PathVariable("file_id") String fileId) {
-        OpenAIFile file = fileService.getFile(fileId);
-        if(file == null) {
-            throw new FileNotFoundException(fileId);
-        }
+        FileDB file = fileService.requireContentFile(fileId);
 
         String targetFileId;
         if("dom_tree".equals(file.getPurpose())) {
-            targetFileId = file.getId();
+            targetFileId = file.getFileId();
         } else if(!StringUtils.isEmpty(file.getDomTreeFileId())) {
             targetFileId = file.getDomTreeFileId();
         } else {
@@ -674,7 +702,9 @@ public class FileController {
                     String.format("the file does not have a legal dom file. file_id = %s", fileId));
         }
 
-        String redirectUrl = fileService.getUrl(targetFileId);
+        String redirectUrl = targetFileId.equals(file.getFileId())
+                ? fileService.getUrl(file, FileService.ONE_DAY)
+                : fileService.getUrl(targetFileId);
         response.setHeader(HttpHeaders.LOCATION, redirectUrl);
         response.setStatus(HttpServletResponse.SC_MOVED_TEMPORARILY);
     }
@@ -683,14 +713,11 @@ public class FileController {
     public FileUrl getDomTreeUrl(
             @PathVariable("file_id") String fileId,
             @RequestParam(value = "expires", required = false, defaultValue = ONE_DAY_STRING) Long expires) {
-        OpenAIFile file = fileService.getFile(fileId);
-        if(file == null) {
-            throw new FileNotFoundException(fileId);
-        }
+        FileDB file = fileService.requireContentFile(fileId);
 
         String targetFileId;
         if("dom_tree".equals(file.getPurpose())) {
-            targetFileId = file.getId();
+            targetFileId = file.getFileId();
         } else if(!StringUtils.isEmpty(file.getDomTreeFileId())) {
             targetFileId = file.getDomTreeFileId();
         } else {
@@ -698,7 +725,9 @@ public class FileController {
                     String.format("the file does not have a legal dom file. file_id = %s", fileId));
         }
 
-        String url = fileService.getUrl(targetFileId, expires);
+        String url = targetFileId.equals(file.getFileId())
+                ? fileService.getUrl(file, expires)
+                : fileService.getUrl(targetFileId, expires);
         return FileUrl.builder()
                 .url(url)
                 .build();
@@ -711,6 +740,7 @@ public class FileController {
         if(StringUtils.isEmpty(sourceFileId)) {
             throw new IllegalArgumentException("file_id is required, but not provided");
         }
+        fileService.requireContentFile(sourceFileId);
 
         final String filename = String.format("pdf_%s.pdf", sourceFileId);
         final String spaceCode = BellaContextHelper.getOperateSpaceCode();
@@ -770,11 +800,8 @@ public class FileController {
     public void retrieveContentRedirect(
             HttpServletResponse response,
             @PathVariable("file_id") String fileId) {
-        OpenAIFile file = fileService.getFile(fileId);
-        if(file == null) {
-            throw new FileNotFoundException(fileId);
-        }
-        String redirectUrl = fileService.getUrl(fileId);
+        FileDB file = fileService.requireContentFile(fileId);
+        String redirectUrl = fileService.getUrl(file, FileService.ONE_DAY);
         response.setHeader(HttpHeaders.LOCATION, redirectUrl);
         response.setStatus(HttpServletResponse.SC_MOVED_TEMPORARILY);
     }
@@ -783,12 +810,8 @@ public class FileController {
     public FileUrl getUrl(
             @PathVariable("file_id") String fileId,
             @RequestParam(value = "expires", required = false, defaultValue = ONE_DAY_STRING) Long expires) {
-        OpenAIFile file = fileService.getFile(fileId);
-        if(file == null) {
-            throw new FileNotFoundException(fileId);
-        }
-        Assert.isTrue(!file.getIsDir(), String.format("file is a directory, not a file. file_id = %s", fileId));
-        String url = fileService.getUrl(fileId, expires);
+        FileDB file = fileService.requireContentFile(fileId);
+        String url = fileService.getUrl(file, expires);
         return FileUrl.builder()
                 .url(url)
                 .build();
@@ -799,10 +822,7 @@ public class FileController {
             @RequestBody UpdateProgressRequestData data,
             @PathVariable("file_id") String fileId,
             @PathVariable("progress_name") String progressName) {
-        OpenAIFile file = fileService.getFile(fileId);
-        if(file == null) {
-            throw new FileNotFoundException(fileId);
-        }
+        FileDB file = fileService.requireContentFile(fileId);
         String purpose = file.getPurpose();
         if(!FilePurposeClassifier.allowedProgressTrackablePurposes().contains(purpose)) {
             throw new IllegalArgumentException(String.format(
@@ -811,18 +831,15 @@ public class FileController {
                     String.join(", ", FilePurposeClassifier.allowedProgressTrackablePurposes()),
                     fileId));
         }
-        fileService.updateProgress(data, fileId, progressName);
-        return fileService.getProgress(fileId, progressName);
+        fileService.updateProgress(data, file, progressName);
+        return fileService.getProgress(file, progressName);
     }
 
     @GetMapping("/{file_id}/progress")
     public Progress getProgress(
             @PathVariable("file_id") String fileId,
             @RequestParam("progress_name") String progressName) {
-        OpenAIFile file = fileService.getFile(fileId);
-        if(file == null) {
-            throw new FileNotFoundException(fileId);
-        }
+        FileDB file = fileService.requireContentFile(fileId);
         String purpose = file.getPurpose();
         if(!FilePurposeClassifier.allowedProgressTrackablePurposes().contains(purpose)) {
             throw new IllegalArgumentException(String.format(
@@ -831,7 +848,7 @@ public class FileController {
                     String.join(", ", FilePurposeClassifier.allowedProgressTrackablePurposes()),
                     fileId));
         }
-        Progress res = fileService.getProgress(fileId, progressName);
+        Progress res = fileService.getProgress(file, progressName);
         if(res == null) {
             throw new ProgressNotFoundException(fileId, progressName);
         }
@@ -861,20 +878,16 @@ public class FileController {
     public FileUrl getPreviewUrl(
             @PathVariable("file_id") String fileId,
             @RequestParam(value = "expires", required = false, defaultValue = ONE_DAY_STRING) Long expires) {
-        OpenAIFile file = fileService.getFile(fileId);
-        if(file == null) {
-            throw new FileNotFoundException(fileId);
-        }
-        Assert.isTrue(!file.getIsDir(), String.format("file is a directory, not a file. file_id = %s", fileId));
+        FileDB file = fileService.requireContentFile(fileId);
 
         String url;
         if(!StringUtils.isEmpty(file.getPdfFileId())) {
             url = fileService.getUrl(file.getPdfFileId(), expires);
             // fixme: doc、docx 历史数据不存在转换回流的pdf，需要刷数后才能下掉
         } else if("doc".equals(file.getExtension()) || "docx".equals(file.getExtension())) {
-            url = fileService.getPreviewUrl(file.getId(), expires);
+            url = fileService.getPreviewUrl(file, expires);
         } else {
-            url = fileService.getUrl(fileId, expires);
+            url = fileService.getUrl(file, expires);
         }
         return FileUrl
                 .builder()
@@ -917,9 +930,7 @@ public class FileController {
         Assert.isTrue(bbox.size() == 4, "bbox must have exactly 4 values: [x1, y1, x2, y2]");
 
         // 校验文件存在
-        OpenAIFile file = fileService.getFile(fileId);;
-        Assert.notNull(file, String.format("file not found. file_id = %s", fileId));
-        Assert.isTrue(!file.getIsDir(), String.format("file is a directory, not a file. file_id = %s", fileId));
+        FileDB file = fileService.requireContentFile(fileId);
 
         // 确认要处理的pdf文件
         String pdfFileId = fileId;
@@ -937,7 +948,9 @@ public class FileController {
         double x2 = bbox.get(2);
         double y2 = bbox.get(3);
 
-        FileService.InputStreamWithCharset streamWithCharset = fileService.getFileInputStream(pdfFileId);
+        FileService.InputStreamWithCharset streamWithCharset = pdfFileId.equals(file.getFileId())
+                ? fileService.getFileInputStream(file)
+                : fileService.getFileInputStream(pdfFileId);
         BufferedImage pageImage = null;
         BufferedImage croppedImage = null;
         ByteArrayOutputStream baos = null;
@@ -1045,6 +1058,7 @@ public class FileController {
         }
 
         String spaceCode = BellaContextHelper.getOperateSpaceCode();
+        validateAncestorDirectory(spaceCode, op.getAncestorId());
 
         return fl.executeWithLock(spaceCode, op.getAncestorId(), op.getName(), FILE_LOCK_TIMEOUT_MS, () -> {
             if(fileService.exists(spaceCode, op.getAncestorId(), op.getName())) {
@@ -1053,6 +1067,35 @@ public class FileController {
             }
 
             return fileService.mkdir(op.getName(), op.getAncestorId(), op.getDescription(), op.getPurpose());
+        });
+    }
+
+    /**
+     * 创建业务资源引用。resource_id 有意不做唯一性校验，支持将同一业务资源登记到多个目录位置；
+     * 删除其中一个节点只移除该处引用，不影响其他引用或业务系统中的原始资源。
+     * purpose 为可选字段，取值范围与文件和目录创建接口一致。
+     */
+    @PostMapping("/resources")
+    public OpenAIFile createResource(@RequestBody CreateResourceOp op) {
+        Assert.notNull(op, "invalid request body");
+        validateDirectoryName(op.getName());
+        validateResourceId(op.getResourceId());
+        if(op.getPurpose() != null && !FilePurposeClassifier.allowedPurposes().contains(op.getPurpose())) {
+            throw new IllegalArgumentException(
+                    String.format("Unsupported purpose: '%s'. Supported purposes are: %s",
+                            op.getPurpose(),
+                            String.join(", ", FilePurposeClassifier.allowedPurposes())));
+        }
+
+        String spaceCode = BellaContextHelper.getOperateSpaceCode();
+        validateAncestorDirectory(spaceCode, op.getAncestorId());
+
+        return fl.executeWithLock(spaceCode, op.getAncestorId(), op.getName(), FILE_LOCK_TIMEOUT_MS, () -> {
+            if(fileService.exists(spaceCode, op.getAncestorId(), op.getName())) {
+                throw new IllegalArgumentException(
+                        String.format("Resource '%s' already exists in current directory, ancestor_id: '%s'", op.getName(), op.getAncestorId()));
+            }
+            return fileService.createResource(op.getName(), op.getResourceId(), op.getAncestorId(), op.getPurpose());
         });
     }
 
@@ -1070,6 +1113,7 @@ public class FileController {
             if(ancestor == null) {
                 throw new IllegalArgumentException("File not found. file_id = " + ancestorId);
             }
+            Assert.isTrue(NodeType.from(ancestor) == NodeType.DIRECTORY, "ancestor_id must refer to a directory");
             files = fileService.findFiles(ancestor);
         } else {
             files = fileService.findFiles(spaceCode);
@@ -1110,6 +1154,8 @@ public class FileController {
         if(existingFile == null) {
             throw new FileNotFoundException(fileId);
         }
+        Assert.isTrue(!NodeType.RESOURCE.getValue().equals(existingFile.getNodeType()),
+                "resource nodes do not support descriptions");
 
         FileOps ops = FileOps.builder()
                 .fileId(fileId)
@@ -1144,6 +1190,8 @@ public class FileController {
         if(existingFile == null) {
             throw new FileNotFoundException(fileId);
         }
+        Assert.isTrue(!NodeType.RESOURCE.getValue().equals(existingFile.getNodeType()),
+                "resource nodes do not support cities");
 
         FileOps ops = FileOps.builder()
                 .fileId(fileId)
@@ -1178,6 +1226,8 @@ public class FileController {
         if(existingFile == null) {
             throw new FileNotFoundException(fileId);
         }
+        Assert.isTrue(!NodeType.RESOURCE.getValue().equals(existingFile.getNodeType()),
+                "resource nodes do not support tags");
 
         FileOps ops = FileOps.builder()
                 .fileId(fileId)
@@ -1214,7 +1264,7 @@ public class FileController {
             if(ancestor == null) {
                 throw new FileNotFoundException(targetAncestorId);
             }
-            Assert.isTrue(ancestor.getIsDir() == 1, "ancestor_id must refer to a directory");
+            Assert.isTrue(NodeType.from(ancestor) == NodeType.DIRECTORY, "ancestor_id must refer to a directory");
             Assert.isTrue(StringUtils.equals(spaceCode, ancestor.getSpaceCode()),
                     "space_code mismatch between context and ancestor_id");
         }
@@ -1226,7 +1276,7 @@ public class FileController {
         Assert.isTrue(StringUtils.equals(spaceCode, file.getSpaceCode()), "space mismatch between context and file_id");
 
         try {
-            boolean directory = file.getIsDir() == 1;
+            boolean directory = NodeType.from(file) == NodeType.DIRECTORY;
             return fl.executeWithMoveLock(spaceCode, directory, FILE_LOCK_TIMEOUT_MS,
                     () -> fl.executeWithLock(spaceCode, targetAncestorId, file.getFilename(), FILE_LOCK_TIMEOUT_MS,
                             () -> {
@@ -1254,9 +1304,17 @@ public class FileController {
         // 校验spaceCode和ancestorId至少提供一个
         Assert.isTrue(StringUtils.isNotEmpty(ops.getSpaceCode()) || StringUtils.isNotEmpty(ops.getAncestorId()),
                 "either space_code or ancestor_id must be provided");
+        if(StringUtils.isNotEmpty(ops.getAncestorId())) {
+            FileDB ancestor = fileService.getFile0(ops.getAncestorId());
+            if(ancestor == null) {
+                throw new FileNotFoundException(ops.getAncestorId());
+            }
+            Assert.isTrue(NodeType.from(ancestor) == NodeType.DIRECTORY, "ancestor_id must refer to a directory");
+        }
         // type 为可选参数，如果提供则必须是 dir 或 file
         if(ops.getType() != null) {
-            Assert.isTrue("dir".equals(ops.getType()) || "file".equals(ops.getType()), "type must be 'dir' or 'file', but got: " + ops.getType());
+            Assert.isTrue("dir".equals(ops.getType()) || "file".equals(ops.getType()) || "resource".equals(ops.getType()),
+                    "type must be 'dir', 'file' or 'resource', but got: " + ops.getType());
         }
         Assert.isTrue(ops.getPage() >= 1, "page must be greater than 0");
         Assert.isTrue(ops.getPageSize() >= 1, "page_size must be greater than 0");

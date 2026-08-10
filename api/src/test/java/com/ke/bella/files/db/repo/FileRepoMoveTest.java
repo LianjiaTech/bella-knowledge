@@ -9,9 +9,11 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.jooq.DSLContext;
@@ -25,6 +27,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.ke.bella.files.db.tables.pojos.FileDB;
+import com.ke.bella.files.enums.NodeType;
 import com.ke.bella.files.protocol.PageFileOps;
 import com.ke.bella.openapi.BellaContext;
 import com.ke.bella.openapi.Operator;
@@ -36,6 +39,9 @@ public class FileRepoMoveTest {
     private static final String LEAF = "file-leaf-0";
     private static final String NEW_ROOT = "file-new-root-0-d";
     private static final String TARGET = "file-target-0-d";
+    private static final String PAGE_DIRECTORY = "file-page-dir-0-d";
+    private static final String PAGE_FILE = "file-page-file-0";
+    private static final String PAGE_RESOURCE = "file-page-resource-0";
 
     private static Connection connection;
     private static DSLContext dsl;
@@ -123,6 +129,49 @@ public class FileRepoMoveTest {
                 .build());
         assertEquals(1, sourcePage.getTotal());
         assertEquals(CHILD, sourcePage.getData().get(0).getFileId());
+    }
+
+    @Test
+    public void pageTypeFiltersHonorIsDirDuringRollingDeployment() {
+        Page<FileDB> directories = fileRepo.pageFiles(PageFileOps.builder()
+                .ancestorId(SOURCE)
+                .type("dir")
+                .page(1)
+                .pageSize(10)
+                .order("asc")
+                .build());
+        assertEquals(1, directories.getTotal());
+        assertEquals(CHILD, directories.getData().get(0).getFileId());
+
+        Page<FileDB> files = fileRepo.pageFiles(PageFileOps.builder()
+                .ancestorId(SOURCE)
+                .type("file")
+                .page(1)
+                .pageSize(10)
+                .order("asc")
+                .build());
+        assertEquals(0, files.getTotal());
+    }
+
+    @Test
+    public void pageTypeFiltersReturnMixedNodesAndMatchingTotals() {
+        insertPageNode(PAGE_DIRECTORY, "page-directory", 1, NodeType.DIRECTORY, "");
+        insertPageNode(PAGE_FILE, "page-file.txt", 0, NodeType.FILE, "");
+        insertPageNode(PAGE_RESOURCE, "page-resource", 0, NodeType.RESOURCE, "dataset:1");
+
+        Page<FileDB> mixed = pageTarget(null);
+        assertEquals(3, mixed.getTotal());
+        assertEquals(3, mixed.getData().size());
+        Set<String> mixedIds = mixed.getData().stream().map(FileDB::getFileId).collect(Collectors.toSet());
+        assertEquals(new HashSet<>(Arrays.asList(PAGE_DIRECTORY, PAGE_FILE, PAGE_RESOURCE)), mixedIds);
+        Set<String> mixedNodeTypes = mixed.getData().stream().map(FileDB::getNodeType).collect(Collectors.toSet());
+        assertEquals(new HashSet<>(Arrays.asList(NodeType.DIRECTORY.getValue(), NodeType.FILE.getValue(),
+                NodeType.RESOURCE.getValue())), mixedNodeTypes);
+
+        assertSinglePageNode("dir", PAGE_DIRECTORY, NodeType.DIRECTORY);
+        assertSinglePageNode("file", PAGE_FILE, NodeType.FILE);
+        Page<FileDB> resources = assertSinglePageNode("resource", PAGE_RESOURCE, NodeType.RESOURCE);
+        assertEquals("dataset:1", resources.getData().get(0).getResourceId());
     }
 
     @Test
@@ -233,6 +282,32 @@ public class FileRepoMoveTest {
     private void insertFile(String fileId, String filename, boolean directory) {
         dsl.execute("insert into file_0 (file_id, filename, is_dir, space_code, meta_data) values (?, ?, ?, ?, ?)",
                 fileId, filename, directory ? 1 : 0, "sp-0", "{}");
+    }
+
+    private void insertPageNode(String fileId, String filename, int isDir, NodeType nodeType, String resourceId) {
+        dsl.execute("insert into file_0 (file_id, filename, is_dir, node_type, resource_id, space_code, meta_data) "
+                        + "values (?, ?, ?, ?, ?, ?, ?)",
+                fileId, filename, isDir, nodeType.getValue(), resourceId, "sp-0", "{}");
+        insertClosure(TARGET, fileId, 1L, -1L);
+    }
+
+    private Page<FileDB> pageTarget(String type) {
+        return fileRepo.pageFiles(PageFileOps.builder()
+                .ancestorId(TARGET)
+                .type(type)
+                .page(1)
+                .pageSize(10)
+                .order("asc")
+                .build());
+    }
+
+    private Page<FileDB> assertSinglePageNode(String type, String expectedFileId, NodeType expectedNodeType) {
+        Page<FileDB> page = pageTarget(type);
+        assertEquals(1, page.getTotal());
+        assertEquals(1, page.getData().size());
+        assertEquals(expectedFileId, page.getData().get(0).getFileId());
+        assertEquals(expectedNodeType.getValue(), page.getData().get(0).getNodeType());
+        return page;
     }
 
     private void insertClosure(String ancestorId, String descendantId, long depth, long rootDepth) {

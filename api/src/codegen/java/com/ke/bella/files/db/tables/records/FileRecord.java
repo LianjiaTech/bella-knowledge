@@ -413,6 +413,34 @@ public class FileRecord extends UpdatableRecordImpl<FileRecord> implements Opera
         return (String) get(27);
     }
 
+    /**
+     * Setter for <code>file.node_type</code>. 节点类型：file、directory、resource
+     */
+    public void setNodeType(String value) {
+        set(28, value);
+    }
+
+    /**
+     * Getter for <code>file.node_type</code>. 节点类型：file、directory、resource
+     */
+    public String getNodeType() {
+        return (String) get(28);
+    }
+
+    /**
+     * Setter for <code>file.resource_id</code>. 业务资源标识
+     */
+    public void setResourceId(String value) {
+        set(29, value);
+    }
+
+    /**
+     * Getter for <code>file.resource_id</code>. 业务资源标识
+     */
+    public String getResourceId() {
+        return (String) get(29);
+    }
+
     // -------------------------------------------------------------------------
     // Primary key information
     // -------------------------------------------------------------------------
@@ -436,7 +464,7 @@ public class FileRecord extends UpdatableRecordImpl<FileRecord> implements Opera
     /**
      * Create a detached, initialised FileRecord
      */
-    public FileRecord(Long id, String fileId, Long version, String filename, Integer isDir, String extension, String mimeType, String type, String bucket, String path, Long bytes, String spaceCode, String purpose, Long cuid, String cuName, LocalDateTime ctime, Long muid, String muName, LocalDateTime mtime, String metaData, Integer status, String akCode, Long broadcastStatus, String domTreeFileId, String pdfFileId, String description, String cities, String tags) {
+    public FileRecord(Long id, String fileId, Long version, String filename, Integer isDir, String extension, String mimeType, String type, String bucket, String path, Long bytes, String spaceCode, String purpose, Long cuid, String cuName, LocalDateTime ctime, Long muid, String muName, LocalDateTime mtime, String metaData, Integer status, String akCode, Long broadcastStatus, String domTreeFileId, String pdfFileId, String description, String cities, String tags, String nodeType, String resourceId) {
         super(File.FILE);
 
         setId(id);
@@ -467,5 +495,7 @@ public class FileRecord extends UpdatableRecordImpl<FileRecord> implements Opera
         setDescription(description);
         setCities(cities);
         setTags(tags);
+        setNodeType(nodeType);
+        setResourceId(resourceId);
     }
 }

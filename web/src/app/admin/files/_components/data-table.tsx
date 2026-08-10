@@ -54,9 +54,11 @@ export function DataTable<TValue>({
   const allExtensions = Array.from(
     new Set(
       data.map((row) => {
-        const isDir = row.is_dir;
-        if (isDir) {
+        if (row.node_type === "directory") {
           return "文件夹";
+        }
+        if (row.node_type === "resource") {
+          return row.resource_id.split(":", 1)[0] || "资源";
         }
         const extension = row.extension;
         if (extension) {
@@ -126,9 +128,7 @@ export function DataTable<TValue>({
             </SelectTrigger>
             <SelectContent>
               {allExtensions.includes("文件夹") && (
-                <SelectItem value="文件夹">
-                  文件夹
-                </SelectItem>
+                <SelectItem value="文件夹">文件夹</SelectItem>
               )}
               {allExtensions.filter((item) => item !== "文件夹").length > 0 && (
                 <SelectGroup>
@@ -136,10 +136,7 @@ export function DataTable<TValue>({
                   {allExtensions
                     .filter((item) => item !== "文件夹")
                     .map((item, index) => (
-                      <SelectItem
-                        value={item}
-                        key={index}
-                      >
+                      <SelectItem value={item} key={index}>
                         {item}
                       </SelectItem>
                     ))}

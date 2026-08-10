@@ -22,6 +22,8 @@ public class OpenAIFile {
     private Long createdAt;
     private String filename;
     private Boolean isDir;
+    private String nodeType;
+    private String resourceId;
     /**
      * assistants
      * assistants_output

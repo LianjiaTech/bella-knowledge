@@ -32,10 +32,10 @@ export async function findFiles(params: FindFilesParams) {
     return {
       ...res.data,
       data: res.data.data.sort((a, b) => {
-        if (a.is_dir && !b.is_dir) {
+        if (a.node_type === "directory" && b.node_type !== "directory") {
           return -1;
         }
-        if (!a.is_dir && b.is_dir) {
+        if (a.node_type !== "directory" && b.node_type === "directory") {
           return 1;
         }
         return b.created_at - a.created_at;

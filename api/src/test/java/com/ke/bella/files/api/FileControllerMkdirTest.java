@@ -1,5 +1,7 @@
 package com.ke.bella.files.api;
 
+import static com.ke.bella.files.api.FileControllerTestFixture.stubDirectory;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -44,6 +46,8 @@ public class FileControllerMkdirTest {
 
         ReflectionTestUtils.setField(fileController, "fileService", fileService);
         ReflectionTestUtils.setField(fileController, "fl", fileUniquenessLock);
+
+        stubDirectory(fileService, "anc-1", "sp-a");
 
         ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.setPropertyNamingStrategy(com.fasterxml.jackson.databind.PropertyNamingStrategy.SNAKE_CASE);

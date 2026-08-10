@@ -51,6 +51,7 @@ import com.ke.bella.files.db.tables.records.FileProgressRecord;
 import com.ke.bella.files.db.tables.records.FileRecord;
 import com.ke.bella.files.db.tables.records.FileShardingRecord;
 import com.ke.bella.files.enums.FileType;
+import com.ke.bella.files.enums.NodeType;
 import com.ke.bella.files.protocol.FileException.FileNotFoundException;
 import com.ke.bella.files.protocol.FileOps;
 import com.ke.bella.files.protocol.FileStatus;
@@ -175,6 +176,7 @@ public class FileRepo implements BaseRepo {
                 .innerJoin(FILE)
                 .on(FILE_CLOSURE.DESCENDANT_ID.eq(FILE.FILE_ID))
                 .where(FILE.FILENAME.eq(filename))
+                .and(FILE.STATUS.eq(FileStatus.NOT_DELETED.getValue()))
                 .and(FILE_CLOSURE.SPACE_CODE.eq(spaceCode));
 
         if(StringUtils.isEmpty(ancestorId)) {
@@ -195,6 +197,7 @@ public class FileRepo implements BaseRepo {
                 .innerJoin(FILE)
                 .on(FILE_CLOSURE.DESCENDANT_ID.eq(FILE.FILE_ID))
                 .where(FILE_CLOSURE.SPACE_CODE.eq(spaceCode))
+                .and(FILE.STATUS.eq(FileStatus.NOT_DELETED.getValue()))
                 .and(FILE.FILENAME.eq(filename));
 
         if(StringUtils.isEmpty(ancestorId)) {
@@ -313,7 +316,9 @@ public class FileRepo implements BaseRepo {
                 .innerJoin(FILE)
                 .on(FILE_CLOSURE.DESCENDANT_ID.eq(FILE.FILE_ID))
                 .where(FILE.SPACE_CODE.eq(spaceCode))
-                .and(FILE_CLOSURE.SPACE_CODE.eq(spaceCode));
+                .and(FILE_CLOSURE.SPACE_CODE.eq(spaceCode))
+                .and(FILE.STATUS.eq(FileStatus.NOT_DELETED.getValue()))
+                .and(FILE.NODE_TYPE.ne(NodeType.RESOURCE.getValue()));
 
         if(StringUtils.isEmpty(ancestorId)) {
             query.and(FILE_CLOSURE.ROOT_DEPTH.eq(1L));
@@ -668,7 +673,8 @@ public class FileRepo implements BaseRepo {
                 .innerJoin(FILE)
                 .on(FILE_CLOSURE.DESCENDANT_ID.eq(FILE.FILE_ID))
                 .where(FILE.SPACE_CODE.eq(spaceCode))
-                .and(FILE_CLOSURE.SPACE_CODE.eq(spaceCode));
+                .and(FILE_CLOSURE.SPACE_CODE.eq(spaceCode))
+                .and(FILE.STATUS.eq(FileStatus.NOT_DELETED.getValue()));
 
         if(StringUtils.isEmpty(ancestorId)) {
             query.and(FILE_CLOSURE.ROOT_DEPTH.eq(1L));
@@ -818,7 +824,11 @@ public class FileRepo implements BaseRepo {
         if("dir".equals(ops.getType())) {
             fileCondition = fileCondition.and(FILE.IS_DIR.eq(1));
         } else if("file".equals(ops.getType())) {
-            fileCondition = fileCondition.and(FILE.IS_DIR.eq(0));
+            fileCondition = fileCondition.and(FILE.IS_DIR.eq(0))
+                    .and(FILE.NODE_TYPE.eq(NodeType.FILE.getValue()));
+        } else if("resource".equals(ops.getType())) {
+            fileCondition = fileCondition.and(FILE.IS_DIR.eq(0))
+                    .and(FILE.NODE_TYPE.eq(NodeType.RESOURCE.getValue()));
         }
         if(ops.getPurpose() != null) {
             fileCondition = fileCondition.and(FILE.PURPOSE.eq(ops.getPurpose()));

@@ -1,5 +1,7 @@
 package com.ke.bella.files.api;
 
+import static com.ke.bella.files.api.FileControllerTestFixture.stubDirectory;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.verify;
@@ -23,6 +25,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ke.bella.files.api.interceptor.FileApiResponseAdvice;
 import com.ke.bella.files.db.repo.Page;
+import com.ke.bella.files.enums.NodeType;
 import com.ke.bella.files.protocol.OpenAIFile;
 import com.ke.bella.files.protocol.PageFileOps;
 import com.ke.bella.files.service.FileService;
@@ -42,10 +45,15 @@ public class FileControllerPageFilesTest {
         ReflectionTestUtils.setField(fileController, "fileService", fileService);
         ReflectionTestUtils.setField(fileController, "fl", fileUniquenessLock);
 
+        stubDirectory(fileService, "dir-1");
+
+        ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.setPropertyNamingStrategy(com.fasterxml.jackson.databind.PropertyNamingStrategy.SNAKE_CASE);
+
         mockMvc = MockMvcBuilders
                 .standaloneSetup(fileController)
                 .setControllerAdvice(new FileApiResponseAdvice())
-                .setMessageConverters(new MappingJackson2HttpMessageConverter(new ObjectMapper()))
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .build();
     }
 
@@ -92,7 +100,6 @@ public class FileControllerPageFilesTest {
 
         when(fileService.pageFiles(any(PageFileOps.class)))
                 .thenReturn(Page.<OpenAIFile>from(page, pageSize).total(total).list(data));
-
         // When & Then
         mockMvc.perform(post("/v1/files/page")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -244,15 +251,19 @@ public class FileControllerPageFilesTest {
 
     @Test
     public void pageFiles_MissingType_Success() throws Exception {
-        // Given: 不传 type 参数，应该成功并返回所有 file 和 dir
+        // Given: 不传 type 参数，应该返回目录、文件和资源节点
         int page = 1;
         int pageSize = 10;
         List<OpenAIFile> data = Arrays.asList(
-                OpenAIFile.builder().id("dir-1").filename("folder1").isDir(true).build(),
-                OpenAIFile.builder().id("file-1").filename("doc.txt").isDir(false).build());
+                OpenAIFile.builder().id("dir-1").filename("folder1").isDir(true)
+                        .nodeType(NodeType.DIRECTORY.getValue()).build(),
+                OpenAIFile.builder().id("file-1").filename("doc.txt").isDir(false)
+                        .nodeType(NodeType.FILE.getValue()).build(),
+                OpenAIFile.builder().id("resource-1").filename("dataset").isDir(false)
+                        .nodeType(NodeType.RESOURCE.getValue()).resourceId("dataset:1").build());
 
         when(fileService.pageFiles(any(PageFileOps.class)))
-                .thenReturn(Page.<OpenAIFile>from(page, pageSize).total(2).list(data));
+                .thenReturn(Page.<OpenAIFile>from(page, pageSize).total(3).list(data));
 
         // When & Then
         mockMvc.perform(post("/v1/files/page")
@@ -264,11 +275,15 @@ public class FileControllerPageFilesTest {
                         "  \"order\": \"desc\"\n" +
                         "}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].id").value("dir-1"))
-                .andExpect(jsonPath("$.data[1].id").value("file-1"));
+                .andExpect(jsonPath("$.total").value(3))
+                .andExpect(jsonPath("$.data.length()").value(3))
+                .andExpect(jsonPath("$.data[0].node_type").value(NodeType.DIRECTORY.getValue()))
+                .andExpect(jsonPath("$.data[1].node_type").value(NodeType.FILE.getValue()))
+                .andExpect(jsonPath("$.data[2].node_type").value(NodeType.RESOURCE.getValue()))
+                .andExpect(jsonPath("$.data[2].resource_id").value("dataset:1"));
 
         // 验证 type 参数为 null
-        verify(fileService).pageFiles(argThat(ops -> ops.getType() == null));
+        verify(fileService).pageFiles(argThat(ops -> ops.getType() == null && ops.getPurpose() == null));
     }
 
     @Test
@@ -285,7 +300,7 @@ public class FileControllerPageFilesTest {
                         "  \"order\": \"desc\"\n" +
                         "}"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error.message").value("type must be 'dir' or 'file', but got: "));
+                .andExpect(jsonPath("$.error.message").value("type must be 'dir', 'file' or 'resource', but got: "));
     }
 
     @Test
@@ -302,7 +317,7 @@ public class FileControllerPageFilesTest {
                         "  \"order\": \"desc\"\n" +
                         "}"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error.message").value("type must be 'dir' or 'file', but got: folder"));
+                .andExpect(jsonPath("$.error.message").value("type must be 'dir', 'file' or 'resource', but got: folder"));
     }
 
     @Test
@@ -311,8 +326,10 @@ public class FileControllerPageFilesTest {
         int page = 1;
         int pageSize = 10;
         List<OpenAIFile> data = Arrays.asList(
-                OpenAIFile.builder().id("dir-1").filename("folder1").isDir(true).build(),
-                OpenAIFile.builder().id("dir-2").filename("folder2").isDir(true).build());
+                OpenAIFile.builder().id("dir-1").filename("folder1").isDir(true)
+                        .nodeType(NodeType.DIRECTORY.getValue()).build(),
+                OpenAIFile.builder().id("dir-2").filename("folder2").isDir(true)
+                        .nodeType(NodeType.DIRECTORY.getValue()).build());
 
         when(fileService.pageFiles(any(PageFileOps.class)))
                 .thenReturn(Page.<OpenAIFile>from(page, pageSize).total(2).list(data));
@@ -327,7 +344,11 @@ public class FileControllerPageFilesTest {
                         "  \"type\": \"dir\",\n" +
                         "  \"order\": \"desc\"\n" +
                         "}"))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(2))
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[0].node_type").value(NodeType.DIRECTORY.getValue()))
+                .andExpect(jsonPath("$.data[1].node_type").value(NodeType.DIRECTORY.getValue()));
 
         // 验证 type 参数为 "dir"
         verify(fileService).pageFiles(argThat(ops -> "dir".equals(ops.getType())));
@@ -339,8 +360,10 @@ public class FileControllerPageFilesTest {
         int page = 1;
         int pageSize = 10;
         List<OpenAIFile> data = Arrays.asList(
-                OpenAIFile.builder().id("file-1").filename("doc.txt").isDir(false).purpose("assistants").build(),
-                OpenAIFile.builder().id("file-2").filename("img.jpg").isDir(false).purpose("vision").build());
+                OpenAIFile.builder().id("file-1").filename("doc.txt").isDir(false)
+                        .nodeType(NodeType.FILE.getValue()).purpose("assistants").build(),
+                OpenAIFile.builder().id("file-2").filename("img.jpg").isDir(false)
+                        .nodeType(NodeType.FILE.getValue()).purpose("vision").build());
 
         when(fileService.pageFiles(any(PageFileOps.class)))
                 .thenReturn(Page.<OpenAIFile>from(page, pageSize).total(2).list(data));
@@ -356,42 +379,46 @@ public class FileControllerPageFilesTest {
                         "  \"order\": \"desc\"\n" +
                         "}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].id").value("file-1"))
-                .andExpect(jsonPath("$.data[1].id").value("file-2"));
+                .andExpect(jsonPath("$.total").value(2))
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[0].node_type").value(NodeType.FILE.getValue()))
+                .andExpect(jsonPath("$.data[1].node_type").value(NodeType.FILE.getValue()));
 
         // 验证 type 为 file 且 purpose 为 null
         verify(fileService).pageFiles(argThat(ops -> "file".equals(ops.getType()) && ops.getPurpose() == null));
     }
 
     @Test
-    public void pageFiles_NoTypeNoPurpose_Success() throws Exception {
-        // Given: 既不传 type 也不传 purpose，应该返回所有文件和目录
+    public void pageFiles_TypeResource_Success() throws Exception {
         int page = 1;
         int pageSize = 10;
         List<OpenAIFile> data = Arrays.asList(
-                OpenAIFile.builder().id("dir-1").filename("folder").isDir(true).build(),
-                OpenAIFile.builder().id("file-1").filename("doc.txt").isDir(false).purpose("assistants").build(),
-                OpenAIFile.builder().id("file-2").filename("img.jpg").isDir(false).purpose("vision").build());
+                OpenAIFile.builder().id("resource-1").filename("dataset-1").isDir(false)
+                        .nodeType(NodeType.RESOURCE.getValue()).resourceId("dataset:1").build(),
+                OpenAIFile.builder().id("resource-2").filename("workflow-2").isDir(false)
+                        .nodeType(NodeType.RESOURCE.getValue()).resourceId("workflow:2").build());
 
         when(fileService.pageFiles(any(PageFileOps.class)))
-                .thenReturn(Page.<OpenAIFile>from(page, pageSize).total(3).list(data));
+                .thenReturn(Page.<OpenAIFile>from(page, pageSize).total(2).list(data));
 
-        // When & Then
         mockMvc.perform(post("/v1/files/page")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\n" +
                         "  \"space_code\": \"space-1\",\n" +
                         "  \"page\": 1,\n" +
                         "  \"page_size\": 10,\n" +
+                        "  \"type\": \"resource\",\n" +
                         "  \"order\": \"desc\"\n" +
                         "}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].id").value("dir-1"))
-                .andExpect(jsonPath("$.data[1].id").value("file-1"))
-                .andExpect(jsonPath("$.data[2].id").value("file-2"));
+                .andExpect(jsonPath("$.total").value(2))
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[0].node_type").value(NodeType.RESOURCE.getValue()))
+                .andExpect(jsonPath("$.data[0].resource_id").value("dataset:1"))
+                .andExpect(jsonPath("$.data[1].node_type").value(NodeType.RESOURCE.getValue()))
+                .andExpect(jsonPath("$.data[1].resource_id").value("workflow:2"));
 
-        // 验证 type 和 purpose 都为 null
-        verify(fileService).pageFiles(argThat(ops -> ops.getType() == null && ops.getPurpose() == null));
+        verify(fileService).pageFiles(argThat(ops -> "resource".equals(ops.getType()) && ops.getPurpose() == null));
     }
 
     // ========== 新增测试：purpose 和 type 的组合场景 ==========

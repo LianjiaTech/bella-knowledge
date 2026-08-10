@@ -58,7 +58,7 @@ export function MoveFolderDialog({
         ancestor_id: ancestorId,
         space_code: spaceCode,
       });
-      setDirectories(res.data.filter((item) => item.is_dir));
+      setDirectories(res.data.filter((item) => item.node_type === "directory"));
       setLoading(false);
     },
     [spaceCode],

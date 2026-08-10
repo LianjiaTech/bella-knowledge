@@ -27,6 +27,7 @@ import com.ke.bella.files.db.repo.Page;
 import com.ke.bella.files.db.tables.pojos.FileDB;
 import com.ke.bella.files.db.tables.pojos.FileProgressDB;
 import com.ke.bella.files.enums.FileType;
+import com.ke.bella.files.enums.NodeType;
 import com.ke.bella.files.protocol.BroadcastStatus;
 import com.ke.bella.files.protocol.EventType;
 import com.ke.bella.files.protocol.FileBroadcasting;
@@ -97,6 +98,7 @@ public class FileService {
     }
 
     private OpenAIFile transferToOpenAIFile(FileDB fileDB) {
+        NodeType nodeType = NodeType.from(fileDB);
         return OpenAIFile.builder()
                 .id(fileDB.getFileId())
                 .bytes(fileDB.getBytes())
@@ -104,7 +106,9 @@ public class FileService {
                         .toInstant(ZoneId.systemDefault().getRules().getOffset(fileDB.getCtime()))
                         .toEpochMilli())
                 .filename(fileDB.getFilename())
-                .isDir(fileDB.getIsDir() == 1)
+                .isDir(nodeType == NodeType.DIRECTORY)
+                .nodeType(nodeType.getValue())
+                .resourceId(fileDB.getResourceId())
                 .extension(fileDB.getExtension())
                 .mimeType(fileDB.getMimeType())
                 .type(fileDB.getType())
@@ -356,6 +360,8 @@ public class FileService {
         fileDB.setDescription(StringUtils.isNotEmpty(description) ? description : "");
         fileDB.setCities(citiesJson);
         fileDB.setTags(tagsJson);
+        fileDB.setNodeType(NodeType.FILE.getValue());
+        fileDB.setResourceId("");
         String shardingKey = fileRepo.addFile(fileDB, ancestorId, fileType);
         if(fileType.notUsersType()) {
             fileShardingCountUpdator.increase(shardingKey, fileType.getType());
@@ -431,20 +437,40 @@ public class FileService {
         return transferToOpenAIFile(fileDB);
     }
 
+    public FileDB requireContentFile(String fileId) {
+        FileType fileType = FileType.fromFileId(fileId);
+        FileDB file = fileRepo.queryFile(fileId, fileType);
+        if(file == null) {
+            throw new FileNotFoundException(fileId);
+        }
+        NodeType nodeType = NodeType.from(file);
+        if(nodeType != NodeType.FILE) {
+            throw new IllegalArgumentException(String.format("node has no file content. file_id = %s, node_type = %s",
+                    fileId, nodeType.getValue()));
+        }
+        return file;
+    }
+
     public FileDB getFile0(String fileId) {
         FileType fileType = FileType.fromFileId(fileId);
         return fileRepo.queryFile(fileId, fileType);
     }
 
     public String updateRealFile(String fileId, String filename, File file, String mimeType, String charset) {
-        FileType fileType = FileType.fromFileId(fileId);
-        FileDB fileDB = fileRepo.queryFile(fileId, fileType);
+        return updateRealFile(requireContentFile(fileId), filename, file, mimeType, charset);
+    }
+
+    public String updateRealFile(FileDB fileDB, String filename, File file, String mimeType, String charset) {
         return storageService.putObject(fileDB.getBucket(), fileDB.getPath(), mimeType, file, filename, charset);
     }
 
     public String updateRealFileFromStream(String fileId, String filename, java.io.InputStream inputStream, long contentLength, String mimeType,
             String charset) {
-        FileDB fileDB = fileRepo.queryFile(fileId);
+        return updateRealFileFromStream(requireContentFile(fileId), filename, inputStream, contentLength, mimeType, charset);
+    }
+
+    public String updateRealFileFromStream(FileDB fileDB, String filename, java.io.InputStream inputStream, long contentLength, String mimeType,
+            String charset) {
         return storageService.putObjectFromStream(fileDB.getBucket(), fileDB.getPath(), mimeType, inputStream, contentLength, filename, charset);
     }
 
@@ -482,7 +508,6 @@ public class FileService {
         String fileId = fileDB.getFileId();
         FileType fileType = FileType.fromFileId(fileId);
 
-        // 构建广播数据
         OpenAIFile fileToDelete = buildOpenAIFileWithSource(fileDB);
 
         // 只标记status字段，不删除文件，不删除数据库记录
@@ -519,7 +544,10 @@ public class FileService {
     public String getUrl(
             String fileId,
             long expires) {
-        FileDB file = fileRepo.queryFile(fileId);
+        return getUrl(requireContentFile(fileId), expires);
+    }
+
+    public String getUrl(FileDB file, long expires) {
         return getUrl(file.getBucket(), file.getPath(), file.getPurpose(), expires);
     }
 
@@ -532,6 +560,14 @@ public class FileService {
             UpdateProgressRequestData data,
             String fileId,
             String progressName) {
+        updateProgress(data, requireContentFile(fileId), progressName);
+    }
+
+    public void updateProgress(
+            UpdateProgressRequestData data,
+            FileDB file,
+            String progressName) {
+        String fileId = file.getFileId();
         String status = data.getStatus();
         String message = data.getMessage();
         Integer percent = data.getPercent();
@@ -545,7 +581,13 @@ public class FileService {
     public Progress getProgress(
             String fileId,
             String progressName) {
-        FileProgressDB fileProgressDB = fileRepo.queryProgress(fileId, progressName);
+        return getProgress(requireContentFile(fileId), progressName);
+    }
+
+    public Progress getProgress(
+            FileDB file,
+            String progressName) {
+        FileProgressDB fileProgressDB = fileRepo.queryProgress(file.getFileId(), progressName);
         return fileProgressDB == null ? null : transferToProgress(fileProgressDB);
     }
 
@@ -564,21 +606,22 @@ public class FileService {
     }
 
     public String getPreviewUrl(String fileId, Long expires) {
-        FileDB file = fileRepo.queryFile(fileId);
+        return getPreviewUrl(requireContentFile(fileId), expires);
+    }
+
+    public String getPreviewUrl(FileDB file, Long expires) {
         String bucketName = file.getBucket();
         String keyName = file.getPath();
         return storageService.getPreviewUrl(bucketName, keyName, expires);
     }
 
     public InputStreamWithCharset getFileInputStream(String fileId) {
-        try {
-            // 获取文件信息
-            FileDB file = fileRepo.queryFile(fileId);
-            if(file == null) {
-                LOGGER.warn("file not found, file_id = {}", fileId);
-                return null;
-            }
+        return getFileInputStream(requireContentFile(fileId));
+    }
 
+    public InputStreamWithCharset getFileInputStream(FileDB file) {
+        String fileId = file.getFileId();
+        try {
             String bucketName = file.getBucket();
             String keyName = file.getPath();
 
@@ -611,6 +654,8 @@ public class FileService {
         fileDB.setMetaData("{}");
         fileDB.setAkCode(akCode);
         fileDB.setIsDir(1);
+        fileDB.setNodeType(NodeType.DIRECTORY.getValue());
+        fileDB.setResourceId("");
         fileDB.setDescription(description == null ? "" : description);
         fileDB.setCities("");
         fileDB.setTags("");
@@ -634,6 +679,50 @@ public class FileService {
         broadcastService.broadcast(message, () -> updateBroadcastStatus(fileId, BroadcastStatus.SUCCESS),
                 () -> updateBroadcastStatus(fileId, BroadcastStatus.FAILED));
         return openAIFile;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public OpenAIFile createResource(String name, String resourceId, String ancestorId, String purpose) {
+        String spaceCode = BellaContextHelper.getOperateSpaceCode();
+        String fileId = FILE_ID_GENERATOR.generateWithType(FileType.USER);
+
+        FileDB fileDB = new FileDB();
+        fileDB.setFileId(fileId);
+        fileDB.setFilename(name);
+        fileDB.setExtension("");
+        fileDB.setMimeType("");
+        fileDB.setType("");
+        fileDB.setBucket("");
+        fileDB.setPath("");
+        fileDB.setBytes(0L);
+        fileDB.setSpaceCode(spaceCode);
+        fileDB.setPurpose(StringUtils.defaultString(purpose));
+        fileDB.setMetaData("{}");
+        fileDB.setAkCode(BellaContextHelper.getOperatorAkCode());
+        fileDB.setIsDir(0);
+        fileDB.setDescription("");
+        fileDB.setCities("");
+        fileDB.setTags("");
+        fileDB.setNodeType(NodeType.RESOURCE.getValue());
+        fileDB.setResourceId(resourceId);
+
+        fileRepo.addFile(fileDB, ancestorId, FileType.USER);
+        FileDB created = fileRepo.queryFile(fileId, FileType.USER);
+        if(created == null) {
+            throw new FileNotFoundException(fileId);
+        }
+        OpenAIFile resource = transferToOpenAIFile(created);
+
+        FileBroadcasting<OpenAIFile> message = new FileBroadcasting<>();
+        message.setEvent(EventType.FILE_CREATED);
+        message.setData(resource);
+        message.setMetadata("{}");
+        message.setUserId(BellaContextHelper.getOperatorUserId());
+        message.setUserName(BellaContextHelper.getOperatorUserName());
+        message.setAkCode(BellaContextHelper.getOperatorAkCode());
+        broadcastService.broadcast(message, () -> updateBroadcastStatus(fileId, BroadcastStatus.SUCCESS),
+                () -> updateBroadcastStatus(fileId, BroadcastStatus.FAILED));
+        return resource;
     }
 
     public List<OpenAIFile> findFiles(FileDB ancestor) {
