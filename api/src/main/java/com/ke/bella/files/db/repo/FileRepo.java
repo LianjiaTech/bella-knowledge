@@ -822,11 +822,13 @@ public class FileRepo implements BaseRepo {
             fileCondition = fileCondition.and(FILE.SPACE_CODE.eq(ops.getSpaceCode()));
         }
         if("dir".equals(ops.getType())) {
-            fileCondition = fileCondition.and(FILE.NODE_TYPE.eq(NodeType.DIRECTORY.getValue()));
+            fileCondition = fileCondition.and(FILE.IS_DIR.eq(1));
         } else if("file".equals(ops.getType())) {
-            fileCondition = fileCondition.and(FILE.NODE_TYPE.eq(NodeType.FILE.getValue()));
+            fileCondition = fileCondition.and(FILE.IS_DIR.eq(0))
+                    .and(FILE.NODE_TYPE.eq(NodeType.FILE.getValue()));
         } else if("resource".equals(ops.getType())) {
-            fileCondition = fileCondition.and(FILE.NODE_TYPE.eq(NodeType.RESOURCE.getValue()));
+            fileCondition = fileCondition.and(FILE.IS_DIR.eq(0))
+                    .and(FILE.NODE_TYPE.eq(NodeType.RESOURCE.getValue()));
         }
         if(ops.getPurpose() != null) {
             fileCondition = fileCondition.and(FILE.PURPOSE.eq(ops.getPurpose()));

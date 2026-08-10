@@ -126,6 +126,28 @@ public class FileRepoMoveTest {
     }
 
     @Test
+    public void pageTypeFiltersHonorIsDirDuringRollingDeployment() {
+        Page<FileDB> directories = fileRepo.pageFiles(PageFileOps.builder()
+                .ancestorId(SOURCE)
+                .type("dir")
+                .page(1)
+                .pageSize(10)
+                .order("asc")
+                .build());
+        assertEquals(1, directories.getTotal());
+        assertEquals(CHILD, directories.getData().get(0).getFileId());
+
+        Page<FileDB> files = fileRepo.pageFiles(PageFileOps.builder()
+                .ancestorId(SOURCE)
+                .type("file")
+                .page(1)
+                .pageSize(10)
+                .order("asc")
+                .build());
+        assertEquals(0, files.getTotal());
+    }
+
+    @Test
     public void moveLeafUsesSameSubtreeAlgorithm() {
         fileRepo.moveFileClosures(LEAF, TARGET);
 

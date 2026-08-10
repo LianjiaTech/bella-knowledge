@@ -20,6 +20,9 @@ public enum NodeType {
         if(file == null) {
             return null;
         }
+        if(Integer.valueOf(1).equals(file.getIsDir())) {
+            return DIRECTORY;
+        }
         if(StringUtils.isNotEmpty(file.getNodeType())) {
             for (NodeType nodeType : values()) {
                 if(nodeType.value.equals(file.getNodeType())) {
@@ -28,6 +31,6 @@ public enum NodeType {
             }
             throw new IllegalStateException("Unsupported node_type: " + file.getNodeType());
         }
-        return Integer.valueOf(1).equals(file.getIsDir()) ? DIRECTORY : FILE;
+        return FILE;
     }
 }
