@@ -15,7 +15,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import javax.annotation.Nullable;
@@ -29,8 +28,6 @@ import org.jooq.SortField;
 import org.jooq.exception.DataAccessException;
 import org.jooq.exception.SQLStateClass;
 import org.jooq.impl.DSL;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,7 +46,6 @@ import com.ke.bella.files.utils.JsonUtils;
 
 @Component
 public class FileEntryRepo implements BaseRepo {
-    private static final Logger LOGGER = LoggerFactory.getLogger(FileEntryRepo.class);
     public static final String ROOT_ENTRY_ID = "";
     public static final String TYPE_FILE = "file";
     public static final String TYPE_DIR = "dir";
@@ -62,8 +58,10 @@ public class FileEntryRepo implements BaseRepo {
     private boolean crossSpaceMoveEnabled;
 
     /**
-     * dual（默认）：闭包表是主链路，entry 为影子写（失败降级）；
-     * entry：停写闭包，entry 写转为主写（失败必须报错），闭包读回退同时关闭。
+     * dual（默认）：闭包表和 entry 双写，任一失败整体回滚，保证两边严格一致；
+     * entry：停写闭包，entry 是唯一记录，闭包读回退同时关闭；
+     * closure：逃生阀——完全停写 entry，退回纯闭包链路。用于 dual 阶段 entry 侧出问题时不发版止血；
+     * 切回 dual 后窗口期缺失的 entry 由懒迁移/回填补齐，切 entry 读之前必须重跑回填校验。
      * 下闭包表的路径：write-mode 切 entry → 观察 → drop 表，中间不需要发布。
      */
     @Value("${bella.file-api.file-entry.write-mode:dual}")
@@ -83,6 +81,10 @@ public class FileEntryRepo implements BaseRepo {
 
     public boolean closureWriteEnabled() {
         return !"entry".equalsIgnoreCase(writeMode);
+    }
+
+    public boolean entryWriteEnabled() {
+        return !"closure".equalsIgnoreCase(writeMode);
     }
 
     private DSLContext entryDb(String spaceCode) {
@@ -451,30 +453,14 @@ public class FileEntryRepo implements BaseRepo {
     }
 
     /**
-     * dual 模式下 file_entry 是闭包表主链路的影子写：写失败一律降级（error 日志 + 放弃本次 entry 写），
-     * 不回滚主事务，缺失/陈旧的 entry 由全量迁移和懒迁移修复。
-     * catch 必须在本类方法体内完成——异常一旦穿过 @Transactional 代理，
-     * 外层事务会被标记为 rollback-only，主流程提交时会失败。
-     * 闭包停写（write-mode=entry）后 entry 写就是唯一记录，失败必须让主事务回滚。
+     * entry 写失败一律抛出，让外层主事务整体回滚，file/闭包/entry 严格一致。
+     * write-mode=closure 是逃生阀：entry 写全部空操作，退回纯闭包链路。
      */
-    private <T> T degradeOnFailure(String operation, String spaceCode, String fileId, Supplier<T> write) {
-        try {
-            return write.get();
-        } catch (RuntimeException e) {
-            if(!closureWriteEnabled()) {
-                throw e;
-            }
-            LOGGER.error("file_entry write degraded, operation: {}, spaceCode: {}, fileId: {}", operation, spaceCode, fileId, e);
-            return null;
-        }
-    }
-
     @Transactional(rollbackFor = Exception.class)
     public FileEntryDB addEntry(String spaceCode, FileDB file, @Nullable String ancestorId) {
-        return degradeOnFailure("addEntry", spaceCode, file.getFileId(), () -> doAddEntry(spaceCode, file, ancestorId));
-    }
-
-    private FileEntryDB doAddEntry(String spaceCode, FileDB file, @Nullable String ancestorId) {
+        if(!entryWriteEnabled()) {
+            return null;
+        }
         String parentEntryId = resolveParentEntryId(spaceCode, ancestorId);
         assertNameAvailable(spaceCode, parentEntryId, file.getFilename(), null);
         FileEntryRecord record = FILE_ENTRY.newRecord();
@@ -563,13 +549,9 @@ public class FileEntryRepo implements BaseRepo {
     }
 
     public void rename(String spaceCode, String fileId, String filename) {
-        degradeOnFailure("rename", spaceCode, fileId, () -> {
-            doRename(spaceCode, fileId, filename);
-            return null;
-        });
-    }
-
-    private void doRename(String spaceCode, String fileId, String filename) {
+        if(!entryWriteEnabled()) {
+            return;
+        }
         FileEntryDB entry = ensureLegacyEntry(spaceCode, fileId);
         assertNameAvailable(spaceCode, entry.getParentEntryId(), filename, entry.getEntryId());
         int updated = entryDb(spaceCode).update(FILE_ENTRY)
@@ -582,13 +564,9 @@ public class FileEntryRepo implements BaseRepo {
     }
 
     public void move(String spaceCode, String fileId, @Nullable String targetAncestorId) {
-        degradeOnFailure("move", spaceCode, fileId, () -> {
-            doMove(spaceCode, fileId, targetAncestorId);
-            return null;
-        });
-    }
-
-    private void doMove(String spaceCode, String fileId, @Nullable String targetAncestorId) {
+        if(!entryWriteEnabled()) {
+            return;
+        }
         FileEntryDB entry = ensureLegacyEntry(spaceCode, fileId);
         String parentEntryId = resolveParentEntryId(spaceCode, targetAncestorId);
         assertNotSelfOrDescendant(spaceCode, entry, parentEntryId);
@@ -603,22 +581,25 @@ public class FileEntryRepo implements BaseRepo {
     }
 
     public void delete(String spaceCode, String fileId) {
-        degradeOnFailure("delete", spaceCode, fileId, () -> {
-            int deleted = entryDb(spaceCode).deleteFrom(FILE_ENTRY)
-                    .where(FILE_ENTRY.SPACE_CODE.eq(spaceCode))
-                    .and(FILE_ENTRY.FILE_ID.eq(fileId))
-                    .execute();
-            if(deleted > 1) {
-                throw new IllegalStateException("multiple file_entry rows deleted, fileId: " + fileId);
-            }
-            return null;
-        });
+        if(!entryWriteEnabled()) {
+            return;
+        }
+        int deleted = entryDb(spaceCode).deleteFrom(FILE_ENTRY)
+                .where(FILE_ENTRY.SPACE_CODE.eq(spaceCode))
+                .and(FILE_ENTRY.FILE_ID.eq(fileId))
+                .execute();
+        if(deleted > 1) {
+            throw new IllegalStateException("multiple file_entry rows deleted, fileId: " + fileId);
+        }
     }
 
     @Transactional(rollbackFor = Exception.class)
     public FileEntryDB moveAcrossSpace(String fileId, String targetSpaceCode, @Nullable String targetAncestorId) {
         if(!crossSpaceMoveEnabled) {
             throw new IllegalStateException("cross-space file entry move is disabled");
+        }
+        if(!entryWriteEnabled()) {
+            throw new IllegalStateException("cross-space move requires file_entry writes, current write-mode is closure");
         }
         FileDB file = queryActiveFile(fileId);
         if(file == null) {
