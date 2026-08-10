@@ -47,10 +47,13 @@ public class FileControllerPageFilesTest {
 
         stubDirectory(fileService, "dir-1");
 
+        ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.setPropertyNamingStrategy(com.fasterxml.jackson.databind.PropertyNamingStrategy.SNAKE_CASE);
+
         mockMvc = MockMvcBuilders
                 .standaloneSetup(fileController)
                 .setControllerAdvice(new FileApiResponseAdvice())
-                .setMessageConverters(new MappingJackson2HttpMessageConverter(new ObjectMapper()))
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .build();
     }
 
