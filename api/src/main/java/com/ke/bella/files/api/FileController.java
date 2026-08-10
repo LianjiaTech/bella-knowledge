@@ -543,7 +543,7 @@ public class FileController {
             throw new IllegalArgumentException("file_id is required, but not provided");
         }
 
-        OpenAIFile existingFile = fileService.requireContentFile(fileId);
+        FileDB existingFile = fileService.requireContentFile(fileId);
 
         // 提取文件元数据
         MediaType mimeTypeSource = Optional.ofNullable(file.getContentType()).map(MediaType::parse).orElse(null);
@@ -559,8 +559,8 @@ public class FileController {
         String extension = FileUtils.getFileExtension(filename);
 
         try (InputStream inputStream = file.getInputStream()) {
-            return updateFileFromStream(fileId, inputStream, file.getSize(), existingFile.getFilename(),
-                    type, mimeType, extension, charset, existingFile.getMetadata(), existingFile.getPurpose());
+            return updateFileFromStream(existingFile, inputStream, file.getSize(), existingFile.getFilename(),
+                    type, mimeType, extension, charset, existingFile.getMetaData(), existingFile.getPurpose());
         } catch (Exception e) {
             LOGGER.error("File update failed, file_id: {}, error: {}", fileId, e.getMessage(), e);
             throw new IllegalStateException("File update failed", e);
@@ -589,8 +589,14 @@ public class FileController {
 
     private OpenAIFile updateFileFromStream(String fileId, InputStream inputStream, long contentLength, String filename,
             String type, String mimeType, String extension, String charset, String metadata, String purpose) {
+        return updateFileFromStream(fileService.requireContentFile(fileId), inputStream, contentLength, filename,
+                type, mimeType, extension, charset, metadata, purpose);
+    }
 
-        String fileKey = fileService.updateRealFileFromStream(fileId, filename, inputStream, contentLength, mimeType, charset);
+    private OpenAIFile updateFileFromStream(FileDB file, InputStream inputStream, long contentLength, String filename,
+            String type, String mimeType, String extension, String charset, String metadata, String purpose) {
+        String fileId = file.getFileId();
+        String fileKey = fileService.updateRealFileFromStream(file, filename, inputStream, contentLength, mimeType, charset);
 
         FileOps ops = FileOps.builder()
                 .fileId(fileId)
@@ -684,11 +690,11 @@ public class FileController {
     public void retrieveDomTreeContent(
             HttpServletResponse response,
             @PathVariable("file_id") String fileId) {
-        OpenAIFile file = fileService.requireContentFile(fileId);
+        FileDB file = fileService.requireContentFile(fileId);
 
         String targetFileId;
         if("dom_tree".equals(file.getPurpose())) {
-            targetFileId = file.getId();
+            targetFileId = file.getFileId();
         } else if(!StringUtils.isEmpty(file.getDomTreeFileId())) {
             targetFileId = file.getDomTreeFileId();
         } else {
@@ -696,7 +702,9 @@ public class FileController {
                     String.format("the file does not have a legal dom file. file_id = %s", fileId));
         }
 
-        String redirectUrl = fileService.getUrl(targetFileId);
+        String redirectUrl = targetFileId.equals(file.getFileId())
+                ? fileService.getUrl(file, FileService.ONE_DAY)
+                : fileService.getUrl(targetFileId);
         response.setHeader(HttpHeaders.LOCATION, redirectUrl);
         response.setStatus(HttpServletResponse.SC_MOVED_TEMPORARILY);
     }
@@ -705,11 +713,11 @@ public class FileController {
     public FileUrl getDomTreeUrl(
             @PathVariable("file_id") String fileId,
             @RequestParam(value = "expires", required = false, defaultValue = ONE_DAY_STRING) Long expires) {
-        OpenAIFile file = fileService.requireContentFile(fileId);
+        FileDB file = fileService.requireContentFile(fileId);
 
         String targetFileId;
         if("dom_tree".equals(file.getPurpose())) {
-            targetFileId = file.getId();
+            targetFileId = file.getFileId();
         } else if(!StringUtils.isEmpty(file.getDomTreeFileId())) {
             targetFileId = file.getDomTreeFileId();
         } else {
@@ -717,7 +725,9 @@ public class FileController {
                     String.format("the file does not have a legal dom file. file_id = %s", fileId));
         }
 
-        String url = fileService.getUrl(targetFileId, expires);
+        String url = targetFileId.equals(file.getFileId())
+                ? fileService.getUrl(file, expires)
+                : fileService.getUrl(targetFileId, expires);
         return FileUrl.builder()
                 .url(url)
                 .build();
@@ -790,8 +800,8 @@ public class FileController {
     public void retrieveContentRedirect(
             HttpServletResponse response,
             @PathVariable("file_id") String fileId) {
-        fileService.requireContentFile(fileId);
-        String redirectUrl = fileService.getUrl(fileId);
+        FileDB file = fileService.requireContentFile(fileId);
+        String redirectUrl = fileService.getUrl(file, FileService.ONE_DAY);
         response.setHeader(HttpHeaders.LOCATION, redirectUrl);
         response.setStatus(HttpServletResponse.SC_MOVED_TEMPORARILY);
     }
@@ -800,8 +810,8 @@ public class FileController {
     public FileUrl getUrl(
             @PathVariable("file_id") String fileId,
             @RequestParam(value = "expires", required = false, defaultValue = ONE_DAY_STRING) Long expires) {
-        fileService.requireContentFile(fileId);
-        String url = fileService.getUrl(fileId, expires);
+        FileDB file = fileService.requireContentFile(fileId);
+        String url = fileService.getUrl(file, expires);
         return FileUrl.builder()
                 .url(url)
                 .build();
@@ -812,7 +822,7 @@ public class FileController {
             @RequestBody UpdateProgressRequestData data,
             @PathVariable("file_id") String fileId,
             @PathVariable("progress_name") String progressName) {
-        OpenAIFile file = fileService.requireContentFile(fileId);
+        FileDB file = fileService.requireContentFile(fileId);
         String purpose = file.getPurpose();
         if(!FilePurposeClassifier.allowedProgressTrackablePurposes().contains(purpose)) {
             throw new IllegalArgumentException(String.format(
@@ -821,15 +831,15 @@ public class FileController {
                     String.join(", ", FilePurposeClassifier.allowedProgressTrackablePurposes()),
                     fileId));
         }
-        fileService.updateProgress(data, fileId, progressName);
-        return fileService.getProgress(fileId, progressName);
+        fileService.updateProgress(data, file, progressName);
+        return fileService.getProgress(file, progressName);
     }
 
     @GetMapping("/{file_id}/progress")
     public Progress getProgress(
             @PathVariable("file_id") String fileId,
             @RequestParam("progress_name") String progressName) {
-        OpenAIFile file = fileService.requireContentFile(fileId);
+        FileDB file = fileService.requireContentFile(fileId);
         String purpose = file.getPurpose();
         if(!FilePurposeClassifier.allowedProgressTrackablePurposes().contains(purpose)) {
             throw new IllegalArgumentException(String.format(
@@ -838,7 +848,7 @@ public class FileController {
                     String.join(", ", FilePurposeClassifier.allowedProgressTrackablePurposes()),
                     fileId));
         }
-        Progress res = fileService.getProgress(fileId, progressName);
+        Progress res = fileService.getProgress(file, progressName);
         if(res == null) {
             throw new ProgressNotFoundException(fileId, progressName);
         }
@@ -868,16 +878,16 @@ public class FileController {
     public FileUrl getPreviewUrl(
             @PathVariable("file_id") String fileId,
             @RequestParam(value = "expires", required = false, defaultValue = ONE_DAY_STRING) Long expires) {
-        OpenAIFile file = fileService.requireContentFile(fileId);
+        FileDB file = fileService.requireContentFile(fileId);
 
         String url;
         if(!StringUtils.isEmpty(file.getPdfFileId())) {
             url = fileService.getUrl(file.getPdfFileId(), expires);
             // fixme: doc、docx 历史数据不存在转换回流的pdf，需要刷数后才能下掉
         } else if("doc".equals(file.getExtension()) || "docx".equals(file.getExtension())) {
-            url = fileService.getPreviewUrl(file.getId(), expires);
+            url = fileService.getPreviewUrl(file, expires);
         } else {
-            url = fileService.getUrl(fileId, expires);
+            url = fileService.getUrl(file, expires);
         }
         return FileUrl
                 .builder()
@@ -920,7 +930,7 @@ public class FileController {
         Assert.isTrue(bbox.size() == 4, "bbox must have exactly 4 values: [x1, y1, x2, y2]");
 
         // 校验文件存在
-        OpenAIFile file = fileService.requireContentFile(fileId);
+        FileDB file = fileService.requireContentFile(fileId);
 
         // 确认要处理的pdf文件
         String pdfFileId = fileId;
@@ -938,7 +948,9 @@ public class FileController {
         double x2 = bbox.get(2);
         double y2 = bbox.get(3);
 
-        FileService.InputStreamWithCharset streamWithCharset = fileService.getFileInputStream(pdfFileId);
+        FileService.InputStreamWithCharset streamWithCharset = pdfFileId.equals(file.getFileId())
+                ? fileService.getFileInputStream(file)
+                : fileService.getFileInputStream(pdfFileId);
         BufferedImage pageImage = null;
         BufferedImage croppedImage = null;
         ByteArrayOutputStream baos = null;

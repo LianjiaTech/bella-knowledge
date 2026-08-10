@@ -36,6 +36,7 @@ import com.ke.bella.files.db.tables.pojos.DatasetDB;
 import com.ke.bella.files.db.tables.pojos.DatasetDocumentDB;
 import com.ke.bella.files.db.tables.pojos.DatasetQaDB;
 import com.ke.bella.files.db.tables.pojos.DatasetQaReferenceDB;
+import com.ke.bella.files.db.tables.pojos.FileDB;
 import com.ke.bella.files.db.tables.pojos.TagDB;
 import com.ke.bella.files.protocol.DatasetOps;
 import com.ke.bella.files.protocol.DatasetOps.DatasetImportingProgress;
@@ -183,7 +184,7 @@ public class DatasetController {
             @RequestParam(name = "type", required = false) String type,
             @RequestParam(name = "remark", required = false) String remark) {
         Assert.isTrue(fileId != null, "file_id must be provided");
-        fs.requireContentFile(fileId);
+        FileDB file = fs.requireContentFile(fileId);
 
         // step1: check dataset and init if necessary
         DatasetDB dataset = null;
@@ -210,9 +211,9 @@ public class DatasetController {
                                 .status(status.name())
                                 .percent(percent)
                                 .message(message)
-                                .build(), fileId, DATASET_IMPORT_PROGRESS);
+                                .build(), file, DATASET_IMPORT_PROGRESS);
 
-                processImport(fileId, finalDataset, progressCallback);
+                processImport(file, finalDataset, progressCallback);
             } catch (Exception e) {
                 LOGGER.error("failed to process import for file_id: {}, dataset_id: {}, e: ", fileId, finalDataset.getDatasetId(), e);
             }
@@ -221,14 +222,15 @@ public class DatasetController {
         return dataset;
     }
 
-    private DatasetDB processImport(String fileId, DatasetDB dataset, TriConsumer<DatasetImportingProgress, Integer, String> progressCallback) {
+    private DatasetDB processImport(FileDB file, DatasetDB dataset, TriConsumer<DatasetImportingProgress, Integer, String> progressCallback) {
+        String fileId = file.getFileId();
         progressCallback.accept(DatasetImportingProgress.preprocessing, 0, DatasetImportingProgress.preprocessing.getDescription());
 
         FileService.InputStreamWithCharset inputStream = null;
         try {
-            inputStream = fs.getFileInputStream(fileId);
+            inputStream = fs.getFileInputStream(file);
 
-            String fileName = fs.getFile(fileId).getFilename();
+            String fileName = file.getFilename();
             Assert.hasText(fileName, "file name must not be empty. file_id: " + fileId);
 
             boolean isExcel = (fileName.toLowerCase().endsWith(".xlsx") || fileName.toLowerCase().endsWith(".xls"));

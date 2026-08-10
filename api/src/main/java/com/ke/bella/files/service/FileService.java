@@ -437,11 +437,16 @@ public class FileService {
         return transferToOpenAIFile(fileDB);
     }
 
-    public OpenAIFile requireContentFile(String fileId) {
-        OpenAIFile file = getFile(fileId);
-        if(!NodeType.FILE.getValue().equals(file.getNodeType())) {
+    public FileDB requireContentFile(String fileId) {
+        FileType fileType = FileType.fromFileId(fileId);
+        FileDB file = fileRepo.queryFile(fileId, fileType);
+        if(file == null) {
+            throw new FileNotFoundException(fileId);
+        }
+        NodeType nodeType = NodeType.from(file);
+        if(nodeType != NodeType.FILE) {
             throw new IllegalArgumentException(String.format("node has no file content. file_id = %s, node_type = %s",
-                    fileId, file.getNodeType()));
+                    fileId, nodeType.getValue()));
         }
         return file;
     }
@@ -452,16 +457,20 @@ public class FileService {
     }
 
     public String updateRealFile(String fileId, String filename, File file, String mimeType, String charset) {
-        requireContentFile(fileId);
-        FileType fileType = FileType.fromFileId(fileId);
-        FileDB fileDB = fileRepo.queryFile(fileId, fileType);
+        return updateRealFile(requireContentFile(fileId), filename, file, mimeType, charset);
+    }
+
+    public String updateRealFile(FileDB fileDB, String filename, File file, String mimeType, String charset) {
         return storageService.putObject(fileDB.getBucket(), fileDB.getPath(), mimeType, file, filename, charset);
     }
 
     public String updateRealFileFromStream(String fileId, String filename, java.io.InputStream inputStream, long contentLength, String mimeType,
             String charset) {
-        requireContentFile(fileId);
-        FileDB fileDB = fileRepo.queryFile(fileId);
+        return updateRealFileFromStream(requireContentFile(fileId), filename, inputStream, contentLength, mimeType, charset);
+    }
+
+    public String updateRealFileFromStream(FileDB fileDB, String filename, java.io.InputStream inputStream, long contentLength, String mimeType,
+            String charset) {
         return storageService.putObjectFromStream(fileDB.getBucket(), fileDB.getPath(), mimeType, inputStream, contentLength, filename, charset);
     }
 
@@ -535,8 +544,10 @@ public class FileService {
     public String getUrl(
             String fileId,
             long expires) {
-        requireContentFile(fileId);
-        FileDB file = fileRepo.queryFile(fileId);
+        return getUrl(requireContentFile(fileId), expires);
+    }
+
+    public String getUrl(FileDB file, long expires) {
         return getUrl(file.getBucket(), file.getPath(), file.getPurpose(), expires);
     }
 
@@ -549,7 +560,14 @@ public class FileService {
             UpdateProgressRequestData data,
             String fileId,
             String progressName) {
-        requireContentFile(fileId);
+        updateProgress(data, requireContentFile(fileId), progressName);
+    }
+
+    public void updateProgress(
+            UpdateProgressRequestData data,
+            FileDB file,
+            String progressName) {
+        String fileId = file.getFileId();
         String status = data.getStatus();
         String message = data.getMessage();
         Integer percent = data.getPercent();
@@ -563,8 +581,13 @@ public class FileService {
     public Progress getProgress(
             String fileId,
             String progressName) {
-        requireContentFile(fileId);
-        FileProgressDB fileProgressDB = fileRepo.queryProgress(fileId, progressName);
+        return getProgress(requireContentFile(fileId), progressName);
+    }
+
+    public Progress getProgress(
+            FileDB file,
+            String progressName) {
+        FileProgressDB fileProgressDB = fileRepo.queryProgress(file.getFileId(), progressName);
         return fileProgressDB == null ? null : transferToProgress(fileProgressDB);
     }
 
@@ -583,23 +606,22 @@ public class FileService {
     }
 
     public String getPreviewUrl(String fileId, Long expires) {
-        requireContentFile(fileId);
-        FileDB file = fileRepo.queryFile(fileId);
+        return getPreviewUrl(requireContentFile(fileId), expires);
+    }
+
+    public String getPreviewUrl(FileDB file, Long expires) {
         String bucketName = file.getBucket();
         String keyName = file.getPath();
         return storageService.getPreviewUrl(bucketName, keyName, expires);
     }
 
     public InputStreamWithCharset getFileInputStream(String fileId) {
-        requireContentFile(fileId);
-        try {
-            // 获取文件信息
-            FileDB file = fileRepo.queryFile(fileId);
-            if(file == null) {
-                LOGGER.warn("file not found, file_id = {}", fileId);
-                return null;
-            }
+        return getFileInputStream(requireContentFile(fileId));
+    }
 
+    public InputStreamWithCharset getFileInputStream(FileDB file) {
+        String fileId = file.getFileId();
+        try {
             String bucketName = file.getBucket();
             String keyName = file.getPath();
 

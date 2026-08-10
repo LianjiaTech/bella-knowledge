@@ -94,6 +94,7 @@ public class FileServiceResourceTest {
                 () -> fileService.getUrl("file-resource-1"));
 
         assertTrue(error.getMessage().contains("no file content"));
+        verify(fileRepo).queryFile("file-resource-1", FileType.USER);
         verifyNoInteractions(storageService);
     }
 
