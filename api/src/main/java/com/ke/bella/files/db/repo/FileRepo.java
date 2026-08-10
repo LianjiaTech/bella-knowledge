@@ -206,15 +206,7 @@ public class FileRepo implements BaseRepo {
                     .and(FILE_CLOSURE.DEPTH.eq(1L));
         }
 
-        boolean closureResult = sql.limit(1).fetchOptional().isPresent();
-        if(compareEntryRead()) {
-            try {
-                fileEntryRepo.exists(spaceCode, ancestorId, filename);
-            } catch (EntryReadNotReadyException e) {
-                logEntryReadFallback("exists-compare", e);
-            }
-        }
-        return closureResult;
+        return sql.limit(1).fetchOptional().isPresent();
     }
 
     public FileDB queryFile(String spaceCode, @Nullable String ancestorId, @NotNull String filename) {
@@ -242,15 +234,7 @@ public class FileRepo implements BaseRepo {
                     .and(FILE_CLOSURE.DEPTH.eq(1L));
         }
 
-        FileDB closureResult = sql.limit(1).fetchOneInto(FileDB.class);
-        if(compareEntryRead()) {
-            try {
-                fileEntryRepo.queryFile(spaceCode, ancestorId, filename);
-            } catch (EntryReadNotReadyException e) {
-                logEntryReadFallback("queryFile-compare", e);
-            }
-        }
-        return closureResult;
+        return sql.limit(1).fetchOneInto(FileDB.class);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -268,7 +252,9 @@ public class FileRepo implements BaseRepo {
         }
 
         if(fileType.needsDirectorySupport()) {
-            addFileClosures(fileDB.getFileId(), ancestorId);
+            if(fileEntryRepo.closureWriteEnabled()) {
+                addFileClosures(fileDB.getFileId(), ancestorId);
+            }
             fileEntryRepo.addEntry(fileDB.getSpaceCode(), fileDB, ancestorId);
         }
 
@@ -563,6 +549,9 @@ public class FileRepo implements BaseRepo {
     }
 
     public void deleteFileClosure(String fileId, FileType fileType) {
+        if(!fileEntryRepo.closureWriteEnabled()) {
+            return;
+        }
         String shardingKey = getShardingKeyByFileId(fileId, fileType);
         db(shardingKey).delete(FILE_CLOSURE)
                 .where(FILE_CLOSURE.DESCENDANT_ID.eq(fileId))
@@ -576,13 +565,15 @@ public class FileRepo implements BaseRepo {
         if(file == null) {
             throw new FileNotFoundException(fileId);
         }
-        String shardingKey = getShardingKeyByFileId(fileId);
-        DSLContext dsl = db(shardingKey);
-        ClosureMoveSnapshot snapshot = loadClosureMoveSnapshot(dsl, fileId, targetAncestorId);
+        if(fileEntryRepo.closureWriteEnabled()) {
+            String shardingKey = getShardingKeyByFileId(fileId);
+            DSLContext dsl = db(shardingKey);
+            ClosureMoveSnapshot snapshot = loadClosureMoveSnapshot(dsl, fileId, targetAncestorId);
 
-        deleteExternalClosures(dsl, snapshot);
-        insertExternalClosures(dsl, snapshot, fileId);
-        updateSubtreeRootDepths(dsl, snapshot, fileId);
+            deleteExternalClosures(dsl, snapshot);
+            insertExternalClosures(dsl, snapshot, fileId);
+            updateSubtreeRootDepths(dsl, snapshot, fileId);
+        }
         fileEntryRepo.move(file.getSpaceCode(), fileId, targetAncestorId);
     }
 
@@ -775,20 +766,30 @@ public class FileRepo implements BaseRepo {
         return "entry".equalsIgnoreCase(fileEntryReadMode);
     }
 
-    private boolean compareEntryRead() {
-        return "compare".equalsIgnoreCase(fileEntryReadMode);
-    }
-
     void setFileEntryReadMode(String readMode) {
         this.fileEntryReadMode = readMode;
     }
 
     private void logEntryReadFallback(String operation, EntryReadNotReadyException e) {
+        if(!fileEntryRepo.closureWriteEnabled()) {
+            // 闭包已停写，回退读只会读到陈旧数据，宁可失败暴露问题
+            throw e;
+        }
         LOGGER.warn("file_entry read is not ready, falling back to closure, operation: {}, reason: {}", operation, e.getMessage());
     }
 
     public List<FileDB> getPathFiles(String fileId) {
         fileId = queryNewFileId(fileId);
+        if(useEntryRead() && FileType.fromFileId(fileId).needsDirectorySupport()) {
+            FileDB file = queryFile(fileId);
+            if(file != null) {
+                try {
+                    return fileEntryRepo.pathFiles(file.getSpaceCode(), fileId);
+                } catch (EntryReadNotReadyException e) {
+                    logEntryReadFallback("getPathFiles", e);
+                }
+            }
+        }
         String shardingKey = getShardingKeyByFileId(fileId);
 
         return db(shardingKey).select(FILE.fields())
@@ -803,6 +804,16 @@ public class FileRepo implements BaseRepo {
     @Nullable
     public String getDirectAncestorId(String fileId) {
         fileId = queryNewFileId(fileId);
+        if(useEntryRead() && FileType.fromFileId(fileId).needsDirectorySupport()) {
+            FileDB file = queryFile(fileId);
+            if(file != null) {
+                try {
+                    return fileEntryRepo.directAncestorFileId(file.getSpaceCode(), fileId);
+                } catch (EntryReadNotReadyException e) {
+                    logEntryReadFallback("getDirectAncestorId", e);
+                }
+            }
+        }
         String shardingKey = getShardingKeyByFileId(fileId);
 
         return db(shardingKey).select(FILE_CLOSURE.ANCESTOR_ID)
@@ -1014,6 +1025,13 @@ public class FileRepo implements BaseRepo {
     public Map<String, List<String>> getFileAncestorIds(String spaceCode, List<String> fileIds) {
         if(CollectionUtils.isEmpty(fileIds)) {
             return Collections.emptyMap();
+        }
+        if(useEntryRead()) {
+            try {
+                return fileEntryRepo.ancestorFileIds(spaceCode, fileIds);
+            } catch (EntryReadNotReadyException e) {
+                logEntryReadFallback("getFileAncestorIds", e);
+            }
         }
         String shardingKey = getShardingKeyBySpaceCode(spaceCode);
         // 查询所有文件的祖先关系

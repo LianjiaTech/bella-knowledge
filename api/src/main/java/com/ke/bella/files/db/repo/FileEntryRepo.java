@@ -7,10 +7,15 @@ import static com.ke.bella.files.db.Tables.FILE_ENTRY;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import javax.annotation.Nullable;
@@ -24,6 +29,8 @@ import org.jooq.SortField;
 import org.jooq.exception.DataAccessException;
 import org.jooq.exception.SQLStateClass;
 import org.jooq.impl.DSL;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +41,7 @@ import com.ke.bella.files.db.tables.pojos.FileDB;
 import com.ke.bella.files.db.tables.pojos.FileEntryDB;
 import com.ke.bella.files.db.tables.records.FileClosureRecord;
 import com.ke.bella.files.db.tables.records.FileEntryRecord;
+import com.ke.bella.files.enums.NodeType;
 import com.ke.bella.files.protocol.FileStatus;
 import com.ke.bella.files.protocol.PageFileOps;
 import com.ke.bella.files.utils.DigestUtils;
@@ -41,14 +49,25 @@ import com.ke.bella.files.utils.JsonUtils;
 
 @Component
 public class FileEntryRepo implements BaseRepo {
+    private static final Logger LOGGER = LoggerFactory.getLogger(FileEntryRepo.class);
     public static final String ROOT_ENTRY_ID = "";
     public static final String TYPE_FILE = "file";
     public static final String TYPE_DIR = "dir";
+    // 祖先链遍历的深度上限，超出视为数据成环等异常
+    static final int MAX_TREE_DEPTH = 64;
 
     private final DSLContext db;
 
     @Value("${bella.file-api.file-entry.cross-space-move-enabled:false}")
     private boolean crossSpaceMoveEnabled;
+
+    /**
+     * dual（默认）：闭包表是主链路，entry 为影子写（失败降级）；
+     * entry：停写闭包，entry 写转为主写（失败必须报错），闭包读回退同时关闭。
+     * 下闭包表的路径：write-mode 切 entry → 观察 → drop 表，中间不需要发布。
+     */
+    @Value("${bella.file-api.file-entry.write-mode:dual}")
+    private String writeMode;
 
     public FileEntryRepo(DSLContext db) {
         this.db = db;
@@ -56,6 +75,14 @@ public class FileEntryRepo implements BaseRepo {
 
     void setCrossSpaceMoveEnabled(boolean enabled) {
         this.crossSpaceMoveEnabled = enabled;
+    }
+
+    void setFileEntryWriteMode(String writeMode) {
+        this.writeMode = writeMode;
+    }
+
+    public boolean closureWriteEnabled() {
+        return !"entry".equalsIgnoreCase(writeMode);
     }
 
     private DSLContext entryDb(String spaceCode) {
@@ -132,7 +159,10 @@ public class FileEntryRepo implements BaseRepo {
                 .collect(Collectors.groupingBy(FileRepo::getShardingKeyByFileIdStatic));
         List<FileDB> candidates = new ArrayList<>();
         idsByShard.forEach((shard, ids) -> {
-            Condition condition = FILE.FILE_ID.in(ids).and(FILE.STATUS.eq(FileStatus.NOT_DELETED.getValue()));
+            // 与闭包版 listFile 对齐：列表接口不返回 resource 节点
+            Condition condition = FILE.FILE_ID.in(ids)
+                    .and(FILE.STATUS.eq(FileStatus.NOT_DELETED.getValue()))
+                    .and(FILE.NODE_TYPE.ne(NodeType.RESOURCE.getValue()));
             if(StringUtils.isNotEmpty(purpose)) {
                 condition = condition.and(FILE.PURPOSE.eq(purpose));
             }
@@ -173,6 +203,163 @@ public class FileEntryRepo implements BaseRepo {
                 .list(new ArrayList<>(filtered.subList(fromIndex, toIndex)));
     }
 
+    /**
+     * 从根到自身的完整路径（含自身），沿 parent_entry_id 逐级点查，深度即目录层级。
+     */
+    public List<FileDB> pathFiles(String spaceCode, String fileId) {
+        FileEntryDB entry = queryActiveByFileId(spaceCode, fileId);
+        if(entry == null) {
+            throw new EntryReadNotReadyException(spaceCode, fileId);
+        }
+        return hydrate(chainToRoot(spaceCode, entry));
+    }
+
+    @Nullable
+    public String directAncestorFileId(String spaceCode, String fileId) {
+        FileEntryDB entry = queryActiveByFileId(spaceCode, fileId);
+        if(entry == null) {
+            throw new EntryReadNotReadyException(spaceCode, fileId);
+        }
+        if(ROOT_ENTRY_ID.equals(entry.getParentEntryId())) {
+            return null;
+        }
+        FileEntryDB parent = queryActiveByEntryId(spaceCode, entry.getParentEntryId());
+        if(parent == null) {
+            throw new EntryReadNotReadyException(spaceCode, entry.getParentEntryId());
+        }
+        return parent.getFileId();
+    }
+
+    /**
+     * 批量祖先链：按层聚合 IN 查询解析父链，查询次数与最大树深同阶，而非文件数。
+     * 无 entry 且 file 已删除/不存在的 fileId 返回空数组（与闭包实现一致）；
+     * 无 entry 但 file 仍活跃说明数据未迁移完成，抛 EntryReadNotReadyException 由调用方回退闭包读。
+     */
+    public Map<String, List<String>> ancestorFileIds(String spaceCode, List<String> fileIds) {
+        Map<String, List<String>> result = new HashMap<>();
+        for (String fileId : fileIds) {
+            result.put(fileId, new ArrayList<>());
+        }
+        if(fileIds.isEmpty()) {
+            return result;
+        }
+
+        Map<String, FileEntryDB> entriesByEntryId = new HashMap<>();
+        Map<String, FileEntryDB> entriesByFileId = new HashMap<>();
+        entryDb(spaceCode).selectFrom(FILE_ENTRY)
+                .where(FILE_ENTRY.SPACE_CODE.eq(spaceCode))
+                .and(FILE_ENTRY.FILE_ID.in(fileIds))
+                .fetchInto(FileEntryDB.class)
+                .forEach(entry -> {
+                    entriesByFileId.put(entry.getFileId(), entry);
+                    entriesByEntryId.put(entry.getEntryId(), entry);
+                });
+        assertNoActiveFileMissingEntry(spaceCode, fileIds, entriesByFileId.keySet());
+
+        Set<String> unresolved = entriesByFileId.values().stream()
+                .map(FileEntryDB::getParentEntryId)
+                .filter(parentEntryId -> !ROOT_ENTRY_ID.equals(parentEntryId))
+                .collect(Collectors.toSet());
+        int depth = 0;
+        while (!unresolved.isEmpty()) {
+            if(++depth > MAX_TREE_DEPTH) {
+                throw new IllegalStateException("file_entry ancestor chain exceeds max depth, spaceCode: " + spaceCode);
+            }
+            List<FileEntryDB> parents = entryDb(spaceCode).selectFrom(FILE_ENTRY)
+                    .where(FILE_ENTRY.SPACE_CODE.eq(spaceCode))
+                    .and(FILE_ENTRY.ENTRY_ID.in(unresolved))
+                    .fetchInto(FileEntryDB.class);
+            if(parents.size() < unresolved.size()) {
+                parents.forEach(parent -> unresolved.remove(parent.getEntryId()));
+                throw new EntryReadNotReadyException(spaceCode, unresolved.iterator().next());
+            }
+            Set<String> next = new HashSet<>();
+            for (FileEntryDB parent : parents) {
+                entriesByEntryId.put(parent.getEntryId(), parent);
+                String grandParentEntryId = parent.getParentEntryId();
+                if(!ROOT_ENTRY_ID.equals(grandParentEntryId) && !entriesByEntryId.containsKey(grandParentEntryId)) {
+                    next.add(grandParentEntryId);
+                }
+            }
+            unresolved.clear();
+            unresolved.addAll(next);
+        }
+
+        for (Map.Entry<String, FileEntryDB> mapping : entriesByFileId.entrySet()) {
+            List<String> ancestors = new ArrayList<>();
+            FileEntryDB current = mapping.getValue();
+            while (!ROOT_ENTRY_ID.equals(current.getParentEntryId())) {
+                if(ancestors.size() >= MAX_TREE_DEPTH) {
+                    throw new IllegalStateException("file_entry ancestor chain exceeds max depth, fileId: " + mapping.getKey());
+                }
+                current = entriesByEntryId.get(current.getParentEntryId());
+                ancestors.add(current.getFileId());
+            }
+            Collections.reverse(ancestors);
+            result.put(mapping.getKey(), ancestors);
+        }
+        return result;
+    }
+
+    private void assertNoActiveFileMissingEntry(String spaceCode, List<String> fileIds, Set<String> foundFileIds) {
+        List<String> missing = fileIds.stream()
+                .filter(fileId -> !foundFileIds.contains(fileId))
+                .collect(Collectors.toList());
+        if(missing.isEmpty()) {
+            return;
+        }
+        String activeMissing = entryDb(spaceCode).select(FILE.FILE_ID)
+                .from(FILE)
+                .where(FILE.FILE_ID.in(missing))
+                .and(FILE.SPACE_CODE.eq(spaceCode))
+                .and(FILE.STATUS.eq(FileStatus.NOT_DELETED.getValue()))
+                .limit(1)
+                .fetchOneInto(String.class);
+        if(activeMissing != null) {
+            throw new EntryReadNotReadyException(spaceCode, activeMissing);
+        }
+    }
+
+    /**
+     * 沿目标父节点的祖先链向上校验，禁止把节点移入自身或其子孙。
+     * 闭包表停写后这是唯一的防环校验，不能依赖闭包 move 里的同名检查。
+     */
+    private void assertNotSelfOrDescendant(String spaceCode, FileEntryDB entry, String targetParentEntryId) {
+        String cursor = targetParentEntryId;
+        int depth = 0;
+        while (!ROOT_ENTRY_ID.equals(cursor)) {
+            if(cursor.equals(entry.getEntryId())) {
+                throw new IllegalArgumentException("cannot move a node into itself or its descendant, fileId: " + entry.getFileId());
+            }
+            if(++depth > MAX_TREE_DEPTH) {
+                throw new IllegalStateException("file_entry ancestor chain exceeds max depth, entryId: " + targetParentEntryId);
+            }
+            FileEntryDB parent = queryActiveByEntryId(spaceCode, cursor);
+            if(parent == null) {
+                throw new EntryReadNotReadyException(spaceCode, cursor);
+            }
+            cursor = parent.getParentEntryId();
+        }
+    }
+
+    private List<FileEntryDB> chainToRoot(String spaceCode, FileEntryDB entry) {
+        LinkedList<FileEntryDB> chain = new LinkedList<>();
+        chain.addFirst(entry);
+        FileEntryDB current = entry;
+        while (!ROOT_ENTRY_ID.equals(current.getParentEntryId())) {
+            if(chain.size() > MAX_TREE_DEPTH) {
+                throw new IllegalStateException("file_entry ancestor chain exceeds max depth, fileId: " + entry.getFileId());
+            }
+            FileEntryDB parent = queryActiveByEntryId(spaceCode, current.getParentEntryId());
+            if(parent == null) {
+                throw new EntryReadNotReadyException(spaceCode, current.getParentEntryId());
+            }
+            chain.addFirst(parent);
+            current = parent;
+        }
+        return chain;
+    }
+
     public List<FileDB> hydrate(List<FileEntryDB> entries) {
         if(entries.isEmpty()) {
             return Collections.emptyList();
@@ -208,7 +395,12 @@ public class FileEntryRepo implements BaseRepo {
         if("dir".equals(ops.getType()) && !Integer.valueOf(1).equals(file.getIsDir())) {
             return false;
         }
-        if("file".equals(ops.getType()) && !Integer.valueOf(0).equals(file.getIsDir())) {
+        if("file".equals(ops.getType())
+                && (!Integer.valueOf(0).equals(file.getIsDir()) || !NodeType.FILE.getValue().equals(file.getNodeType()))) {
+            return false;
+        }
+        if("resource".equals(ops.getType())
+                && (!Integer.valueOf(0).equals(file.getIsDir()) || !NodeType.RESOURCE.getValue().equals(file.getNodeType()))) {
             return false;
         }
         if(ops.getPurpose() != null && !ops.getPurpose().equals(file.getPurpose())) {
@@ -258,8 +450,31 @@ public class FileEntryRepo implements BaseRepo {
                 .thenComparing(idComparator);
     }
 
+    /**
+     * dual 模式下 file_entry 是闭包表主链路的影子写：写失败一律降级（error 日志 + 放弃本次 entry 写），
+     * 不回滚主事务，缺失/陈旧的 entry 由全量迁移和懒迁移修复。
+     * catch 必须在本类方法体内完成——异常一旦穿过 @Transactional 代理，
+     * 外层事务会被标记为 rollback-only，主流程提交时会失败。
+     * 闭包停写（write-mode=entry）后 entry 写就是唯一记录，失败必须让主事务回滚。
+     */
+    private <T> T degradeOnFailure(String operation, String spaceCode, String fileId, Supplier<T> write) {
+        try {
+            return write.get();
+        } catch (RuntimeException e) {
+            if(!closureWriteEnabled()) {
+                throw e;
+            }
+            LOGGER.error("file_entry write degraded, operation: {}, spaceCode: {}, fileId: {}", operation, spaceCode, fileId, e);
+            return null;
+        }
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public FileEntryDB addEntry(String spaceCode, FileDB file, @Nullable String ancestorId) {
+        return degradeOnFailure("addEntry", spaceCode, file.getFileId(), () -> doAddEntry(spaceCode, file, ancestorId));
+    }
+
+    private FileEntryDB doAddEntry(String spaceCode, FileDB file, @Nullable String ancestorId) {
         String parentEntryId = resolveParentEntryId(spaceCode, ancestorId);
         assertNameAvailable(spaceCode, parentEntryId, file.getFilename(), null);
         FileEntryRecord record = FILE_ENTRY.newRecord();
@@ -307,6 +522,10 @@ public class FileEntryRepo implements BaseRepo {
         if(file == null || !spaceCode.equals(file.getSpaceCode())) {
             throw new IllegalStateException("cannot build legacy file_entry for fileId: " + fileId);
         }
+        if(!closureWriteEnabled()) {
+            // 闭包已停写，数据可能陈旧，不能用于重建 entry；活跃文件缺 entry 说明数据有洞，必须报错
+            throw new IllegalStateException("file_entry missing while closure is no longer authoritative, fileId: " + fileId);
+        }
         String parentFileId = entryDb(spaceCode).select(FILE_CLOSURE.ANCESTOR_ID)
                 .from(FILE_CLOSURE)
                 .where(FILE_CLOSURE.SPACE_CODE.eq(spaceCode))
@@ -344,6 +563,13 @@ public class FileEntryRepo implements BaseRepo {
     }
 
     public void rename(String spaceCode, String fileId, String filename) {
+        degradeOnFailure("rename", spaceCode, fileId, () -> {
+            doRename(spaceCode, fileId, filename);
+            return null;
+        });
+    }
+
+    private void doRename(String spaceCode, String fileId, String filename) {
         FileEntryDB entry = ensureLegacyEntry(spaceCode, fileId);
         assertNameAvailable(spaceCode, entry.getParentEntryId(), filename, entry.getEntryId());
         int updated = entryDb(spaceCode).update(FILE_ENTRY)
@@ -356,11 +582,16 @@ public class FileEntryRepo implements BaseRepo {
     }
 
     public void move(String spaceCode, String fileId, @Nullable String targetAncestorId) {
+        degradeOnFailure("move", spaceCode, fileId, () -> {
+            doMove(spaceCode, fileId, targetAncestorId);
+            return null;
+        });
+    }
+
+    private void doMove(String spaceCode, String fileId, @Nullable String targetAncestorId) {
         FileEntryDB entry = ensureLegacyEntry(spaceCode, fileId);
         String parentEntryId = resolveParentEntryId(spaceCode, targetAncestorId);
-        if(entry.getEntryId().equals(parentEntryId)) {
-            throw new IllegalArgumentException("cannot move file_entry under itself, fileId: " + fileId);
-        }
+        assertNotSelfOrDescendant(spaceCode, entry, parentEntryId);
         assertNameAvailable(spaceCode, parentEntryId, entry.getFilename(), entry.getEntryId());
         int updated = entryDb(spaceCode).update(FILE_ENTRY)
                 .set(FILE_ENTRY.PARENT_ENTRY_ID, parentEntryId)
@@ -372,13 +603,16 @@ public class FileEntryRepo implements BaseRepo {
     }
 
     public void delete(String spaceCode, String fileId) {
-        int deleted = entryDb(spaceCode).deleteFrom(FILE_ENTRY)
-                .where(FILE_ENTRY.SPACE_CODE.eq(spaceCode))
-                .and(FILE_ENTRY.FILE_ID.eq(fileId))
-                .execute();
-        if(deleted > 1) {
-            throw new IllegalStateException("multiple file_entry rows deleted, fileId: " + fileId);
-        }
+        degradeOnFailure("delete", spaceCode, fileId, () -> {
+            int deleted = entryDb(spaceCode).deleteFrom(FILE_ENTRY)
+                    .where(FILE_ENTRY.SPACE_CODE.eq(spaceCode))
+                    .and(FILE_ENTRY.FILE_ID.eq(fileId))
+                    .execute();
+            if(deleted > 1) {
+                throw new IllegalStateException("multiple file_entry rows deleted, fileId: " + fileId);
+            }
+            return null;
+        });
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -415,7 +649,9 @@ public class FileEntryRepo implements BaseRepo {
         if(sourceUpdated != 1) {
             throw new IllegalStateException("delete source file_entry failed, fileId: " + fileId);
         }
-        moveLeafClosureAcrossSpace(fileId, sourceSpaceCode, targetSpaceCode, targetAncestorId);
+        if(closureWriteEnabled()) {
+            moveLeafClosureAcrossSpace(fileId, sourceSpaceCode, targetSpaceCode, targetAncestorId);
+        }
         int updated = fileDb(fileId).update(FILE).set(FILE.SPACE_CODE, targetSpaceCode)
                 .where(FILE.FILE_ID.eq(fileId)).and(FILE.STATUS.eq(FileStatus.NOT_DELETED.getValue())).execute();
         if(updated != 1) {

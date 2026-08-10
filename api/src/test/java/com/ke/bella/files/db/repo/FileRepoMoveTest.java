@@ -171,12 +171,21 @@ public class FileRepoMoveTest {
 
         assertEquals(Collections.singletonList(CHILD), children);
         assertEquals(1, page.getTotal());
+
+        assertEquals(CHILD, fileRepo.getDirectAncestorId(LEAF));
+        List<String> pathIds = fileRepo.getPathFiles(LEAF).stream()
+                .map(FileDB::getFileId)
+                .collect(Collectors.toList());
+        assertEquals(Arrays.asList(OLD_ROOT, SOURCE, CHILD, LEAF), pathIds);
+        Map<String, List<String>> ancestorIds = fileRepo.getFileAncestorIds("sp-0", Collections.singletonList(LEAF));
+        assertEquals(Arrays.asList(OLD_ROOT, SOURCE, CHILD), ancestorIds.get(LEAF));
+
         assertEquals(0, dsl.fetchCount(DSL.table("file_entry_0")));
     }
 
     @Test
-    public void compareReadUsesClosureWhenDirectoryEntryIsMissing() {
-        fileRepo.setFileEntryReadMode("compare");
+    public void entryReadFallsBackForExistsAndQueryFileWhenDirectoryEntryIsMissing() {
+        fileRepo.setFileEntryReadMode("entry");
 
         assertTrue(fileRepo.exists("sp-0", SOURCE, "child"));
         assertEquals(CHILD, fileRepo.queryFile("sp-0", SOURCE, "child").getFileId());

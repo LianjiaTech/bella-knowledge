@@ -41,6 +41,7 @@ bella:
       session-ttl-hours: ${BELLA_UPLOAD_SESSION_TTL_HOURS:720}
     file-entry:
       read-mode: ${BELLA_FILE_ENTRY_READ_MODE:closure}
+      write-mode: ${BELLA_FILE_ENTRY_WRITE_MODE:dual}
       cross-space-move-enabled: ${BELLA_FILE_ENTRY_CROSS_SPACE_MOVE_ENABLED:false}
     file:
       tmp-file-dir: ${BELLA_TMP_FILE_DIR:.}

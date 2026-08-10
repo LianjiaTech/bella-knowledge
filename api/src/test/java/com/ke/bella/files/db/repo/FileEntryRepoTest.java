@@ -1,20 +1,25 @@
 package com.ke.bella.files.db.repo;
 
 import static com.ke.bella.files.db.Tables.FILE;
+import static com.ke.bella.files.db.Tables.FILE_CLOSURE;
 import static com.ke.bella.files.db.Tables.FILE_ENTRY;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.jooq.DSLContext;
 import org.jooq.SQLDialect;
@@ -29,6 +34,7 @@ import com.ke.bella.files.db.IDGenerator;
 import com.ke.bella.files.db.tables.pojos.FileDB;
 import com.ke.bella.files.db.tables.pojos.FileEntryDB;
 import com.ke.bella.files.enums.FileType;
+import com.ke.bella.files.enums.NodeType;
 import com.ke.bella.files.protocol.FileOps;
 import com.ke.bella.files.protocol.FileStatus;
 import com.ke.bella.files.protocol.PageFileOps;
@@ -84,8 +90,10 @@ public class FileEntryRepoTest {
         assertNotNull(original);
         assertEquals(entryRepo.queryActiveByFileId(SOURCE_SPACE, firstParent.getFileId()).getEntryId(), original.getParentEntryId());
         assertTrue(entryRepo.exists(SOURCE_SPACE, firstParent.getFileId(), "report.txt"));
-        assertThrows(IllegalStateException.class,
-                () -> addFile(SOURCE_SPACE, "report.txt", firstParent.getFileId(), "duplicate"));
+        // 重名文件的 entry 写降级：file 行照常创建，entry 缺失待迁移修复
+        FileDB duplicate = addFile(SOURCE_SPACE, "report.txt", firstParent.getFileId(), "duplicate");
+        assertNotNull(duplicate);
+        assertNull(entryRepo.queryActiveByFileId(SOURCE_SPACE, duplicate.getFileId()));
 
         fileRepo.moveFileClosures(file.getFileId(), secondParent.getFileId());
         FileEntryDB moved = entryRepo.queryActiveByFileId(SOURCE_SPACE, file.getFileId());
@@ -163,6 +171,109 @@ public class FileEntryRepoTest {
     }
 
     @Test
+    public void entryReadResolvesAncestorChainsWithoutClosure() {
+        FileDB rootDir = addDirectory(SOURCE_SPACE, "chain-root", null, "chain-root");
+        FileDB childDir = addDirectory(SOURCE_SPACE, "chain-child", rootDir.getFileId(), "chain-child");
+        FileDB leaf = addFile(SOURCE_SPACE, "chain-leaf.txt", childDir.getFileId(), "chain-leaf");
+        FileDB rootFile = addFile(SOURCE_SPACE, "chain-top.txt", null, "chain-top");
+        FileDB deleted = addFile(SOURCE_SPACE, "chain-del.txt", null, "chain-del");
+        fileRepo.updateFile(FileOps.builder().fileId(deleted.getFileId()).status(FileStatus.DELETED).build());
+
+        // 清空闭包表，证明以下读取完全来自 file_entry
+        dsl.execute("delete from file_closure_" + FileRepo.getShardingKeyBySpaceCode(SOURCE_SPACE));
+        fileRepo.setFileEntryReadMode("entry");
+
+        assertEquals(childDir.getFileId(), fileRepo.getDirectAncestorId(leaf.getFileId()));
+        assertNull(fileRepo.getDirectAncestorId(rootFile.getFileId()));
+
+        List<String> pathIds = fileRepo.getPathFiles(leaf.getFileId()).stream()
+                .map(FileDB::getFileId)
+                .collect(Collectors.toList());
+        assertEquals(Arrays.asList(rootDir.getFileId(), childDir.getFileId(), leaf.getFileId()), pathIds);
+
+        Map<String, List<String>> ancestors = fileRepo.getFileAncestorIds(SOURCE_SPACE,
+                Arrays.asList(leaf.getFileId(), childDir.getFileId(), rootFile.getFileId(), deleted.getFileId()));
+        assertEquals(Arrays.asList(rootDir.getFileId(), childDir.getFileId()), ancestors.get(leaf.getFileId()));
+        assertEquals(Collections.singletonList(rootDir.getFileId()), ancestors.get(childDir.getFileId()));
+        assertEquals(Collections.emptyList(), ancestors.get(rootFile.getFileId()));
+        assertEquals(Collections.emptyList(), ancestors.get(deleted.getFileId()));
+    }
+
+    @Test
+    public void entryOnlyModeStopsClosureWritesAndStaysConsistent() {
+        entryRepo.setFileEntryWriteMode("entry");
+        fileRepo.setFileEntryReadMode("entry");
+        DSLContext shardDsl = DSLContextHolder.get(FileRepo.getShardingKeyBySpaceCode(SOURCE_SPACE), dsl);
+
+        FileDB root = addDirectory(SOURCE_SPACE, "eo-root", null, "eo-root");
+        FileDB child = addDirectory(SOURCE_SPACE, "eo-child", root.getFileId(), "eo-child");
+        FileDB leaf = addFile(SOURCE_SPACE, "eo-leaf.txt", child.getFileId(), "eo-leaf");
+
+        // 闭包表零写入，层级读写全部走 entry
+        assertEquals(0, shardDsl.fetchCount(FILE_CLOSURE));
+        assertEquals(child.getFileId(), fileRepo.getDirectAncestorId(leaf.getFileId()));
+        assertEquals(Arrays.asList(root.getFileId(), child.getFileId(), leaf.getFileId()),
+                fileRepo.getPathFiles(leaf.getFileId()).stream().map(FileDB::getFileId).collect(Collectors.toList()));
+
+        // 防环校验由 entry 自己承担
+        assertThrows(IllegalArgumentException.class,
+                () -> fileRepo.moveFileClosures(root.getFileId(), child.getFileId()));
+
+        // entry 写是主写：重名冲突必须失败，不再降级
+        assertThrows(IllegalStateException.class,
+                () -> addFile(SOURCE_SPACE, "eo-child", root.getFileId(), "eo-dup"));
+
+        fileRepo.moveFileClosures(leaf.getFileId(), root.getFileId());
+        assertEquals(root.getFileId(), fileRepo.getDirectAncestorId(leaf.getFileId()));
+
+        fileRepo.updateFile(FileOps.builder().fileId(leaf.getFileId()).status(FileStatus.DELETED).build());
+        fileRepo.deleteFileClosure(leaf.getFileId(), FileType.USER);
+        assertNull(entryRepo.queryActiveByFileId(SOURCE_SPACE, leaf.getFileId()));
+        assertEquals(0, shardDsl.fetchCount(FILE_CLOSURE));
+    }
+
+    @Test
+    public void entryReadFiltersResourceNodesLikeClosure() {
+        FileDB dir = addDirectory(SOURCE_SPACE, "res-dir", null, "res-dir");
+        FileDB file = addFile(SOURCE_SPACE, "res-file.txt", dir.getFileId(), "res-file");
+        FileDB resource = addResource(SOURCE_SPACE, "res-node", dir.getFileId(), "res-node");
+
+        // 闭包读作为基准
+        List<String> closureListed = listIds(dir.getFileId());
+        List<String> closureFilePage = pageIds(dir.getFileId(), "file");
+        List<String> closureResourcePage = pageIds(dir.getFileId(), "resource");
+        assertEquals(Collections.singletonList(file.getFileId()), closureListed);
+        assertEquals(Collections.singletonList(file.getFileId()), closureFilePage);
+        assertEquals(Collections.singletonList(resource.getFileId()), closureResourcePage);
+
+        fileRepo.setFileEntryReadMode("entry");
+        assertEquals(closureListed, listIds(dir.getFileId()));
+        assertEquals(closureFilePage, pageIds(dir.getFileId(), "file"));
+        assertEquals(closureResourcePage, pageIds(dir.getFileId(), "resource"));
+        assertEquals(2, pageIds(dir.getFileId(), null).size());
+    }
+
+    private List<String> listIds(String ancestorId) {
+        return fileRepo.listFile(null, 10, "asc", null, SOURCE_SPACE, ancestorId).stream()
+                .map(FileDB::getFileId)
+                .collect(Collectors.toList());
+    }
+
+    private List<String> pageIds(String ancestorId, String type) {
+        return fileRepo.pageFiles(PageFileOps.builder()
+                .spaceCode(SOURCE_SPACE)
+                .ancestorId(ancestorId)
+                .type(type)
+                .page(1)
+                .pageSize(10)
+                .order("asc")
+                .build())
+                .getData().stream()
+                .map(FileDB::getFileId)
+                .collect(Collectors.toList());
+    }
+
+    @Test
     public void entryListUsesStableCursorAndHandlesMissingAfter() {
         FileDB first = addFile(SOURCE_SPACE, "first.txt", null, "cursor-first");
         FileDB second = addFile(SOURCE_SPACE, "second.txt", null, "cursor-second");
@@ -184,14 +295,19 @@ public class FileEntryRepoTest {
     }
 
     private FileDB addDirectory(String spaceCode, String filename, String ancestorId, String seed) {
-        return add(spaceCode, filename, ancestorId, seed, FileType.DIRECTORY, 1);
+        return add(spaceCode, filename, ancestorId, seed, FileType.DIRECTORY, 1, NodeType.DIRECTORY, "");
     }
 
     private FileDB addFile(String spaceCode, String filename, String ancestorId, String seed) {
-        return add(spaceCode, filename, ancestorId, seed, FileType.USER, 0);
+        return add(spaceCode, filename, ancestorId, seed, FileType.USER, 0, NodeType.FILE, "");
     }
 
-    private FileDB add(String spaceCode, String filename, String ancestorId, String seed, FileType type, int isDir) {
+    private FileDB addResource(String spaceCode, String filename, String ancestorId, String seed) {
+        return add(spaceCode, filename, ancestorId, seed, FileType.USER, 0, NodeType.RESOURCE, "res:" + seed);
+    }
+
+    private FileDB add(String spaceCode, String filename, String ancestorId, String seed, FileType type, int isDir,
+            NodeType nodeType, String resourceId) {
         setOperator(spaceCode);
         String hash = String.valueOf(Math.abs(CustomStringUtils.hashCode(spaceCode)));
         String fileId = "file-260808000000" + String.format("%06d", Math.abs(seed.hashCode()) % 1000000) + "-" + hash + type.getSuffix();
@@ -199,6 +315,8 @@ public class FileEntryRepoTest {
         file.setFileId(fileId);
         file.setFilename(filename);
         file.setIsDir(isDir);
+        file.setNodeType(nodeType.getValue());
+        file.setResourceId(resourceId);
         file.setSpaceCode(spaceCode);
         file.setPurpose("assistants");
         file.setStatus(FileStatus.NOT_DELETED.getValue());
