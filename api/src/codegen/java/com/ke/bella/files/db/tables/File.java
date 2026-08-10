@@ -190,6 +190,16 @@ public class File extends TableImpl<FileRecord> {
      */
     public final TableField<FileRecord, String> TAGS = createField(DSL.name("tags"), SQLDataType.VARCHAR(512).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "标签,示例[\"tag1\",\"tag2\"]");
 
+    /**
+     * The column <code>file.node_type</code>. 节点类型：file、directory、resource
+     */
+    public final TableField<FileRecord, String> NODE_TYPE = createField(DSL.name("node_type"), SQLDataType.VARCHAR(16).nullable(false).defaultValue(DSL.inline("file", SQLDataType.VARCHAR)), this, "节点类型：file、directory、resource");
+
+    /**
+     * The column <code>file.resource_id</code>. 业务资源标识
+     */
+    public final TableField<FileRecord, String> RESOURCE_ID = createField(DSL.name("resource_id"), SQLDataType.VARCHAR(256).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "业务资源标识");
+
     private File(Name alias, Table<FileRecord> aliased) {
         this(alias, aliased, null);
     }

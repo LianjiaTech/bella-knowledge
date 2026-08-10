@@ -46,6 +46,8 @@ public class FileDB implements Operator, Serializable {
     private String        description;
     private String        cities;
     private String        tags;
+    private String        nodeType;
+    private String        resourceId;
 
     public FileDB() {}
 
@@ -78,6 +80,8 @@ public class FileDB implements Operator, Serializable {
         this.description = value.description;
         this.cities = value.cities;
         this.tags = value.tags;
+        this.nodeType = value.nodeType;
+        this.resourceId = value.resourceId;
     }
 
     public FileDB(
@@ -108,7 +112,9 @@ public class FileDB implements Operator, Serializable {
         String        pdfFileId,
         String        description,
         String        cities,
-        String        tags
+        String        tags,
+        String        nodeType,
+        String        resourceId
     ) {
         this.id = id;
         this.fileId = fileId;
@@ -138,6 +144,8 @@ public class FileDB implements Operator, Serializable {
         this.description = description;
         this.cities = cities;
         this.tags = tags;
+        this.nodeType = nodeType;
+        this.resourceId = resourceId;
     }
 
     /**
@@ -532,6 +540,34 @@ public class FileDB implements Operator, Serializable {
         this.tags = tags;
     }
 
+    /**
+     * Getter for <code>file.node_type</code>. 节点类型：file、directory、resource
+     */
+    public String getNodeType() {
+        return this.nodeType;
+    }
+
+    /**
+     * Setter for <code>file.node_type</code>. 节点类型：file、directory、resource
+     */
+    public void setNodeType(String nodeType) {
+        this.nodeType = nodeType;
+    }
+
+    /**
+     * Getter for <code>file.resource_id</code>. 业务资源标识
+     */
+    public String getResourceId() {
+        return this.resourceId;
+    }
+
+    /**
+     * Setter for <code>file.resource_id</code>. 业务资源标识
+     */
+    public void setResourceId(String resourceId) {
+        this.resourceId = resourceId;
+    }
+
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder("FileDB (");
@@ -564,6 +600,8 @@ public class FileDB implements Operator, Serializable {
         sb.append(", ").append(description);
         sb.append(", ").append(cities);
         sb.append(", ").append(tags);
+        sb.append(", ").append(nodeType);
+        sb.append(", ").append(resourceId);
 
         sb.append(")");
         return sb.toString();

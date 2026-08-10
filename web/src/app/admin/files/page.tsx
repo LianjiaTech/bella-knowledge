@@ -82,9 +82,9 @@ const Page = () => {
   const router = useRouter();
   const onClickFile = useThrottleFn(
     (file: KnowledgeFile) => {
-      if (file.is_dir) {
+      if (file.node_type === "directory") {
         enterFolder(file, currentWorkspace?.spaceCode);
-      } else {
+      } else if (file.node_type === "file") {
         if (file.extension === "rageval") {
           router.push(`/rageval-preview?fileId=${file.id}`);
           return;
@@ -133,7 +133,9 @@ const Page = () => {
     async (file: KnowledgeFile) => {
       const success = await deleteFile(file, currentDir.id);
       if (success) {
-        toast.success("删除成功");
+        toast.success(
+          file.node_type === "resource" ? "资源引用已移除" : "删除成功",
+        );
       }
       return success;
     },

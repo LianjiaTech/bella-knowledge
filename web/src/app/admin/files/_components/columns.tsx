@@ -10,12 +10,15 @@ import {
   FileIcon,
   FileJsonIcon,
   FolderIcon,
+  Boxes,
+  Copy,
   Pencil,
   MoreHorizontal,
   Move,
   Trash2,
   Upload,
 } from "lucide-react";
+import { toast } from "sonner";
 import {
   RiFileExcel2Line,
   RiFilePdf2Line,
@@ -69,7 +72,8 @@ const FilenameCell = ({
   onReUpload: (file: KnowledgeFile, newFile: File) => Promise<boolean>;
   siblingFiles?: KnowledgeFile[];
 }) => {
-  const isDir = file.is_dir;
+  const isDir = file.node_type === "directory";
+  const isResource = file.node_type === "resource";
   const isImage = file.mime_type.startsWith("image/");
   const extension = file.mime_type.split("/")[1];
   const props = {
@@ -78,6 +82,9 @@ const FilenameCell = ({
   let icon = <FileIcon {...props} />;
   if (isDir) {
     icon = <FolderIcon {...props} />;
+  }
+  if (isResource) {
+    icon = <Boxes {...props} />;
   }
   if (extension === "pdf") {
     icon = <RiFilePdf2Line {...props} />;
@@ -121,11 +128,13 @@ const FilenameCell = ({
     if (!isEditing || !inputValue.trim() || inputValue === file.filename) {
       return false;
     }
-    return siblingFiles?.some(
-      (sibling) => 
-        sibling.id !== file.id && 
-        sibling.filename.toLowerCase() === inputValue.trim().toLowerCase()
-    ) || false;
+    return (
+      siblingFiles?.some(
+        (sibling) =>
+          sibling.id !== file.id &&
+          sibling.filename.toLowerCase() === inputValue.trim().toLowerCase(),
+      ) || false
+    );
   }, [isEditing, inputValue, file.filename, file.id, siblingFiles]);
 
   useEffect(() => {
@@ -153,12 +162,12 @@ const FilenameCell = ({
       setIsEditing(false);
       return;
     }
-    
+
     // 前端校验：检测同名冲突
     if (hasNameConflict) {
       return; // 不允许提交，保持编辑状态
     }
-    
+
     setIsRenaming(true);
     const success = await onRename(file, trimmedValue);
     setIsRenaming(false);
@@ -194,7 +203,7 @@ const FilenameCell = ({
       setIsUploading(false);
       // Reset file input
       if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+        fileInputRef.current.value = "";
       }
     }
   };
@@ -225,21 +234,19 @@ const FilenameCell = ({
                 }
               }}
               className={`h-8 ${
-                hasNameConflict 
-                  ? "border-red-500 focus:border-red-500 focus:ring-red-500" 
+                hasNameConflict
+                  ? "border-red-500 focus:border-red-500 focus:ring-red-500"
                   : ""
               }`}
             />
             {hasNameConflict && (
-              <span className="text-xs text-red-500 mt-1">
-                文件名已存在
-              </span>
+              <span className="text-xs text-red-500 mt-1">文件名已存在</span>
             )}
           </div>
         ) : (
           <div className="flex items-center min-w-0 flex-1">
-            <span 
-              className="truncate mr-2 cursor-pointer hover:text-blue-600" 
+            <span
+              className="truncate mr-2 cursor-pointer hover:text-blue-600"
               title={displayName}
               onClick={(e) => {
                 e.stopPropagation();
@@ -250,7 +257,7 @@ const FilenameCell = ({
             </span>
           </div>
         )}
-        
+
         {/* 操作按钮区域 */}
         <div className="flex items-center gap-1 flex-shrink-0">
           <Button
@@ -266,7 +273,7 @@ const FilenameCell = ({
           >
             <Pencil size={14} />
           </Button>
-          
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -279,11 +286,8 @@ const FilenameCell = ({
                 <MoreHorizontal size={14} />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent 
-              align="end" 
-              className="w-48"
-            >
-              {!isDir && (
+            <DropdownMenuContent align="end" className="w-48">
+              {file.node_type === "file" && (
                 <DropdownMenuItem
                   onClick={(e) => {
                     e.stopPropagation();
@@ -293,6 +297,18 @@ const FilenameCell = ({
                 >
                   <Upload className="mr-2 h-4 w-4" />
                   {isUploading ? "上传中..." : "重新上传"}
+                </DropdownMenuItem>
+              )}
+              {isResource && (
+                <DropdownMenuItem
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    await navigator.clipboard.writeText(file.resource_id);
+                    toast.success("资源标识已复制");
+                  }}
+                >
+                  <Copy className="mr-2 h-4 w-4" />
+                  复制资源标识
                 </DropdownMenuItem>
               )}
               <DropdownMenuItem
@@ -312,18 +328,18 @@ const FilenameCell = ({
                 className="text-red-600 focus:text-red-600"
               >
                 <Trash2 className="mr-2 h-4 w-4" />
-                删除
+                {isResource ? "移除引用" : "删除"}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-        
-        {!isDir && (
+
+        {file.node_type === "file" && (
           <input
             ref={fileInputRef}
             type="file"
             onChange={handleFileChange}
-            style={{ display: 'none' }}
+            style={{ display: "none" }}
           />
         )}
       </div>
@@ -331,9 +347,13 @@ const FilenameCell = ({
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>确认删除</AlertDialogTitle>
+            <AlertDialogTitle>
+              {isResource ? "确认移除资源引用" : "确认删除"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              确定要删除 &ldquo;{file.filename}&rdquo; 吗？此操作不可撤销。
+              {isResource
+                ? `确定要移除“${file.filename}”的资源引用吗？此操作不会删除业务系统中的原始资源。`
+                : `确定要删除“${file.filename}”吗？此操作不可撤销。`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -345,7 +365,13 @@ const FilenameCell = ({
               disabled={isDeleting}
               className="bg-red-600 hover:bg-red-700"
             >
-              {isDeleting ? "删除中..." : "删除"}
+              {isDeleting
+                ? isResource
+                  ? "移除中..."
+                  : "删除中..."
+                : isResource
+                  ? "移除引用"
+                  : "删除"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -354,7 +380,13 @@ const FilenameCell = ({
   );
 };
 
-export const getColumns = ({ onRename, onDelete, onMove, onReUpload, siblingFiles }: GetColumnsOptions): ColumnDef<KnowledgeFile>[] => [
+export const getColumns = ({
+  onRename,
+  onDelete,
+  onMove,
+  onReUpload,
+  siblingFiles,
+}: GetColumnsOptions): ColumnDef<KnowledgeFile>[] => [
   {
     accessorKey: "filename",
     header: "名称",
@@ -374,9 +406,11 @@ export const getColumns = ({ onRename, onDelete, onMove, onReUpload, siblingFile
     accessorKey: "extension",
     header: "类型",
     accessorFn: (row) => {
-      const isDir = row.is_dir;
-      if (isDir) {
+      if (row.node_type === "directory") {
         return "文件夹";
+      }
+      if (row.node_type === "resource") {
+        return row.resource_id.split(":", 1)[0] || "资源";
       }
       const extension = row.extension;
       if (extension) {
@@ -452,8 +486,7 @@ export const getColumns = ({ onRename, onDelete, onMove, onReUpload, siblingFile
     header: "大小",
     cell: ({ row }) => {
       const bytes = row.getValue<number>("bytes");
-      const isDir = row.original.is_dir;
-      if (isDir) {
+      if (row.original.node_type !== "file") {
         return "";
       }
       if (bytes) {

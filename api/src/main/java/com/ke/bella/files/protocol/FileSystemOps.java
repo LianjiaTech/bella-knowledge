@@ -35,6 +35,16 @@ public class FileSystemOps {
     @AllArgsConstructor
     @NoArgsConstructor
     @Builder
+    public static class CreateResourceOp {
+        private String ancestorId;
+        private String name;
+        private String resourceId;
+    }
+
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
+    @Builder
     public static class FindOp {
         private String name;
         private List<String> types;

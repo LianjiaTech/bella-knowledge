@@ -65,7 +65,7 @@ public class PageFileOps {
      */
     private String filename;
     /**
-     * 类型过滤：file（仅文件）、dir（仅目录）
+     * 类型过滤：file（仅内容文件）、dir（仅目录）、resource（仅资源）
      */
     private String type;
     /**

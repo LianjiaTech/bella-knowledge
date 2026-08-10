@@ -183,6 +183,7 @@ public class DatasetController {
             @RequestParam(name = "type", required = false) String type,
             @RequestParam(name = "remark", required = false) String remark) {
         Assert.isTrue(fileId != null, "file_id must be provided");
+        fs.requireContentFile(fileId);
 
         // step1: check dataset and init if necessary
         DatasetDB dataset = null;
