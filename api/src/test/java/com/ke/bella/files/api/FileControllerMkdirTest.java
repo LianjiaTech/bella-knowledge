@@ -23,6 +23,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ke.bella.files.api.interceptor.FileApiResponseAdvice;
+import com.ke.bella.files.db.tables.pojos.FileDB;
+import com.ke.bella.files.enums.NodeType;
 import com.ke.bella.files.protocol.OpenAIFile;
 import com.ke.bella.files.service.FileService;
 import com.ke.bella.files.service.lock.FileUniquenessLock;
@@ -44,6 +46,13 @@ public class FileControllerMkdirTest {
 
         ReflectionTestUtils.setField(fileController, "fileService", fileService);
         ReflectionTestUtils.setField(fileController, "fl", fileUniquenessLock);
+
+        FileDB ancestor = new FileDB();
+        ancestor.setFileId("anc-1");
+        ancestor.setSpaceCode("sp-a");
+        ancestor.setIsDir(1);
+        ancestor.setNodeType(NodeType.DIRECTORY.getValue());
+        when(fileService.getFile0("anc-1")).thenReturn(ancestor);
 
         ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.setPropertyNamingStrategy(com.fasterxml.jackson.databind.PropertyNamingStrategy.SNAKE_CASE);

@@ -24,6 +24,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ke.bella.files.api.interceptor.FileApiResponseAdvice;
 import com.ke.bella.files.db.repo.Page;
 import com.ke.bella.files.db.tables.pojos.FileDB;
+import com.ke.bella.files.enums.NodeType;
 import com.ke.bella.files.protocol.OpenAIFile;
 import com.ke.bella.files.protocol.PageFileOps;
 import com.ke.bella.files.service.FileService;
@@ -42,6 +43,12 @@ public class FileControllerPageFilesTest {
 
         ReflectionTestUtils.setField(fileController, "fileService", fileService);
         ReflectionTestUtils.setField(fileController, "fl", fileUniquenessLock);
+
+        FileDB ancestor = new FileDB();
+        ancestor.setFileId("dir-1");
+        ancestor.setIsDir(1);
+        ancestor.setNodeType(NodeType.DIRECTORY.getValue());
+        when(fileService.getFile0("dir-1")).thenReturn(ancestor);
 
         mockMvc = MockMvcBuilders
                 .standaloneSetup(fileController)
@@ -291,7 +298,7 @@ public class FileControllerPageFilesTest {
                         "  \"order\": \"desc\"\n" +
                         "}"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error.message").value("type must be 'dir' or 'file', but got: "));
+                .andExpect(jsonPath("$.error.message").value("type must be 'dir', 'file' or 'resource', but got: "));
     }
 
     @Test
@@ -308,7 +315,7 @@ public class FileControllerPageFilesTest {
                         "  \"order\": \"desc\"\n" +
                         "}"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error.message").value("type must be 'dir' or 'file', but got: folder"));
+                .andExpect(jsonPath("$.error.message").value("type must be 'dir', 'file' or 'resource', but got: folder"));
     }
 
     @Test
