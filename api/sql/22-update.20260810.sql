@@ -1,26 +1,25 @@
 ALTER TABLE `file`
     ADD COLUMN `node_type` varchar(16) NOT NULL DEFAULT 'file' COMMENT '节点类型：file、directory、resource',
-    ADD COLUMN `resource_id` varchar(256) NOT NULL DEFAULT '' COMMENT '业务资源标识',
-    ADD INDEX `idx_resource` (`space_code`, `node_type`, `resource_id`(128), `status`);
+    ADD COLUMN `resource_id` varchar(256) NOT NULL DEFAULT '' COMMENT '业务资源标识';
 
-ALTER TABLE `file_0` ADD COLUMN `node_type` varchar(16) NOT NULL DEFAULT 'file', ADD COLUMN `resource_id` varchar(256) NOT NULL DEFAULT '', ADD INDEX `idx_resource` (`space_code`, `node_type`, `resource_id`(128), `status`);
-ALTER TABLE `file_1` ADD COLUMN `node_type` varchar(16) NOT NULL DEFAULT 'file', ADD COLUMN `resource_id` varchar(256) NOT NULL DEFAULT '', ADD INDEX `idx_resource` (`space_code`, `node_type`, `resource_id`(128), `status`);
-ALTER TABLE `file_2` ADD COLUMN `node_type` varchar(16) NOT NULL DEFAULT 'file', ADD COLUMN `resource_id` varchar(256) NOT NULL DEFAULT '', ADD INDEX `idx_resource` (`space_code`, `node_type`, `resource_id`(128), `status`);
-ALTER TABLE `file_3` ADD COLUMN `node_type` varchar(16) NOT NULL DEFAULT 'file', ADD COLUMN `resource_id` varchar(256) NOT NULL DEFAULT '', ADD INDEX `idx_resource` (`space_code`, `node_type`, `resource_id`(128), `status`);
-ALTER TABLE `file_4` ADD COLUMN `node_type` varchar(16) NOT NULL DEFAULT 'file', ADD COLUMN `resource_id` varchar(256) NOT NULL DEFAULT '', ADD INDEX `idx_resource` (`space_code`, `node_type`, `resource_id`(128), `status`);
-ALTER TABLE `file_5` ADD COLUMN `node_type` varchar(16) NOT NULL DEFAULT 'file', ADD COLUMN `resource_id` varchar(256) NOT NULL DEFAULT '', ADD INDEX `idx_resource` (`space_code`, `node_type`, `resource_id`(128), `status`);
-ALTER TABLE `file_6` ADD COLUMN `node_type` varchar(16) NOT NULL DEFAULT 'file', ADD COLUMN `resource_id` varchar(256) NOT NULL DEFAULT '', ADD INDEX `idx_resource` (`space_code`, `node_type`, `resource_id`(128), `status`);
-ALTER TABLE `file_7` ADD COLUMN `node_type` varchar(16) NOT NULL DEFAULT 'file', ADD COLUMN `resource_id` varchar(256) NOT NULL DEFAULT '', ADD INDEX `idx_resource` (`space_code`, `node_type`, `resource_id`(128), `status`);
-ALTER TABLE `file_8` ADD COLUMN `node_type` varchar(16) NOT NULL DEFAULT 'file', ADD COLUMN `resource_id` varchar(256) NOT NULL DEFAULT '', ADD INDEX `idx_resource` (`space_code`, `node_type`, `resource_id`(128), `status`);
-ALTER TABLE `file_9` ADD COLUMN `node_type` varchar(16) NOT NULL DEFAULT 'file', ADD COLUMN `resource_id` varchar(256) NOT NULL DEFAULT '', ADD INDEX `idx_resource` (`space_code`, `node_type`, `resource_id`(128), `status`);
-ALTER TABLE `file_10` ADD COLUMN `node_type` varchar(16) NOT NULL DEFAULT 'file', ADD COLUMN `resource_id` varchar(256) NOT NULL DEFAULT '', ADD INDEX `idx_resource` (`space_code`, `node_type`, `resource_id`(128), `status`);
-ALTER TABLE `file_11` ADD COLUMN `node_type` varchar(16) NOT NULL DEFAULT 'file', ADD COLUMN `resource_id` varchar(256) NOT NULL DEFAULT '', ADD INDEX `idx_resource` (`space_code`, `node_type`, `resource_id`(128), `status`);
-ALTER TABLE `file_12` ADD COLUMN `node_type` varchar(16) NOT NULL DEFAULT 'file', ADD COLUMN `resource_id` varchar(256) NOT NULL DEFAULT '', ADD INDEX `idx_resource` (`space_code`, `node_type`, `resource_id`(128), `status`);
-ALTER TABLE `file_13` ADD COLUMN `node_type` varchar(16) NOT NULL DEFAULT 'file', ADD COLUMN `resource_id` varchar(256) NOT NULL DEFAULT '', ADD INDEX `idx_resource` (`space_code`, `node_type`, `resource_id`(128), `status`);
-ALTER TABLE `file_14` ADD COLUMN `node_type` varchar(16) NOT NULL DEFAULT 'file', ADD COLUMN `resource_id` varchar(256) NOT NULL DEFAULT '', ADD INDEX `idx_resource` (`space_code`, `node_type`, `resource_id`(128), `status`);
-ALTER TABLE `file_15` ADD COLUMN `node_type` varchar(16) NOT NULL DEFAULT 'file', ADD COLUMN `resource_id` varchar(256) NOT NULL DEFAULT '', ADD INDEX `idx_resource` (`space_code`, `node_type`, `resource_id`(128), `status`);
-ALTER TABLE `file_temp` ADD COLUMN `node_type` varchar(16) NOT NULL DEFAULT 'file', ADD COLUMN `resource_id` varchar(256) NOT NULL DEFAULT '', ADD INDEX `idx_resource` (`space_code`, `node_type`, `resource_id`(128), `status`);
-ALTER TABLE `file_system` ADD COLUMN `node_type` varchar(16) NOT NULL DEFAULT 'file', ADD COLUMN `resource_id` varchar(256) NOT NULL DEFAULT '', ADD INDEX `idx_resource` (`space_code`, `node_type`, `resource_id`(128), `status`);
+ALTER TABLE `file_0` ADD COLUMN `node_type` varchar(16) NOT NULL DEFAULT 'file', ADD COLUMN `resource_id` varchar(256) NOT NULL DEFAULT '';
+ALTER TABLE `file_1` ADD COLUMN `node_type` varchar(16) NOT NULL DEFAULT 'file', ADD COLUMN `resource_id` varchar(256) NOT NULL DEFAULT '';
+ALTER TABLE `file_2` ADD COLUMN `node_type` varchar(16) NOT NULL DEFAULT 'file', ADD COLUMN `resource_id` varchar(256) NOT NULL DEFAULT '';
+ALTER TABLE `file_3` ADD COLUMN `node_type` varchar(16) NOT NULL DEFAULT 'file', ADD COLUMN `resource_id` varchar(256) NOT NULL DEFAULT '';
+ALTER TABLE `file_4` ADD COLUMN `node_type` varchar(16) NOT NULL DEFAULT 'file', ADD COLUMN `resource_id` varchar(256) NOT NULL DEFAULT '';
+ALTER TABLE `file_5` ADD COLUMN `node_type` varchar(16) NOT NULL DEFAULT 'file', ADD COLUMN `resource_id` varchar(256) NOT NULL DEFAULT '';
+ALTER TABLE `file_6` ADD COLUMN `node_type` varchar(16) NOT NULL DEFAULT 'file', ADD COLUMN `resource_id` varchar(256) NOT NULL DEFAULT '';
+ALTER TABLE `file_7` ADD COLUMN `node_type` varchar(16) NOT NULL DEFAULT 'file', ADD COLUMN `resource_id` varchar(256) NOT NULL DEFAULT '';
+ALTER TABLE `file_8` ADD COLUMN `node_type` varchar(16) NOT NULL DEFAULT 'file', ADD COLUMN `resource_id` varchar(256) NOT NULL DEFAULT '';
+ALTER TABLE `file_9` ADD COLUMN `node_type` varchar(16) NOT NULL DEFAULT 'file', ADD COLUMN `resource_id` varchar(256) NOT NULL DEFAULT '';
+ALTER TABLE `file_10` ADD COLUMN `node_type` varchar(16) NOT NULL DEFAULT 'file', ADD COLUMN `resource_id` varchar(256) NOT NULL DEFAULT '';
+ALTER TABLE `file_11` ADD COLUMN `node_type` varchar(16) NOT NULL DEFAULT 'file', ADD COLUMN `resource_id` varchar(256) NOT NULL DEFAULT '';
+ALTER TABLE `file_12` ADD COLUMN `node_type` varchar(16) NOT NULL DEFAULT 'file', ADD COLUMN `resource_id` varchar(256) NOT NULL DEFAULT '';
+ALTER TABLE `file_13` ADD COLUMN `node_type` varchar(16) NOT NULL DEFAULT 'file', ADD COLUMN `resource_id` varchar(256) NOT NULL DEFAULT '';
+ALTER TABLE `file_14` ADD COLUMN `node_type` varchar(16) NOT NULL DEFAULT 'file', ADD COLUMN `resource_id` varchar(256) NOT NULL DEFAULT '';
+ALTER TABLE `file_15` ADD COLUMN `node_type` varchar(16) NOT NULL DEFAULT 'file', ADD COLUMN `resource_id` varchar(256) NOT NULL DEFAULT '';
+ALTER TABLE `file_temp` ADD COLUMN `node_type` varchar(16) NOT NULL DEFAULT 'file', ADD COLUMN `resource_id` varchar(256) NOT NULL DEFAULT '';
+ALTER TABLE `file_system` ADD COLUMN `node_type` varchar(16) NOT NULL DEFAULT 'file', ADD COLUMN `resource_id` varchar(256) NOT NULL DEFAULT '';
 
 UPDATE `file` SET `node_type` = 'directory' WHERE `is_dir` = 1;
 UPDATE `file_0` SET `node_type` = 'directory' WHERE `is_dir` = 1;

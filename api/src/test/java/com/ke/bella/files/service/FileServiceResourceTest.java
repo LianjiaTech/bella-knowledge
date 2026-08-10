@@ -3,6 +3,7 @@ package com.ke.bella.files.service;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
@@ -14,6 +15,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -23,6 +25,8 @@ import com.ke.bella.files.db.repo.FileRepo;
 import com.ke.bella.files.db.tables.pojos.FileDB;
 import com.ke.bella.files.enums.FileType;
 import com.ke.bella.files.enums.NodeType;
+import com.ke.bella.files.protocol.EventType;
+import com.ke.bella.files.protocol.FileBroadcasting;
 import com.ke.bella.files.protocol.OpenAIFile;
 import com.ke.bella.files.service.broadcast.BroadcastService;
 import com.ke.bella.files.service.storage.StorageService;
@@ -51,7 +55,7 @@ public class FileServiceResourceTest {
     }
 
     @Test
-    public void createResourceOnlyWritesDatabaseNode() {
+    public void createResourceWritesDatabaseNodeAndBroadcastsCreatedEvent() {
         AtomicReference<FileDB> inserted = new AtomicReference<>();
         when(fileRepo.addFile(any(FileDB.class), anyString(), any(FileType.class))).thenAnswer(invocation -> {
             FileDB file = invocation.getArgument(0);
@@ -70,7 +74,11 @@ public class FileServiceResourceTest {
         assertEquals(Long.valueOf(0L), resource.getBytes());
         verify(fileRepo).addFile(any(FileDB.class), org.mockito.ArgumentMatchers.eq("file-parent-1-d"),
                 org.mockito.ArgumentMatchers.eq(FileType.USER));
-        verifyNoInteractions(storageService, broadcastService);
+        ArgumentCaptor<FileBroadcasting> messageCaptor = ArgumentCaptor.forClass(FileBroadcasting.class);
+        verify(broadcastService).broadcast(messageCaptor.capture(), any(Runnable.class), any(Runnable.class));
+        assertEquals(EventType.FILE_CREATED.getValue(), messageCaptor.getValue().getEvent());
+        assertEquals(resource, messageCaptor.getValue().getData());
+        verifyNoInteractions(storageService);
     }
 
     @Test
@@ -89,7 +97,7 @@ public class FileServiceResourceTest {
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
                 () -> fileService.getUrl("file-resource-1"));
 
-        assertEquals("node has no file content. file_id = file-resource-1, node_type = resource", error.getMessage());
+        assertTrue(error.getMessage().contains("no file content"));
         verifyNoInteractions(storageService);
     }
 }

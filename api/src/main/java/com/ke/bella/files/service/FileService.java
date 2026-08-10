@@ -696,7 +696,18 @@ public class FileService {
         if(created == null) {
             throw new FileNotFoundException(fileId);
         }
-        return transferToOpenAIFile(created);
+        OpenAIFile resource = transferToOpenAIFile(created);
+
+        FileBroadcasting<OpenAIFile> message = new FileBroadcasting<>();
+        message.setEvent(EventType.FILE_CREATED);
+        message.setData(resource);
+        message.setMetadata("{}");
+        message.setUserId(BellaContextHelper.getOperatorUserId());
+        message.setUserName(BellaContextHelper.getOperatorUserName());
+        message.setAkCode(BellaContextHelper.getOperatorAkCode());
+        broadcastService.broadcast(message, () -> updateBroadcastStatus(fileId, BroadcastStatus.SUCCESS),
+                () -> updateBroadcastStatus(fileId, BroadcastStatus.FAILED));
+        return resource;
     }
 
     public List<OpenAIFile> findFiles(FileDB ancestor) {
