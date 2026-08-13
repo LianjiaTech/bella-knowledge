@@ -27,7 +27,6 @@ import com.ke.bella.files.db.tables.Tag;
  */
 @SuppressWarnings({ "all", "unchecked", "rawtypes" })
 public class Tables {
-    public static final FileUpload FILE_UPLOAD = FileUpload.FILE_UPLOAD;
 
     /**
      * 数据集
@@ -93,6 +92,11 @@ public class Tables {
      * The table <code>file_temp</code>.
      */
     public static final FileTemp FILE_TEMP = FileTemp.FILE_TEMP;
+
+    /**
+     * 分片上传会话表（低频，不分表）
+     */
+    public static final FileUpload FILE_UPLOAD = FileUpload.FILE_UPLOAD;
 
     /**
      * The table <code>instance</code>.

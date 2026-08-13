@@ -107,6 +107,9 @@ public class DefaultSchema extends SchemaImpl {
      */
     public final FileTemp FILE_TEMP = FileTemp.FILE_TEMP;
 
+    /**
+     * 分片上传会话表（低频，不分表）
+     */
     public final FileUpload FILE_UPLOAD = FileUpload.FILE_UPLOAD;
 
     /**

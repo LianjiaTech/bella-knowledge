@@ -96,16 +96,28 @@ public class UploadService {
         String type = StringUtils.isEmpty(mimeType) ? "" : StringUtils.substringBefore(mimeType, "/");
         String storageUploadId = storageService.createMultipartUpload(bucket, path, mimeType, op.getFilename(), "");
 
-        FileUploadDB row = FileUploadDB.builder()
-                .uploadId(UPLOAD_ID_GENERATOR.generateWithSpaceCode(spaceCode)).spaceCode(spaceCode)
-                .akCode(StringUtils.defaultString(BellaContextHelper.getOperatorAkCode())).fileId(fileId)
-                .filename(op.getFilename()).extension(extension).purpose(purpose).mimeType(mimeType).type(type).charset("")
-                .bucket(bucket).path(path).declaredBytes(op.getBytes()).storageUploadId(storageUploadId)
-                .ancestorId(StringUtils.defaultString(op.getAncestorId())).metadata(op.getMetadata())
-                .description(StringUtils.defaultString(op.getDescription()))
-                .cities(op.getCities() == null ? "" : JsonUtils.toJson(op.getCities()))
-                .tags(op.getTags() == null ? "" : JsonUtils.toJson(op.getTags()))
-                .status("PENDING").expiresAt(LocalDateTime.now().plusHours(sessionTtlHours)).build();
+        FileUploadDB row = new FileUploadDB();
+        row.setUploadId(UPLOAD_ID_GENERATOR.generateWithSpaceCode(spaceCode));
+        row.setSpaceCode(spaceCode);
+        row.setAkCode(StringUtils.defaultString(BellaContextHelper.getOperatorAkCode()));
+        row.setFileId(fileId);
+        row.setFilename(op.getFilename());
+        row.setExtension(extension);
+        row.setPurpose(purpose);
+        row.setMimeType(mimeType);
+        row.setType(type);
+        row.setCharset("");
+        row.setBucket(bucket);
+        row.setPath(path);
+        row.setDeclaredBytes(op.getBytes());
+        row.setStorageUploadId(storageUploadId);
+        row.setAncestorId(StringUtils.defaultString(op.getAncestorId()));
+        row.setMetadata(op.getMetadata());
+        row.setDescription(StringUtils.defaultString(op.getDescription()));
+        row.setCities(op.getCities() == null ? "" : JsonUtils.toJson(op.getCities()));
+        row.setTags(op.getTags() == null ? "" : JsonUtils.toJson(op.getTags()));
+        row.setStatus("PENDING");
+        row.setExpiresAt(LocalDateTime.now().plusHours(sessionTtlHours));
         try {
             return toUpload(fileUploadRepo.insert(row), null);
         } catch (Exception e) {

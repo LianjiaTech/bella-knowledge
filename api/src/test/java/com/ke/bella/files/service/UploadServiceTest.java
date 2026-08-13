@@ -36,7 +36,8 @@ public class UploadServiceTest {
         uploadService = new UploadService();
         fileUploadRepo = mock(FileUploadRepo.class);
         ReflectionTestUtils.setField(uploadService, "fileUploadRepo", fileUploadRepo);
-        session = FileUploadDB.builder().declaredBytes(11L).build();
+        session = new FileUploadDB();
+        session.setDeclaredBytes(11L);
         BellaContext.setOperator(Operator.builder().userId(1L).userName("tester").spaceCode(SPACE_CODE).build());
     }
 
@@ -46,8 +47,16 @@ public class UploadServiceTest {
     }
 
     private FileUploadDB sessionWith(String status, LocalDateTime expiresAt) {
-        return FileUploadDB.builder().uploadId("upload-1").spaceCode(SPACE_CODE).filename("a.txt").purpose("temp")
-                .declaredBytes(11L).status(status).ctime(LocalDateTime.now()).expiresAt(expiresAt).build();
+        FileUploadDB row = new FileUploadDB();
+        row.setUploadId("upload-1");
+        row.setSpaceCode(SPACE_CODE);
+        row.setFilename("a.txt");
+        row.setPurpose("temp");
+        row.setDeclaredBytes(11L);
+        row.setStatus(status);
+        row.setCtime(LocalDateTime.now());
+        row.setExpiresAt(expiresAt);
+        return row;
     }
 
     @Test
