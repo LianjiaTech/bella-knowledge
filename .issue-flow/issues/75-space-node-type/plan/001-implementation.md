@@ -17,9 +17,9 @@
 ### 1. 确定接口契约和空间来源
 
 - 新增 `GET /v1/files/count`，沿用文件 API 的认证和 `FileApiResponseAdvice` 响应处理。
-- 接受可选查询参数 `space_code` 或 `ancestor_id`，至少提供一个且不允许同时提供；只提供 `space_code` 时统计整个 space，只提供 `ancestor_id` 时先校验节点存在、属于目标空间且为 directory，再统计该目录的直属子节点。`ancestor_id` 的直属语义沿用现有 `pageFiles` 的 `file_closure.depth = 1` 约定；未提供 `space_code` 时从 ancestor 解析空间，二者都省略时回退到 `BellaContextHelper.getOperateSpaceCode()`。对最终解析出的 space 做非空校验，避免无条件查询空空间。
+- 接受可选查询参数 `space_code` 和 `ancestor_id`，允许同时提供；只提供 `space_code` 时统计整个 space，只提供 `ancestor_id` 时先从 ancestor 解析空间并统计该目录的直属子节点，同时提供时校验 ancestor 存在、属于该 space 且为 directory，二者不一致直接返回参数错误。`ancestor_id` 的直属语义沿用现有 `pageFiles` 的 `file_closure.depth = 1` 约定；二者都省略时回退到 `BellaContextHelper.getOperateSpaceCode()`。对最终解析出的 space 做非空校验，避免无条件查询空空间。
 - 返回专用 DTO（建议放在 `api/src/main/java/com/ke/bella/files/protocol`）并使用明确的 snake_case 字段：`file_count`、`directory_count`、`resource_count`。响应直接是该 DTO，由现有 API 响应链路序列化，不引入分页包装或动态 map；三个字段始终输出，空 space 为 `0`。
-- 接口范围是整个 space 或指定目录的直属子节点，不接受子树递归开关、分页、purpose、容量或明细参数；不提供 ancestor_id 时的 space 统计仍覆盖该 space 内全部有效节点。
+- 接口范围是整个 space 或指定目录的直属子节点，不接受子树递归开关、分页、purpose、容量或明细参数；不提供 ancestor_id 时的 space 统计仍覆盖该 space 内全部有效节点。space_code 与 ancestor_id 同时提供时，以一致性校验后的 space 为统计范围。
 
 ### 2. 增加服务与仓储聚合路径
 
@@ -37,7 +37,7 @@
 
 ### 4. 测试、文档与验收
 
-- 控制器测试覆盖：默认从上下文取 space、显式 `space_code`、仅提供 `ancestor_id`、同时提供两个参数、缺少可用 space/ancestor 的参数错误、ancestor 非 directory 或跨 space，以及三个字段始终存在。
+- 控制器测试覆盖：默认从上下文取 space、显式 `space_code`、仅提供 `ancestor_id`、同时提供且一致、同时提供但不一致、缺少可用 space/ancestor 的参数错误、ancestor 非 directory 或跨 space，以及三个字段始终存在。
 - 服务/仓储测试覆盖：space 级同一 space 中 `file`、`directory`、`resource` 各一条时分别返回准确数量；空 space 返回三个 `0`；ancestor 级只统计直属子节点、不统计孙节点；空目录返回三个 `0`；已删除节点不计入；不同 space 不串数据；历史 `is_dir = 1` 目录归类为 `directory`；未知类型按约定被拒绝或显式处理。
 - 使用现有测试 fixture 重建目标分片表并插入数据，验证统计查询走 space 对应分片；补充必要的 SQL/索引迁移校验，确保所有分片表结构一致。
 - 在仓库现有 API 文档承载位置补充 endpoint、参数来源、响应 JSON 示例、有效状态口径和三类字段定义；若仓库没有集中 API 文档，则在 `api` 模块现有接口说明位置新增最小示例，避免修改无关客户端。
@@ -55,6 +55,6 @@
 - 静态检查接口路径、参数、DTO 序列化字段与现有 `@FileAPI`、`/v1/files` 和错误响应约定一致。
 - 用集成测试验证正常 space、空 space、三类节点分别计数、同 space 多节点累计、不同 space 隔离、ancestor 直属子节点与孙节点边界，以及 `status = DELETED` 和无效节点排除。
 - 验证目录兼容规则：`is_dir = 1` 只计入 `directory`；正常 `file` 与 `resource` 不因闭包关系或 `is_dir` 默认值被误分类。
-- 验证分片路由：使用至少两个映射到不同分片的 space，分别进行 space 统计，并对 ancestor 统计使用其 file ID 路由，确认每次只读目标 space 对应分片且不会漏数/串数。
+- 验证分片路由：使用至少两个映射到不同分片的 space，分别进行 space 统计，并对 ancestor 统计使用其 file ID 路由；同时验证传入一致的 space_code 与 ancestor_id 时仍只读目标分片，确认不会漏数/串数。
 - 执行迁移 SQL 的测试数据库验证，检查 `file_0` 至 `file_15` 索引存在且字段顺序为 `space_code,status,node_type`；用 `EXPLAIN` 确认统计查询使用该过滤索引或有等价可接受的执行计划。
 - 运行 API 模块相关测试及项目现有构建；检查新增 API 文档中的链接/锚点可达、space 与 ancestor 两种示例 JSON 可按当前响应反序列化、示例命令参数有效，并将关键事实与当前 controller、service、repo、配置和 SQL 定义逐项比对。
