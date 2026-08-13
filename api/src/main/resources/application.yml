@@ -11,8 +11,8 @@ spring:
       minimum-idle: 5
   servlet:
     multipart:
-      max-file-size: ${BELLA_MULTIPART_MAX_FILE_SIZE:5GB}
-      max-request-size: ${BELLA_MULTIPART_MAX_REQUEST_SIZE:5GB}
+      max-file-size: ${BELLA_MULTIPART_MAX_FILE_SIZE:512MB}
+      max-request-size: ${BELLA_MULTIPART_MAX_REQUEST_SIZE:512MB}
       file-size-threshold: 512KB
       resolve-lazily: true
   jackson:

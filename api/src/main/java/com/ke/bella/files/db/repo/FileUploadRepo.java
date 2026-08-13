@@ -47,10 +47,6 @@ public class FileUploadRepo implements BaseRepo {
                 .fetchOneInto(FileUploadDB.class);
     }
 
-    public FileUploadDB queryByUploadId(String uploadId) {
-        return db.selectFrom(FILE_UPLOAD).where(FILE_UPLOAD.UPLOAD_ID.eq(uploadId)).fetchOneInto(FileUploadDB.class);
-    }
-
     public boolean casStatus(String uploadId, String from, String to) {
         return db.update(FILE_UPLOAD).set(FILE_UPLOAD.STATUS, to).set(FILE_UPLOAD.MTIME, LocalDateTime.now())
                 .where(FILE_UPLOAD.UPLOAD_ID.eq(uploadId).and(FILE_UPLOAD.STATUS.eq(from))).execute() > 0;

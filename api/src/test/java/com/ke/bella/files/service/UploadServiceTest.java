@@ -2,28 +2,52 @@ package com.ke.bella.files.service;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import com.ke.bella.files.db.repo.FileUploadRepo;
 import com.ke.bella.files.db.tables.pojos.FileUploadDB;
+import com.ke.bella.files.protocol.Upload;
 import com.ke.bella.files.protocol.UploadException;
 import com.ke.bella.files.protocol.UploadOps.CompleteUploadOp;
 import com.ke.bella.files.service.storage.StoragePart;
+import com.ke.bella.openapi.BellaContext;
+import com.ke.bella.openapi.Operator;
 
 public class UploadServiceTest {
+    private static final String SPACE_CODE = "sp-a";
+
     private UploadService uploadService;
+    private FileUploadRepo fileUploadRepo;
     private FileUploadDB session;
 
     @Before
     public void setUp() {
         uploadService = new UploadService();
+        fileUploadRepo = mock(FileUploadRepo.class);
+        ReflectionTestUtils.setField(uploadService, "fileUploadRepo", fileUploadRepo);
         session = FileUploadDB.builder().declaredBytes(11L).build();
+        BellaContext.setOperator(Operator.builder().userId(1L).userName("tester").spaceCode(SPACE_CODE).build());
+    }
+
+    @After
+    public void tearDown() {
+        BellaContext.clearAll();
+    }
+
+    private FileUploadDB sessionWith(String status, LocalDateTime expiresAt) {
+        return FileUploadDB.builder().uploadId("upload-1").spaceCode(SPACE_CODE).filename("a.txt").purpose("temp")
+                .declaredBytes(11L).status(status).ctime(LocalDateTime.now()).expiresAt(expiresAt).build();
     }
 
     @Test
@@ -69,5 +93,46 @@ public class UploadServiceTest {
                 () -> ReflectionTestUtils.invokeMethod(uploadService, "validateParts", session, parts, op));
 
         assertEquals("invalid_parts", error.getErrorCode());
+    }
+
+    @Test
+    public void loadSessionQueriesByCallerSpaceAndRejectsMissingSession() {
+        when(fileUploadRepo.queryByUploadId("upload-1", SPACE_CODE)).thenReturn(null);
+
+        UploadException error = assertThrows(UploadException.class, () -> uploadService.cancel("upload-1"));
+
+        assertEquals("upload_not_found", error.getErrorCode());
+        assertEquals(404, error.getHttpStatus());
+    }
+
+    @Test
+    public void loadSessionRejectsExpiredPendingSession() {
+        when(fileUploadRepo.queryByUploadId("upload-1", SPACE_CODE))
+                .thenReturn(sessionWith("PENDING", LocalDateTime.now().minusMinutes(1)));
+
+        UploadException error = assertThrows(UploadException.class, () -> uploadService.cancel("upload-1"));
+
+        assertEquals("upload_expired", error.getErrorCode());
+    }
+
+    @Test
+    public void loadSessionAllowsExpiredCompletingSessionForRecovery() {
+        when(fileUploadRepo.queryByUploadId("upload-1", SPACE_CODE))
+                .thenReturn(sessionWith("COMPLETING", LocalDateTime.now().minusMinutes(1)));
+
+        // 过期不再拦截 COMPLETING：cancel 走到 CAS 才失败，报状态冲突而非 upload_expired
+        UploadException error = assertThrows(UploadException.class, () -> uploadService.cancel("upload-1"));
+
+        assertEquals("upload_state_conflict", error.getErrorCode());
+    }
+
+    @Test
+    public void cancelStaysIdempotentForExpiredCancelledSession() {
+        when(fileUploadRepo.queryByUploadId("upload-1", SPACE_CODE))
+                .thenReturn(sessionWith("CANCELLED", LocalDateTime.now().minusMinutes(1)));
+
+        Upload result = uploadService.cancel("upload-1");
+
+        assertEquals("cancelled", result.getStatus());
     }
 }

@@ -77,7 +77,11 @@ public class UploadService {
         validateJsonLength(op.getTags(), 512, "tags");
 
         String spaceCode = StringUtils.defaultIfBlank(op.getSpaceCode(), BellaContextHelper.getOperateSpaceCode());
-        String purpose = FilePurposeClassifier.allowedPurposes().contains(op.getPurpose()) ? op.getPurpose() : FilePurpose.TEMP.getValue();
+        String purpose = op.getPurpose();
+        if(!FilePurposeClassifier.allowedPurposes().contains(purpose)) {
+            LOGGER.info("Invalid purpose '{}', force to '{}'", purpose, FilePurpose.TEMP.getValue());
+            purpose = FilePurpose.TEMP.getValue();
+        }
         validateAncestorDirectory(spaceCode, op.getAncestorId());
         if(fileService.exists(spaceCode, op.getAncestorId(), op.getFilename())) {
             throw new UploadException(409, "file_already_exists", "file already exists: " + op.getFilename());
@@ -241,11 +245,12 @@ public class UploadService {
     }
 
     private FileUploadDB loadSession(String uploadId) {
-        FileUploadDB session = fileUploadRepo.queryByUploadId(uploadId);
+        FileUploadDB session = fileUploadRepo.queryByUploadId(uploadId, BellaContextHelper.getOperateSpaceCode());
         if(session == null) {
             throw new UploadException(404, "upload_not_found", "upload not found: " + uploadId);
         }
-        if(session.getExpiresAt().isBefore(LocalDateTime.now()) && !"COMPLETED".equals(session.getStatus())) {
+        // 过期仅拦截 PENDING；COMPLETING 必须允许 complete 重试，这是崩溃后唯一的恢复路径（没有清理任务）
+        if("PENDING".equals(session.getStatus()) && session.getExpiresAt().isBefore(LocalDateTime.now())) {
             throw badRequest("upload_expired", "upload has expired: " + uploadId);
         }
         return session;
