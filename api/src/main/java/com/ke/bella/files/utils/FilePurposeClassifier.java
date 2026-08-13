@@ -21,7 +21,6 @@ public class FilePurposeClassifier {
     static {
         // User files
         USER_PURPOSES.add(FilePurpose.ASSISTANTS.getValue());
-        USER_PURPOSES.add(FilePurpose.VISION.getValue());
         USER_PURPOSES.add(FilePurpose.USER_DATA.getValue());
 
         // System files
@@ -35,6 +34,7 @@ public class FilePurposeClassifier {
         TEMP_PURPOSES.add(FilePurpose.FINE_TUNE.getValue());
         TEMP_PURPOSES.add(FilePurpose.EVALS.getValue());
         TEMP_PURPOSES.add(FilePurpose.ASSISTANTS_CHAT.getValue());
+        TEMP_PURPOSES.add(FilePurpose.VISION.getValue());
 
         // Progress trackable purposes
         PROGRESS_TRACKABLE_PURPOSES.add(FilePurpose.ASSISTANTS.getValue());
