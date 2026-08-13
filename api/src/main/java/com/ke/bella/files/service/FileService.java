@@ -34,6 +34,7 @@ import com.ke.bella.files.protocol.EventType;
 import com.ke.bella.files.protocol.FileBroadcasting;
 import com.ke.bella.files.protocol.FileException.FileNotFoundException;
 import com.ke.bella.files.protocol.FileOps;
+import com.ke.bella.files.protocol.FileNodeCount;
 import com.ke.bella.files.protocol.FileStatus;
 import com.ke.bella.files.protocol.ListFileOps;
 import com.ke.bella.files.protocol.OpenAIFile;
@@ -765,6 +766,10 @@ public class FileService {
         return fileDbs.stream()
                 .map(this::transferToOpenAIFile)
                 .collect(Collectors.toList());
+    }
+
+    public FileNodeCount countNodes(String spaceCode, String ancestorId) {
+        return fileRepo.countNodes(spaceCode, ancestorId);
     }
 
     public OpenAIFile info(String fileId) {

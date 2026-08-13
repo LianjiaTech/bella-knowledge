@@ -57,6 +57,7 @@ import com.ke.bella.files.db.tables.records.FileShardingRecord;
 import com.ke.bella.files.enums.FileType;
 import com.ke.bella.files.enums.NodeType;
 import com.ke.bella.files.protocol.FileException.FileNotFoundException;
+import com.ke.bella.files.protocol.FileNodeCount;
 import com.ke.bella.files.protocol.FileOps;
 import com.ke.bella.files.protocol.FileStatus;
 import com.ke.bella.files.protocol.ListFileOps;
@@ -776,6 +777,10 @@ public class FileRepo implements BaseRepo {
             throw e;
         }
         LOGGER.warn("file_entry read is not ready, falling back to closure, operation: {}, reason: {}", operation, e.getMessage());
+    }
+
+    public FileNodeCount countNodes(String spaceCode, String ancestorId) {
+        return fileEntryRepo.countNodes(spaceCode, ancestorId);
     }
 
     public List<FileDB> getPathFiles(String fileId) {

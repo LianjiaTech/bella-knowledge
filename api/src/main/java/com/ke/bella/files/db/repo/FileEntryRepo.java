@@ -23,6 +23,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.jooq.Condition;
 import org.jooq.DSLContext;
 import org.jooq.Record;
+import org.jooq.Record2;
+import org.jooq.Result;
 import org.jooq.SelectConditionStep;
 import org.jooq.SortField;
 import org.jooq.exception.DataAccessException;
@@ -39,6 +41,7 @@ import com.ke.bella.files.db.tables.pojos.FileEntryDB;
 import com.ke.bella.files.db.tables.records.FileClosureRecord;
 import com.ke.bella.files.db.tables.records.FileEntryRecord;
 import com.ke.bella.files.enums.NodeType;
+import com.ke.bella.files.protocol.FileNodeCount;
 import com.ke.bella.files.protocol.FileStatus;
 import com.ke.bella.files.protocol.PageFileOps;
 import com.ke.bella.files.utils.DigestUtils;
@@ -49,6 +52,7 @@ public class FileEntryRepo implements BaseRepo {
     public static final String ROOT_ENTRY_ID = "";
     public static final String TYPE_FILE = "file";
     public static final String TYPE_DIR = "dir";
+    public static final String TYPE_RESOURCE = "resource";
     // 祖先链遍历的深度上限，超出视为数据成环等异常
     static final int MAX_TREE_DEPTH = 64;
 
@@ -131,6 +135,34 @@ public class FileEntryRepo implements BaseRepo {
     public FileDB queryFile(String spaceCode, @Nullable String ancestorId, String filename) {
         FileEntryDB entry = queryActiveByName(spaceCode, resolveParentEntryIdForRead(spaceCode, ancestorId), filename);
         return entry == null ? null : queryActiveFile(entry.getFileId());
+    }
+
+    public FileNodeCount countNodes(String spaceCode, @Nullable String ancestorId) {
+        Condition condition = FILE_ENTRY.SPACE_CODE.eq(spaceCode);
+        if(StringUtils.isNotEmpty(ancestorId)) {
+            condition = condition.and(FILE_ENTRY.PARENT_ENTRY_ID.eq(resolveParentEntryIdForRead(spaceCode, ancestorId)));
+        }
+        Result<Record2<String, Integer>> counts = entryDb(spaceCode)
+                .select(FILE_ENTRY.TYPE, DSL.count())
+                .from(FILE_ENTRY)
+                .where(condition)
+                .groupBy(FILE_ENTRY.TYPE)
+                .fetch();
+        FileNodeCount result = new FileNodeCount();
+        counts.forEach(record -> {
+            String type = record.value1();
+            long count = record.value2();
+            if(TYPE_FILE.equals(type)) {
+                result.setFileCount(count);
+            } else if(TYPE_DIR.equals(type)) {
+                result.setDirectoryCount(count);
+            } else if(TYPE_RESOURCE.equals(type)) {
+                result.setResourceCount(count);
+            } else {
+                throw new IllegalStateException("Unsupported file_entry type: " + type);
+            }
+        });
+        return result;
     }
 
     public List<FileDB> listFiles(String spaceCode, @Nullable String ancestorId) {
@@ -456,6 +488,13 @@ public class FileEntryRepo implements BaseRepo {
      * entry 写失败一律抛出，让外层主事务整体回滚，file/闭包/entry 严格一致。
      * write-mode=closure 是逃生阀：entry 写全部空操作，退回纯闭包链路。
      */
+    private String entryType(FileDB file) {
+        if(Integer.valueOf(1).equals(file.getIsDir())) {
+            return TYPE_DIR;
+        }
+        return NodeType.RESOURCE.getValue().equals(file.getNodeType()) ? TYPE_RESOURCE : TYPE_FILE;
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public FileEntryDB addEntry(String spaceCode, FileDB file, @Nullable String ancestorId) {
         if(!entryWriteEnabled()) {
@@ -469,7 +508,7 @@ public class FileEntryRepo implements BaseRepo {
         record.setParentEntryId(parentEntryId);
         record.setFileId(file.getFileId());
         record.setFilename(file.getFilename());
-        record.setType(Integer.valueOf(1).equals(file.getIsDir()) ? TYPE_DIR : TYPE_FILE);
+        record.setType(entryType(file));
         fillCreatorInfo(record);
         int inserted = entryDb(spaceCode).insertInto(FILE_ENTRY).set(record).execute();
         if(inserted != 1) {
@@ -526,7 +565,7 @@ public class FileEntryRepo implements BaseRepo {
         record.setParentEntryId(parentEntryId);
         record.setFileId(fileId);
         record.setFilename(file.getFilename());
-        record.setType(Integer.valueOf(1).equals(file.getIsDir()) ? TYPE_DIR : TYPE_FILE);
+        record.setType(entryType(file));
         fillCreatorInfo(record);
         try {
             entryDb(spaceCode).insertInto(FILE_ENTRY).set(record).execute();

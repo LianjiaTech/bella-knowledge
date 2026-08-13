@@ -52,6 +52,7 @@ import com.ke.bella.files.protocol.FileException.FileNotFoundException;
 import com.ke.bella.files.protocol.FileException.ProgressNotFoundException;
 import com.ke.bella.files.protocol.FileExists;
 import com.ke.bella.files.protocol.FileMoveOps;
+import com.ke.bella.files.protocol.FileNodeCount;
 import com.ke.bella.files.protocol.FileOps;
 import com.ke.bella.files.protocol.FileSystemOps.MkdirOp;
 import com.ke.bella.files.protocol.FileSystemOps.CreateResourceOp;
@@ -1129,6 +1130,31 @@ public class FileController {
             res.setLastId(files.get(files.size() - 1).getId());
         }
         return res;
+    }
+
+    @GetMapping("/count")
+    public FileNodeCount count(
+            @RequestParam(value = "space_code", required = false) String spaceCode,
+            @RequestParam(value = "ancestor_id", required = false) String ancestorId) {
+        FileDB ancestor = null;
+        if(StringUtils.isNotEmpty(ancestorId)) {
+            ancestor = fileService.getFile0(ancestorId);
+            if(ancestor == null) {
+                throw new FileNotFoundException(ancestorId);
+            }
+            Assert.isTrue(NodeType.from(ancestor) == NodeType.DIRECTORY, "ancestor_id must refer to a directory");
+            if(StringUtils.isNotEmpty(spaceCode)) {
+                Assert.isTrue(StringUtils.equals(spaceCode, ancestor.getSpaceCode()),
+                        "space_code mismatch between context and ancestor_id");
+            } else {
+                spaceCode = ancestor.getSpaceCode();
+            }
+        }
+        if(StringUtils.isEmpty(spaceCode)) {
+            spaceCode = BellaContextHelper.getOperateSpaceCode();
+        }
+        Assert.hasText(spaceCode, "space_code is required");
+        return fileService.countNodes(spaceCode, ancestor == null ? null : ancestor.getFileId());
     }
 
     @GetMapping("/{file_id}/info")
