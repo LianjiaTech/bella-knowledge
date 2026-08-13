@@ -338,6 +338,28 @@ public class FileService {
         if(StringUtils.isNotEmpty(extension)) {
             keyName += "." + extension;
         }
+        return createFileWithId(spaceCode, fileId, bucketName, keyName, filename, contentLength, purpose, metadata,
+                mimeType, type, extension, ancestorId, description, cities, tags);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public FileUploadContext createFileWithId(
+            String spaceCode,
+            String fileId,
+            String bucketName,
+            String keyName,
+            String filename,
+            long contentLength,
+            String purpose,
+            String metadata,
+            String mimeType,
+            String type,
+            String extension,
+            String ancestorId,
+            String description,
+            List<String> cities,
+            List<String> tags) {
+        FileType fileType = FilePurposeClassifier.classify(purpose);
         String akCode = BellaContextHelper.getOperatorAkCode();
 
         String citiesJson = cities == null ? "" : JsonUtils.toJson(cities);

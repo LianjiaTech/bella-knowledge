@@ -513,6 +513,17 @@
                                         <recordImplements>com.ke.bella.files.db.repo.Operator</recordImplements>
                                     </table>
                                     <table>
+                                        <expression>file_upload</expression>
+                                        <daoClass>
+                                            <transform>PASCAL</transform>
+                                            <expression>$0_D_B_Dao</expression>
+                                        </daoClass>
+                                        <pojoClass>
+                                            <transform>PASCAL</transform>
+                                            <expression>$0_D_B</expression>
+                                        </pojoClass>
+                                    </table>
+                                    <table>
                                         <expression>file_progress_temp</expression>
                                         <daoClass>
                                             <transform>PASCAL</transform>

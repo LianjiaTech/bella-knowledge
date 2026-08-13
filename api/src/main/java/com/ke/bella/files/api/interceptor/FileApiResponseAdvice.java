@@ -24,6 +24,7 @@ import com.ke.bella.files.protocol.CustomOpenAiError;
 import com.ke.bella.files.protocol.FileException.AuthorizationException;
 import com.ke.bella.files.protocol.FileException.FileNotFoundException;
 import com.ke.bella.files.protocol.FileException.ProgressNotFoundException;
+import com.ke.bella.files.protocol.UploadException;
 import com.ke.bella.files.utils.JsonUtils;
 import com.theokanning.openai.OpenAiError.OpenAiErrorDetails;
 
@@ -70,6 +71,8 @@ public class FileApiResponseAdvice implements ResponseBodyAdvice<Object> {
         String msg = e.getMessage();
         if(e instanceof AuthorizationException) {
             code = 401;
+        } else if(e instanceof UploadException) {
+            code = ((UploadException) e).getHttpStatus();
         } else if(e instanceof FileNotFoundException || e instanceof ProgressNotFoundException) {
             code = 404;
         } else if(e instanceof MaxUploadSizeExceededException) {
@@ -89,7 +92,8 @@ public class FileApiResponseAdvice implements ResponseBodyAdvice<Object> {
             errorType = "invalid_request_error";
             LOGGER.info(e.getMessage());
         }
-        OpenAiErrorDetails openAiErrorDetails = new OpenAiErrorDetails(msg, errorType, null, null);
+        String errorCode = e instanceof UploadException ? ((UploadException) e).getErrorCode() : null;
+        OpenAiErrorDetails openAiErrorDetails = new OpenAiErrorDetails(msg, errorType, null, errorCode);
         CustomOpenAiError customOpenAiError = new CustomOpenAiError();
         customOpenAiError.setCode(code);
         customOpenAiError.setError(openAiErrorDetails);

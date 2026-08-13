@@ -17,6 +17,7 @@ import com.ke.bella.files.db.tables.FileProgressTemp;
 import com.ke.bella.files.db.tables.FileSharding;
 import com.ke.bella.files.db.tables.FileSystem;
 import com.ke.bella.files.db.tables.FileTemp;
+import com.ke.bella.files.db.tables.FileUpload;
 import com.ke.bella.files.db.tables.Instance;
 import com.ke.bella.files.db.tables.Tag;
 
@@ -106,6 +107,8 @@ public class DefaultSchema extends SchemaImpl {
      */
     public final FileTemp FILE_TEMP = FileTemp.FILE_TEMP;
 
+    public final FileUpload FILE_UPLOAD = FileUpload.FILE_UPLOAD;
+
     /**
      * The table <code>instance</code>.
      */
@@ -145,6 +148,7 @@ public class DefaultSchema extends SchemaImpl {
             FileSharding.FILE_SHARDING,
             FileSystem.FILE_SYSTEM,
             FileTemp.FILE_TEMP,
+            FileUpload.FILE_UPLOAD,
             Instance.INSTANCE,
             Tag.TAG);
     }

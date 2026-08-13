@@ -2,6 +2,7 @@ package com.ke.bella.files.service.storage;
 
 import java.io.File;
 import java.io.InputStream;
+import java.util.List;
 
 import com.ke.bella.files.service.FileService;
 
@@ -23,4 +24,16 @@ public interface StorageService {
 
     // 获取文件输入流
     FileService.InputStreamWithCharset getObjectInputStream(String bucketName, String fileKey);
+
+    String createMultipartUpload(String bucketName, String fileKey, String mimeType, String filename, String charset);
+
+    String uploadPart(String bucketName, String fileKey, String uploadId, int partNumber, InputStream inputStream, long contentLength);
+
+    List<StoragePart> listParts(String bucketName, String fileKey, String uploadId);
+
+    void completeMultipartUpload(String bucketName, String fileKey, String uploadId, List<StoragePart> parts);
+
+    void abortMultipartUpload(String bucketName, String fileKey, String uploadId);
+
+    boolean objectExists(String bucketName, String fileKey);
 }

@@ -70,6 +70,12 @@ public class IDGenerator {
         return strategy.generateId(this.prefix, now, instanceId, nextTick());
     }
 
+    public String generateWithSpaceCode(String spaceCode) {
+        String now = new SimpleDateFormat(yyMMddHHmmss).format(new Date());
+        String spaceCodeHash = String.valueOf(Math.abs(CustomStringUtils.hashCode(spaceCode)));
+        return String.format("%s%s%s%s-%s", prefix, now, instanceId, nextTick(), spaceCodeHash);
+    }
+
     private String nextTick() {
         int val = serialCounter.incrementAndGet();
         if(val >= MAX_COUNT) {

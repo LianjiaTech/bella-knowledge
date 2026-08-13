@@ -17,6 +17,7 @@ import com.ke.bella.files.db.tables.FileProgressTemp;
 import com.ke.bella.files.db.tables.FileSharding;
 import com.ke.bella.files.db.tables.FileSystem;
 import com.ke.bella.files.db.tables.FileTemp;
+import com.ke.bella.files.db.tables.FileUpload;
 import com.ke.bella.files.db.tables.Instance;
 import com.ke.bella.files.db.tables.Tag;
 
@@ -26,6 +27,7 @@ import com.ke.bella.files.db.tables.Tag;
  */
 @SuppressWarnings({ "all", "unchecked", "rawtypes" })
 public class Tables {
+    public static final FileUpload FILE_UPLOAD = FileUpload.FILE_UPLOAD;
 
     /**
      * 数据集

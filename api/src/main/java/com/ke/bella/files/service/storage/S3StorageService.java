@@ -21,8 +21,18 @@ import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.GetUrlRequest;
+import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
+import software.amazon.awssdk.services.s3.model.AbortMultipartUploadRequest;
+import software.amazon.awssdk.services.s3.model.CompleteMultipartUploadRequest;
+import software.amazon.awssdk.services.s3.model.CompletedMultipartUpload;
+import software.amazon.awssdk.services.s3.model.CompletedPart;
+import software.amazon.awssdk.services.s3.model.CreateMultipartUploadRequest;
+import software.amazon.awssdk.services.s3.model.ListPartsRequest;
+import software.amazon.awssdk.services.s3.model.ListPartsResponse;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectResponse;
+import software.amazon.awssdk.services.s3.model.UploadPartRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
@@ -37,6 +47,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.time.Duration;
 import java.util.Optional;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -310,6 +323,109 @@ public class S3StorageService implements StorageService {
             LOGGER.error(errMsg);
             throw new IllegalArgumentException("object not found, file_key : " + fileKey, e);
         }
+    }
+
+    @Override
+    public String createMultipartUpload(String bucketName, String fileKey, String mimeType, String filename, String charset) {
+        try {
+            String contentType = buildContentType(mimeType, charset);
+            String filenameEncoded = UriUtils.encodeFragment(filename, StandardCharsets.UTF_8);
+            CreateMultipartUploadRequest request = CreateMultipartUploadRequest.builder()
+                    .bucket(bucketName)
+                    .key(fileKey)
+                    .contentType(contentType)
+                    .contentDisposition(getContentDispositionType(mimeType) + "; filename=" + filenameEncoded)
+                    .build();
+            return s3Client.createMultipartUpload(request).uploadId();
+        } catch (Exception e) {
+            String message = String.format("failed to create multipart upload, bucketName: %s, fileKey: %s", bucketName, fileKey);
+            LOGGER.error(message, e);
+            throw new IllegalStateException(message, e);
+        }
+    }
+
+    @Override
+    public String uploadPart(String bucketName, String fileKey, String uploadId, int partNumber, InputStream inputStream, long contentLength) {
+        try {
+            UploadPartRequest request = UploadPartRequest.builder()
+                    .bucket(bucketName).key(fileKey).uploadId(uploadId).partNumber(partNumber).contentLength(contentLength).build();
+            return s3Client.uploadPart(request, software.amazon.awssdk.core.sync.RequestBody.fromInputStream(inputStream, contentLength)).eTag();
+        } catch (Exception e) {
+            String message = String.format("failed to upload part, bucketName: %s, fileKey: %s, partNumber: %s", bucketName, fileKey, partNumber);
+            LOGGER.error(message, e);
+            throw new IllegalStateException(message, e);
+        }
+    }
+
+    @Override
+    public List<StoragePart> listParts(String bucketName, String fileKey, String uploadId) {
+        try {
+            List<StoragePart> result = new ArrayList<>();
+            Integer marker = null;
+            boolean truncated;
+            do {
+                ListPartsRequest request = ListPartsRequest.builder().bucket(bucketName).key(fileKey).uploadId(uploadId)
+                        .partNumberMarker(marker).build();
+                ListPartsResponse response = s3Client.listParts(request);
+                response.parts().forEach(part -> result.add(new StoragePart(part.partNumber(), part.size(), part.eTag())));
+                truncated = Boolean.TRUE.equals(response.isTruncated());
+                marker = response.nextPartNumberMarker();
+            } while(truncated);
+            result.sort(Comparator.comparingInt(StoragePart::getPartNumber));
+            return result;
+        } catch (Exception e) {
+            String message = String.format("failed to list multipart upload parts, bucketName: %s, fileKey: %s", bucketName, fileKey);
+            LOGGER.error(message, e);
+            throw new IllegalStateException(message, e);
+        }
+    }
+
+    @Override
+    public void completeMultipartUpload(String bucketName, String fileKey, String uploadId, List<StoragePart> parts) {
+        try {
+            List<CompletedPart> completedParts = new ArrayList<>();
+            parts.forEach(part -> completedParts.add(CompletedPart.builder().partNumber(part.getPartNumber()).eTag(part.getEtag()).build()));
+            CompleteMultipartUploadRequest request = CompleteMultipartUploadRequest.builder().bucket(bucketName).key(fileKey).uploadId(uploadId)
+                    .multipartUpload(CompletedMultipartUpload.builder().parts(completedParts).build()).build();
+            s3Client.completeMultipartUpload(request);
+        } catch (Exception e) {
+            String message = String.format("failed to complete multipart upload, bucketName: %s, fileKey: %s", bucketName, fileKey);
+            LOGGER.error(message, e);
+            throw new IllegalStateException(message, e);
+        }
+    }
+
+    @Override
+    public void abortMultipartUpload(String bucketName, String fileKey, String uploadId) {
+        try {
+            s3Client.abortMultipartUpload(AbortMultipartUploadRequest.builder().bucket(bucketName).key(fileKey).uploadId(uploadId).build());
+        } catch (Exception e) {
+            String message = String.format("failed to abort multipart upload, bucketName: %s, fileKey: %s", bucketName, fileKey);
+            LOGGER.error(message, e);
+            throw new IllegalStateException(message, e);
+        }
+    }
+
+    @Override
+    public boolean objectExists(String bucketName, String fileKey) {
+        try {
+            s3Client.headObject(HeadObjectRequest.builder().bucket(bucketName).key(fileKey).build());
+            return true;
+        } catch (NoSuchKeyException e) {
+            return false;
+        } catch (software.amazon.awssdk.services.s3.model.S3Exception e) {
+            if(e.statusCode() == 404) {
+                return false;
+            }
+            throw e;
+        }
+    }
+
+    private String buildContentType(String mimeType, String charset) {
+        if(StringUtils.isEmpty(mimeType)) {
+            return null;
+        }
+        return StringUtils.isEmpty(charset) ? mimeType : mimeType + "; charset=" + charset;
     }
 
     /**
