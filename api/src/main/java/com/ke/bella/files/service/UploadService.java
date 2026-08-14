@@ -11,6 +11,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -216,10 +217,16 @@ public class UploadService {
         return toUpload(session, null);
     }
 
-    public List<StoragePart> listParts(String uploadId) {
+    public List<UploadPart> listParts(String uploadId) {
         FileUploadDB session = loadSession(uploadId);
         requirePending(session);
-        return storageService.listParts(session.getBucket(), session.getPath(), session.getStorageUploadId());
+        return storageService.listParts(session.getBucket(), session.getPath(), session.getStorageUploadId()).stream()
+                .map(part -> {
+                    String etag = normalizeEtag(part.getEtag());
+                    return UploadPart.builder().id(partId(part.getPartNumber(), etag)).uploadId(uploadId)
+                            .partNumber(part.getPartNumber()).size(part.getSize()).etag(etag).build();
+                })
+                .collect(Collectors.toList());
     }
 
     private List<StoragePart> validateParts(FileUploadDB session, List<StoragePart> parts, CompleteUploadOp op) {

@@ -1,8 +1,6 @@
 package com.ke.bella.files.api;
 
 import java.io.IOException;
-import java.util.List;
-import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,7 +19,6 @@ import com.ke.bella.files.protocol.UploadOps.CompleteUploadOp;
 import com.ke.bella.files.protocol.UploadOps.CreateUploadOp;
 import com.ke.bella.files.protocol.UploadPart;
 import com.ke.bella.files.service.UploadService;
-import com.ke.bella.files.service.storage.StoragePart;
 
 @FileAPI
 @RestController
@@ -55,11 +52,6 @@ public class UploadController {
 
     @GetMapping("/{upload_id}/parts")
     public OpenapiListResponse<UploadPart> listParts(@PathVariable("upload_id") String uploadId) {
-        List<UploadPart> parts = uploadService.listParts(uploadId).stream().map(this::toUploadPart).collect(Collectors.toList());
-        return new OpenapiListResponse<>(parts, "list", null, false);
-    }
-
-    private UploadPart toUploadPart(StoragePart part) {
-        return UploadPart.builder().partNumber(part.getPartNumber()).size(part.getSize()).etag(part.getEtag()).build();
+        return new OpenapiListResponse<>(uploadService.listParts(uploadId), "list", null, false);
     }
 }
