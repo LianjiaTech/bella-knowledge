@@ -12,11 +12,13 @@ public class IDGenerator {
         String generateId(String prefix, String now, String instanceId, String nextTick);
     }
 
-    protected static final IdGenerateStrategy SPACE_CODE_STRATEGY = (prefix, now, instanceId, nextTick) -> {
-        String spaceCode = BellaContextHelper.getOperateSpaceCode();
+    protected static final IdGenerateStrategy SPACE_CODE_STRATEGY = (prefix, now, instanceId, nextTick) ->
+            formatWithSpaceCode(prefix, now, instanceId, nextTick, BellaContextHelper.getOperateSpaceCode());
+
+    private static String formatWithSpaceCode(String prefix, String now, String instanceId, String nextTick, String spaceCode) {
         String spaceCodeHash = String.valueOf(Math.abs(CustomStringUtils.hashCode(spaceCode)));
         return String.format("%s%s%s%s-%s", prefix, now, instanceId, nextTick, spaceCodeHash);
-    };
+    }
 
     protected static final IdGenerateStrategy SIMPLE_STRATEGY = (prefix, now, instanceId, nextTick) -> String.format("%s%s%s%s", prefix, now,
             instanceId, nextTick);
@@ -72,8 +74,7 @@ public class IDGenerator {
 
     public String generateWithSpaceCode(String spaceCode) {
         String now = new SimpleDateFormat(yyMMddHHmmss).format(new Date());
-        String spaceCodeHash = String.valueOf(Math.abs(CustomStringUtils.hashCode(spaceCode)));
-        return String.format("%s%s%s%s-%s", prefix, now, instanceId, nextTick(), spaceCodeHash);
+        return formatWithSpaceCode(this.prefix, now, instanceId, nextTick(), spaceCode);
     }
 
     private String nextTick() {

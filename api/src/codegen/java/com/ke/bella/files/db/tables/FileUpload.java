@@ -63,17 +63,17 @@ public class FileUpload extends TableImpl<FileUploadRecord> {
     /**
      * The column <code>file_upload.space_code</code>. 所属空间
      */
-    public final TableField<FileUploadRecord, String> SPACE_CODE = createField(DSL.name("space_code"), SQLDataType.VARCHAR(64).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "所属空间");
+    public final TableField<FileUploadRecord, String> SPACE_CODE = createField(DSL.name("space_code"), SQLDataType.VARCHAR(128).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "所属空间");
 
     /**
      * The column <code>file_upload.ak_code</code>. 发起方AK
      */
-    public final TableField<FileUploadRecord, String> AK_CODE = createField(DSL.name("ak_code"), SQLDataType.VARCHAR(64).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "发起方AK");
+    public final TableField<FileUploadRecord, String> AK_CODE = createField(DSL.name("ak_code"), SQLDataType.VARCHAR(128).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "发起方AK");
 
     /**
      * The column <code>file_upload.file_id</code>. 预生成的文件ID
      */
-    public final TableField<FileUploadRecord, String> FILE_ID = createField(DSL.name("file_id"), SQLDataType.VARCHAR(64).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "预生成的文件ID");
+    public final TableField<FileUploadRecord, String> FILE_ID = createField(DSL.name("file_id"), SQLDataType.VARCHAR(256).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "预生成的文件ID");
 
     /**
      * The column <code>file_upload.filename</code>. 文件名
@@ -83,22 +83,22 @@ public class FileUpload extends TableImpl<FileUploadRecord> {
     /**
      * The column <code>file_upload.extension</code>. 扩展名
      */
-    public final TableField<FileUploadRecord, String> EXTENSION = createField(DSL.name("extension"), SQLDataType.VARCHAR(32).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "扩展名");
+    public final TableField<FileUploadRecord, String> EXTENSION = createField(DSL.name("extension"), SQLDataType.VARCHAR(512).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "扩展名");
 
     /**
      * The column <code>file_upload.purpose</code>. 用途
      */
-    public final TableField<FileUploadRecord, String> PURPOSE = createField(DSL.name("purpose"), SQLDataType.VARCHAR(32).nullable(false), this, "用途");
+    public final TableField<FileUploadRecord, String> PURPOSE = createField(DSL.name("purpose"), SQLDataType.VARCHAR(64).nullable(false), this, "用途");
 
     /**
      * The column <code>file_upload.mime_type</code>. MIME类型
      */
-    public final TableField<FileUploadRecord, String> MIME_TYPE = createField(DSL.name("mime_type"), SQLDataType.VARCHAR(128).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "MIME类型");
+    public final TableField<FileUploadRecord, String> MIME_TYPE = createField(DSL.name("mime_type"), SQLDataType.VARCHAR(512).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "MIME类型");
 
     /**
      * The column <code>file_upload.type</code>. 文件类型
      */
-    public final TableField<FileUploadRecord, String> TYPE = createField(DSL.name("type"), SQLDataType.VARCHAR(32).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "文件类型");
+    public final TableField<FileUploadRecord, String> TYPE = createField(DSL.name("type"), SQLDataType.VARCHAR(512).nullable(false).defaultValue(DSL.inline("", SQLDataType.VARCHAR)), this, "文件类型");
 
     /**
      * The column <code>file_upload.charset</code>. 字符集
@@ -108,7 +108,7 @@ public class FileUpload extends TableImpl<FileUploadRecord> {
     /**
      * The column <code>file_upload.bucket</code>. 目标bucket
      */
-    public final TableField<FileUploadRecord, String> BUCKET = createField(DSL.name("bucket"), SQLDataType.VARCHAR(64).nullable(false), this, "目标bucket");
+    public final TableField<FileUploadRecord, String> BUCKET = createField(DSL.name("bucket"), SQLDataType.VARCHAR(256).nullable(false), this, "目标bucket");
 
     /**
      * The column <code>file_upload.path</code>. 目标对象key
