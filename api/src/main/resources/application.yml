@@ -37,7 +37,8 @@ bella:
   file-api:
     upload:
       max-bytes: ${BELLA_UPLOAD_MAX_BYTES:5368709120}
-      session-ttl-hours: ${BELLA_UPLOAD_SESSION_TTL_HOURS:24}
+      # 注意：bucket 的 AbortIncompleteMultipartUpload lifecycle 规则需 ≥ 此 TTL，否则未完成分片会被提前清理
+      session-ttl-hours: ${BELLA_UPLOAD_SESSION_TTL_HOURS:720}
     file:
       tmp-file-dir: ${BELLA_TMP_FILE_DIR:.}
     bucket-name:

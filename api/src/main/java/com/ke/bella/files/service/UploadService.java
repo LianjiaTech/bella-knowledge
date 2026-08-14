@@ -64,7 +64,7 @@ public class UploadService {
     private FileUniquenessLock fileUniquenessLock;
     @Value("${bella.file-api.upload.max-bytes:5368709120}")
     private long maxBytes;
-    @Value("${bella.file-api.upload.session-ttl-hours:24}")
+    @Value("${bella.file-api.upload.session-ttl-hours:720}")
     private long sessionTtlHours;
 
     public Upload create(CreateUploadOp op) {
