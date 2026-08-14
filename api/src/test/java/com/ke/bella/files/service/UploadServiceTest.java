@@ -62,7 +62,8 @@ public class UploadServiceTest {
     @Test
     @SuppressWarnings("unchecked")
     public void validatePartsAcceptsContinuousPartsWithMatchingBytesAndIds() {
-        List<StoragePart> parts = Arrays.asList(new StoragePart(2, 6L, "\"etag-2\""), new StoragePart(1, 5L, "etag-1"));
+        session.setDeclaredBytes(UploadService.PART_SIZE_MIN + 6L);
+        List<StoragePart> parts = Arrays.asList(new StoragePart(2, 6L, "\"etag-2\""), new StoragePart(1, UploadService.PART_SIZE_MIN, "etag-1"));
         CompleteUploadOp op = new CompleteUploadOp();
         op.setPartIds(Arrays.asList("part_1_etag-1", "part_2_etag-2"));
 
@@ -70,6 +71,18 @@ public class UploadServiceTest {
 
         assertEquals(1, result.get(0).getPartNumber());
         assertEquals(2, result.get(1).getPartNumber());
+    }
+
+    @Test
+    public void validatePartsRejectsUndersizedNonFinalPart() {
+        session.setDeclaredBytes(11L);
+        List<StoragePart> parts = Arrays.asList(new StoragePart(1, 5L, "etag-1"), new StoragePart(2, 6L, "etag-2"));
+
+        UploadException error = assertThrows(UploadException.class,
+                () -> ReflectionTestUtils.invokeMethod(uploadService, "validateParts", session, parts, null));
+
+        assertEquals("invalid_parts", error.getErrorCode());
+        assertEquals(400, error.getHttpStatus());
     }
 
     @Test
@@ -94,7 +107,8 @@ public class UploadServiceTest {
 
     @Test
     public void validatePartsRejectsEtagMismatch() {
-        List<StoragePart> parts = Arrays.asList(new StoragePart(1, 5L, "etag-1"), new StoragePart(2, 6L, "etag-2"));
+        session.setDeclaredBytes(UploadService.PART_SIZE_MIN + 6L);
+        List<StoragePart> parts = Arrays.asList(new StoragePart(1, UploadService.PART_SIZE_MIN, "etag-1"), new StoragePart(2, 6L, "etag-2"));
         CompleteUploadOp op = new CompleteUploadOp();
         op.setPartIds(Arrays.asList("part_1_etag-1", "part_2_wrong"));
 

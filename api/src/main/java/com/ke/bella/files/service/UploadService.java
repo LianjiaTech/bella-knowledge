@@ -239,6 +239,11 @@ public class UploadService {
             if(part.getPartNumber() != expected) {
                 throw badRequest("invalid_parts", "missing or unexpected part_number " + expected);
             }
+            // 非末位分片小于 S3 下限时必须在 CAS 之前拒绝：进入 COMPLETING 后分片无法重传，会话会永久卡死
+            if(index < sorted.size() - 1 && part.getSize() < PART_SIZE_MIN) {
+                throw badRequest("invalid_parts",
+                        "part " + part.getPartNumber() + " size " + part.getSize() + " is below the minimum of " + PART_SIZE_MIN);
+            }
             total += part.getSize();
         }
         if(total != session.getDeclaredBytes()) {
