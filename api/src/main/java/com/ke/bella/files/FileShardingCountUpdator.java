@@ -83,8 +83,13 @@ public class FileShardingCountUpdator {
             long v = d.get();
             if(v > 0) {
                 LOGGER.info("update file {} count, sharding: {}, delta: {}", type, k, v);
-                repo.increaseFileShardingCount(k, v, type);
-                d.addAndGet(-v);
+                int updatedRows = repo.increaseFileShardingCount(k, v, type);
+                if(updatedRows == 1) {
+                    d.addAndGet(-v);
+                } else {
+                    LOGGER.error("file sharding count update missed target, type: {}, physical sharding: {}, delta: {}, updated rows: {}",
+                            type, k, v, updatedRows);
+                }
             }
         });
     }
