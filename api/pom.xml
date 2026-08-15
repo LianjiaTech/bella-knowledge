@@ -513,6 +513,17 @@
                                         <recordImplements>com.ke.bella.files.db.repo.Operator</recordImplements>
                                     </table>
                                     <table>
+                                        <expression>file_upload</expression>
+                                        <daoClass>
+                                            <transform>PASCAL</transform>
+                                            <expression>$0_D_B_Dao</expression>
+                                        </daoClass>
+                                        <pojoClass>
+                                            <transform>PASCAL</transform>
+                                            <expression>$0_D_B</expression>
+                                        </pojoClass>
+                                    </table>
+                                    <table>
                                         <expression>file_progress_temp</expression>
                                         <daoClass>
                                             <transform>PASCAL</transform>
@@ -541,7 +552,7 @@
                                 </forcedType>
                             </forcedTypes>
                             <includes>
-                                file|file_mapping|file_progress|instance|dataset|dataset_qa|dataset_qa_reference|dataset_sharding|dataset_document|tag|file_closure|file_sharding|file_system|file_temp|file_progress_temp
+                                file|file_mapping|file_progress|instance|dataset|dataset_qa|dataset_qa_reference|dataset_sharding|dataset_document|tag|file_closure|file_sharding|file_system|file_temp|file_progress_temp|file_upload
                             </includes>
                             <unsignedTypes>false</unsignedTypes>
                         </database>

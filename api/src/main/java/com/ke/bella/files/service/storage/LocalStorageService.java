@@ -3,6 +3,7 @@ package com.ke.bella.files.service.storage;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.List;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -10,6 +11,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.NotImplementedException;
 
 import com.ke.bella.files.service.FileService;
 import com.ke.bella.files.service.storage.config.LocalStorageConfig;
@@ -127,6 +129,36 @@ public class LocalStorageService implements StorageService {
             LOGGER.error("failed to get input stream for file: {}/{}", bucketName, fileKey, e);
             throw new RuntimeException("failed to get input stream for file: " + fileKey, e);
         }
+    }
+
+    @Override
+    public String createMultipartUpload(String bucketName, String fileKey, String mimeType, String filename, String charset) {
+        throw new NotImplementedException("当前对象存储服务不支持分片上传");
+    }
+
+    @Override
+    public String uploadPart(String bucketName, String fileKey, String uploadId, int partNumber, InputStream inputStream, long contentLength) {
+        throw new NotImplementedException("当前对象存储服务不支持分片上传");
+    }
+
+    @Override
+    public List<StoragePart> listParts(String bucketName, String fileKey, String uploadId) {
+        throw new NotImplementedException("当前对象存储服务不支持分片上传");
+    }
+
+    @Override
+    public void completeMultipartUpload(String bucketName, String fileKey, String uploadId, List<StoragePart> parts) {
+        throw new NotImplementedException("当前对象存储服务不支持分片上传");
+    }
+
+    @Override
+    public void abortMultipartUpload(String bucketName, String fileKey, String uploadId) {
+        throw new NotImplementedException("当前对象存储服务不支持分片上传");
+    }
+
+    @Override
+    public boolean objectExists(String bucketName, String fileKey) {
+        return Files.exists(Paths.get(config.getRootPath(), bucketName, fileKey));
     }
 
 }

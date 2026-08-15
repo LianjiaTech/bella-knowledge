@@ -11,8 +11,8 @@ spring:
       minimum-idle: 5
   servlet:
     multipart:
-      max-file-size: 512MB
-      max-request-size: 512MB
+      max-file-size: ${BELLA_MULTIPART_MAX_FILE_SIZE:512MB}
+      max-request-size: ${BELLA_MULTIPART_MAX_REQUEST_SIZE:512MB}
       file-size-threshold: 512KB
       resolve-lazily: true
   jackson:
@@ -35,6 +35,10 @@ app:
 bella:
   open-api-base: ${BELLA_OPEN_API_BASE:https://localhost:8080/}
   file-api:
+    upload:
+      max-bytes: ${BELLA_UPLOAD_MAX_BYTES:5368709120}
+      # 注意：bucket 的 AbortIncompleteMultipartUpload lifecycle 规则需 ≥ 此 TTL，否则未完成分片会被提前清理
+      session-ttl-hours: ${BELLA_UPLOAD_SESSION_TTL_HOURS:720}
     file:
       tmp-file-dir: ${BELLA_TMP_FILE_DIR:.}
     bucket-name:

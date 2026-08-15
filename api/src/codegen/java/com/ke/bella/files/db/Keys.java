@@ -17,6 +17,7 @@ import com.ke.bella.files.db.tables.FileProgressTemp;
 import com.ke.bella.files.db.tables.FileSharding;
 import com.ke.bella.files.db.tables.FileSystem;
 import com.ke.bella.files.db.tables.FileTemp;
+import com.ke.bella.files.db.tables.FileUpload;
 import com.ke.bella.files.db.tables.Instance;
 import com.ke.bella.files.db.tables.Tag;
 import com.ke.bella.files.db.tables.records.DatasetDocumentRecord;
@@ -32,6 +33,7 @@ import com.ke.bella.files.db.tables.records.FileRecord;
 import com.ke.bella.files.db.tables.records.FileShardingRecord;
 import com.ke.bella.files.db.tables.records.FileSystemRecord;
 import com.ke.bella.files.db.tables.records.FileTempRecord;
+import com.ke.bella.files.db.tables.records.FileUploadRecord;
 import com.ke.bella.files.db.tables.records.InstanceRecord;
 import com.ke.bella.files.db.tables.records.TagRecord;
 
@@ -78,6 +80,8 @@ public class Keys {
     public static final UniqueKey<FileSystemRecord> KEY_FILE_SYSTEM_PRIMARY = Internal.createUniqueKey(FileSystem.FILE_SYSTEM, DSL.name("KEY_file_system_PRIMARY"), new TableField[] { FileSystem.FILE_SYSTEM.ID }, true);
     public static final UniqueKey<FileTempRecord> KEY_FILE_TEMP_IDX_FILE_SPACE = Internal.createUniqueKey(FileTemp.FILE_TEMP, DSL.name("KEY_file_temp_idx_file_space"), new TableField[] { FileTemp.FILE_TEMP.FILE_ID, FileTemp.FILE_TEMP.SPACE_CODE }, true);
     public static final UniqueKey<FileTempRecord> KEY_FILE_TEMP_PRIMARY = Internal.createUniqueKey(FileTemp.FILE_TEMP, DSL.name("KEY_file_temp_PRIMARY"), new TableField[] { FileTemp.FILE_TEMP.ID }, true);
+    public static final UniqueKey<FileUploadRecord> KEY_FILE_UPLOAD_PRIMARY = Internal.createUniqueKey(FileUpload.FILE_UPLOAD, DSL.name("KEY_file_upload_PRIMARY"), new TableField[] { FileUpload.FILE_UPLOAD.ID }, true);
+    public static final UniqueKey<FileUploadRecord> KEY_FILE_UPLOAD_UNIQ_UPLOAD_ID = Internal.createUniqueKey(FileUpload.FILE_UPLOAD, DSL.name("KEY_file_upload_uniq_upload_id"), new TableField[] { FileUpload.FILE_UPLOAD.UPLOAD_ID }, true);
     public static final UniqueKey<InstanceRecord> KEY_INSTANCE_PRIMARY = Internal.createUniqueKey(Instance.INSTANCE, DSL.name("KEY_instance_PRIMARY"), new TableField[] { Instance.INSTANCE.ID }, true);
     public static final UniqueKey<TagRecord> KEY_TAG_IDX_SPACE_NAME = Internal.createUniqueKey(Tag.TAG, DSL.name("KEY_tag_idx_space_name"), new TableField[] { Tag.TAG.SPACE_CODE, Tag.TAG.NAME }, true);
     public static final UniqueKey<TagRecord> KEY_TAG_PRIMARY = Internal.createUniqueKey(Tag.TAG, DSL.name("KEY_tag_PRIMARY"), new TableField[] { Tag.TAG.ID }, true);

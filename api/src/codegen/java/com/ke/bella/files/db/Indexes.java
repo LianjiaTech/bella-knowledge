@@ -14,6 +14,7 @@ import com.ke.bella.files.db.tables.FileClosure;
 import com.ke.bella.files.db.tables.FileSharding;
 import com.ke.bella.files.db.tables.FileSystem;
 import com.ke.bella.files.db.tables.FileTemp;
+import com.ke.bella.files.db.tables.FileUpload;
 import com.ke.bella.files.db.tables.Instance;
 import com.ke.bella.files.db.tables.Tag;
 
@@ -66,6 +67,7 @@ public class Indexes {
     public static final Index FILE_IDX_SPACE_PURPOSE = Internal.createIndex(DSL.name("idx_space_purpose"), File.FILE, new OrderField[] { File.FILE.SPACE_CODE, File.FILE.PURPOSE, File.FILE.STATUS }, false);
     public static final Index FILE_SYSTEM_IDX_SPACE_PURPOSE = Internal.createIndex(DSL.name("idx_space_purpose"), FileSystem.FILE_SYSTEM, new OrderField[] { FileSystem.FILE_SYSTEM.SPACE_CODE, FileSystem.FILE_SYSTEM.PURPOSE, FileSystem.FILE_SYSTEM.STATUS }, false);
     public static final Index FILE_TEMP_IDX_SPACE_PURPOSE = Internal.createIndex(DSL.name("idx_space_purpose"), FileTemp.FILE_TEMP, new OrderField[] { FileTemp.FILE_TEMP.SPACE_CODE, FileTemp.FILE_TEMP.PURPOSE, FileTemp.FILE_TEMP.STATUS }, false);
+    public static final Index FILE_UPLOAD_IDX_SPACE_STATUS = Internal.createIndex(DSL.name("idx_space_status"), FileUpload.FILE_UPLOAD, new OrderField[] { FileUpload.FILE_UPLOAD.SPACE_CODE, FileUpload.FILE_UPLOAD.STATUS }, false);
     public static final Index DATASET_SHARDING_IDX_TYPE_LAST_KEY = Internal.createIndex(DSL.name("idx_type_last_key"), DatasetSharding.DATASET_SHARDING, new OrderField[] { DatasetSharding.DATASET_SHARDING.TYPE, DatasetSharding.DATASET_SHARDING.LAST_KEY }, false);
     public static final Index FILE_SHARDING_IDX_TYPE_LAST_KEY = Internal.createIndex(DSL.name("idx_type_last_key"), FileSharding.FILE_SHARDING, new OrderField[] { FileSharding.FILE_SHARDING.TYPE, FileSharding.FILE_SHARDING.LAST_KEY }, false);
 }

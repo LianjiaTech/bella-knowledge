@@ -17,6 +17,7 @@ import com.ke.bella.files.db.tables.FileProgressTemp;
 import com.ke.bella.files.db.tables.FileSharding;
 import com.ke.bella.files.db.tables.FileSystem;
 import com.ke.bella.files.db.tables.FileTemp;
+import com.ke.bella.files.db.tables.FileUpload;
 import com.ke.bella.files.db.tables.Instance;
 import com.ke.bella.files.db.tables.Tag;
 
@@ -91,6 +92,11 @@ public class Tables {
      * The table <code>file_temp</code>.
      */
     public static final FileTemp FILE_TEMP = FileTemp.FILE_TEMP;
+
+    /**
+     * 分片上传会话表（低频，不分表）
+     */
+    public static final FileUpload FILE_UPLOAD = FileUpload.FILE_UPLOAD;
 
     /**
      * The table <code>instance</code>.

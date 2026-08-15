@@ -34,6 +34,11 @@ public class FileIdGenerator {
         return baseId + fileType.getSuffix();
     }
 
+    public String generateWithType(FileType fileType, String spaceCode) {
+        String baseId = idGenerator.generateWithSpaceCode(spaceCode);
+        return baseId + fileType.getSuffix();
+    }
+
     // ID Parsing Utilities
 
     /**
