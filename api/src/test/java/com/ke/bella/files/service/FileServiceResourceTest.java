@@ -148,4 +148,33 @@ public class FileServiceResourceTest {
         resource.setMtime(LocalDateTime.now());
         return resource;
     }
+
+    @Test
+    public void mkdirPersistsMetadataCitiesTagsAndBroadcastsFinalRecord() {
+        AtomicReference<FileDB> inserted = new AtomicReference<>();
+        when(fileRepo.addFile(any(FileDB.class), anyString(), any(FileType.class))).thenAnswer(invocation -> {
+            FileDB file = invocation.getArgument(0);
+            file.setCtime(LocalDateTime.now());
+            file.setMtime(LocalDateTime.now());
+            inserted.set(file);
+            return "1";
+        });
+        when(fileRepo.queryFile(anyString(), any(FileType.class))).thenAnswer(invocation -> inserted.get());
+
+        java.util.List<String> cities = java.util.Arrays.asList("beijing", "shanghai");
+        java.util.List<String> tags = java.util.Arrays.asList("prod", "important");
+        OpenAIFile directory = fileService.mkdir("Sales", "file-parent-1-d", "description", "assistants",
+                "{\"team\":\"search\"}", cities, tags);
+
+        assertEquals("{\"team\":\"search\"}", inserted.get().getMetaData());
+        assertEquals("[\"beijing\",\"shanghai\"]", inserted.get().getCities());
+        assertEquals("[\"prod\",\"important\"]", inserted.get().getTags());
+        assertEquals(cities, directory.getCities());
+        assertEquals(tags, directory.getTags());
+        ArgumentCaptor<FileBroadcasting> messageCaptor = ArgumentCaptor.forClass(FileBroadcasting.class);
+        verify(broadcastService).broadcast(messageCaptor.capture(), any(Runnable.class), any(Runnable.class));
+        assertEquals(EventType.FILE_CREATED.getValue(), messageCaptor.getValue().getEvent());
+        assertEquals(directory, messageCaptor.getValue().getData());
+        assertEquals("{\"team\":\"search\"}", messageCaptor.getValue().getMetadata());
+    }
 }

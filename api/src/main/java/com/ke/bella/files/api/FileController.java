@@ -1050,6 +1050,8 @@ public class FileController {
 
         validateDirectoryName(op.getName());
         validateDescription(op.getDescription());
+        validateCitiesJson(op.getCities());
+        validateTagsJson(op.getTags());
         if(op.getPurpose() != null && !FilePurposeClassifier.allowedPurposes().contains(op.getPurpose())) {
             throw new IllegalArgumentException(
                     String.format("Unsupported purpose: '%s'. Supported purposes are: %s",
@@ -1066,7 +1068,8 @@ public class FileController {
                         String.format("Directory '%s' already exists in current directory, ancestor_id: '%s'", op.getName(), op.getAncestorId()));
             }
 
-            return fileService.mkdir(op.getName(), op.getAncestorId(), op.getDescription(), op.getPurpose());
+            return fileService.mkdir(op.getName(), op.getAncestorId(), op.getDescription(), op.getPurpose(),
+                    op.getMetadata(), op.getCities(), op.getTags());
         });
     }
 

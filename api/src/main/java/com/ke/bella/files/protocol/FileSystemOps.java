@@ -29,6 +29,9 @@ public class FileSystemOps {
         private String name;
         private String description;
         private String purpose;
+        private String metadata;
+        private List<String> cities;
+        private List<String> tags;
     }
 
     @Data

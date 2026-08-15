@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.Arrays;
 import java.util.function.Supplier;
 
 import org.junit.Before;
@@ -78,7 +79,7 @@ public class FileControllerMkdirTest {
                     return supplier.get();
                 });
         when(fileService.exists(spaceCode, ancestorId, dirName)).thenReturn(false);
-        when(fileService.mkdir(dirName, ancestorId, description, null)).thenReturn(createdDir);
+        when(fileService.mkdir(dirName, ancestorId, description, null, null, null, null)).thenReturn(createdDir);
 
         String body = "{\"name\":\"" + dirName + "\",\"ancestor_id\":\"" + ancestorId + "\",\"description\":\"" + description + "\"}";
 
@@ -92,7 +93,7 @@ public class FileControllerMkdirTest {
                 .andExpect(jsonPath("$.filename").value(dirName))
                 .andExpect(jsonPath("$.space_code").value(spaceCode));
 
-        verify(fileService).mkdir(dirName, ancestorId, description, null);
+        verify(fileService).mkdir(dirName, ancestorId, description, null, null, null, null);
     }
 
     @Test
@@ -116,7 +117,7 @@ public class FileControllerMkdirTest {
                     return supplier.get();
                 });
         when(fileService.exists(spaceCode, ancestorId, dirName)).thenReturn(false);
-        when(fileService.mkdir(dirName, ancestorId, description, purpose)).thenReturn(createdDir);
+        when(fileService.mkdir(dirName, ancestorId, description, purpose, null, null, null)).thenReturn(createdDir);
 
         String body = "{\"name\":\"" + dirName + "\",\"ancestor_id\":\"" + ancestorId + "\",\"description\":\"" + description + "\",\"purpose\":\""
                 + purpose + "\"}";
@@ -131,7 +132,7 @@ public class FileControllerMkdirTest {
                 .andExpect(jsonPath("$.filename").value(dirName))
                 .andExpect(jsonPath("$.space_code").value(spaceCode));
 
-        verify(fileService).mkdir(dirName, ancestorId, description, purpose);
+        verify(fileService).mkdir(dirName, ancestorId, description, purpose, null, null, null);
     }
 
     @Test
@@ -153,7 +154,7 @@ public class FileControllerMkdirTest {
                 .andExpect(jsonPath("$.error.message").value(org.hamcrest.Matchers.containsString(invalidPurpose)));
 
         verify(fileUniquenessLock, never()).executeWithLock(any(), any(), any(), anyLong(), any());
-        verify(fileService, never()).mkdir(any(), any(), any(), any());
+        verify(fileService, never()).mkdir(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -180,7 +181,7 @@ public class FileControllerMkdirTest {
                 .andExpect(jsonPath("$.error.message").value(org.hamcrest.Matchers.containsString("already exists")))
                 .andExpect(jsonPath("$.error.message").value(org.hamcrest.Matchers.containsString(dirName)));
 
-        verify(fileService, never()).mkdir(any(), any(), any(), any());
+        verify(fileService, never()).mkdir(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -218,7 +219,7 @@ public class FileControllerMkdirTest {
                 .andExpect(jsonPath("$.error.message").value("name is required"));
 
         verify(fileUniquenessLock, never()).executeWithLock(any(), any(), any(), anyLong(), any());
-        verify(fileService, never()).mkdir(any(), any(), any(), any());
+        verify(fileService, never()).mkdir(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -237,7 +238,7 @@ public class FileControllerMkdirTest {
                 .andExpect(jsonPath("$.error.message").value("name is required"));
 
         verify(fileUniquenessLock, never()).executeWithLock(any(), any(), any(), anyLong(), any());
-        verify(fileService, never()).mkdir(any(), any(), any(), any());
+        verify(fileService, never()).mkdir(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -251,7 +252,7 @@ public class FileControllerMkdirTest {
                 .andExpect(status().isInternalServerError());
 
         verify(fileUniquenessLock, never()).executeWithLock(any(), any(), any(), anyLong(), any());
-        verify(fileService, never()).mkdir(any(), any(), any(), any());
+        verify(fileService, never()).mkdir(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -271,7 +272,7 @@ public class FileControllerMkdirTest {
                 .andExpect(jsonPath("$.error.message").value(org.hamcrest.Matchers.containsString("whitespace")));
 
         verify(fileUniquenessLock, never()).executeWithLock(any(), any(), any(), anyLong(), any());
-        verify(fileService, never()).mkdir(any(), any(), any(), any());
+        verify(fileService, never()).mkdir(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -296,7 +297,7 @@ public class FileControllerMkdirTest {
                 .andExpect(jsonPath("$.error.message").value(org.hamcrest.Matchers.containsString("too long")));
 
         verify(fileUniquenessLock, never()).executeWithLock(any(), any(), any(), anyLong(), any());
-        verify(fileService, never()).mkdir(any(), any(), any(), any());
+        verify(fileService, never()).mkdir(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -322,7 +323,7 @@ public class FileControllerMkdirTest {
                 .andExpect(jsonPath("$.error.message").value(org.hamcrest.Matchers.containsString("Description too long")));
 
         verify(fileUniquenessLock, never()).executeWithLock(any(), any(), any(), anyLong(), any());
-        verify(fileService, never()).mkdir(any(), any(), any(), any());
+        verify(fileService, never()).mkdir(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -341,7 +342,7 @@ public class FileControllerMkdirTest {
                 .andExpect(status().isBadRequest());
 
         verify(fileUniquenessLock, never()).executeWithLock(any(), any(), any(), anyLong(), any());
-        verify(fileService, never()).mkdir(any(), any(), any(), any());
+        verify(fileService, never()).mkdir(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -360,7 +361,7 @@ public class FileControllerMkdirTest {
                 .andExpect(status().isBadRequest());
 
         verify(fileUniquenessLock, never()).executeWithLock(any(), any(), any(), anyLong(), any());
-        verify(fileService, never()).mkdir(any(), any(), any(), any());
+        verify(fileService, never()).mkdir(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -384,7 +385,7 @@ public class FileControllerMkdirTest {
                         return supplier.get();
                     });
             when(fileService.exists(spaceCode, ancestorId, dirName)).thenReturn(false);
-            when(fileService.mkdir(dirName, ancestorId, null, purpose)).thenReturn(createdDir);
+            when(fileService.mkdir(dirName, ancestorId, null, purpose, null, null, null)).thenReturn(createdDir);
 
             String body = "{\"name\":\"" + dirName + "\",\"ancestor_id\":\"" + ancestorId + "\",\"purpose\":\"" + purpose + "\"}";
 
@@ -398,5 +399,70 @@ public class FileControllerMkdirTest {
                     .andExpect(jsonPath("$.filename").value(dirName))
                     .andExpect(jsonPath("$.space_code").value(spaceCode));
         }
+    }
+
+    @Test
+    public void mkdir_Success_WithMetadataCitiesAndTags() throws Exception {
+        String spaceCode = "sp-a";
+        String ancestorId = "anc-1";
+        String dirName = "test-dir";
+        OpenAIFile createdDir = OpenAIFile.builder()
+                .id("dir-1")
+                .filename(dirName)
+                .spaceCode(spaceCode)
+                .metadata("{\"team\":\"search\"}")
+                .cities(Arrays.asList("beijing", "shanghai"))
+                .tags(Arrays.asList("prod", "important"))
+                .build();
+
+        when(fileUniquenessLock.executeWithLock(eq(spaceCode), eq(ancestorId), eq(dirName), anyLong(), any()))
+                .thenAnswer(invocation -> {
+                    Supplier<?> supplier = invocation.getArgument(4);
+                    return supplier.get();
+                });
+        when(fileService.exists(spaceCode, ancestorId, dirName)).thenReturn(false);
+        when(fileService.mkdir(dirName, ancestorId, "description", "assistants",
+                "{\"team\":\"search\"}", Arrays.asList("beijing", "shanghai"),
+                Arrays.asList("prod", "important"))).thenReturn(createdDir);
+
+        String body = "{\"name\":\"" + dirName + "\",\"ancestor_id\":\"" + ancestorId
+                + "\",\"description\":\"description\",\"purpose\":\"assistants\","
+                + "\"metadata\":\"{\\\"team\\\":\\\"search\\\"}\","
+                + "\"cities\":[\"beijing\",\"shanghai\"],\"tags\":[\"prod\",\"important\"]}";
+
+        BellaContext.setOperator(Operator.builder().userId(1L).userName("tester").spaceCode(spaceCode).build());
+        mockMvc.perform(post("/v1/files/mkdir")
+                .header("X-BELLA-SPACE-CODE", spaceCode)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.metadata").value("{\"team\":\"search\"}"))
+                .andExpect(jsonPath("$.cities[0]").value("beijing"))
+                .andExpect(jsonPath("$.tags[1]").value("important"));
+
+        verify(fileService).mkdir(dirName, ancestorId, "description", "assistants",
+                "{\"team\":\"search\"}", Arrays.asList("beijing", "shanghai"),
+                Arrays.asList("prod", "important"));
+    }
+
+    @Test
+    public void mkdir_CitiesTooLong_BadRequest() throws Exception {
+        StringBuilder value = new StringBuilder();
+        for(int i = 0; i < 600; i++) {
+            value.append("a");
+        }
+        String body = "{\"name\":\"test-dir\",\"ancestor_id\":\"anc-1\",\"cities\":[\""
+                + value + "\"]}";
+
+        BellaContext.setOperator(Operator.builder().userId(1L).userName("tester").spaceCode("sp-a").build());
+        mockMvc.perform(post("/v1/files/mkdir")
+                .header("X-BELLA-SPACE-CODE", "sp-a")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.message").value(org.hamcrest.Matchers.containsString("cities total length")));
+
+        verify(fileUniquenessLock, never()).executeWithLock(any(), any(), any(), anyLong(), any());
+        verify(fileService, never()).mkdir(any(), any(), any(), any(), any(), any(), any());
     }
 }
