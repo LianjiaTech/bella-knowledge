@@ -874,13 +874,28 @@ public class FileRepo implements BaseRepo {
                 .execute();
     }
 
-    public void increaseFileShardingCount(String key, long delta, String type) {
-        db.update(FILE_SHARDING)
+    public int increaseFileShardingCount(String physicalShardingKey, long delta, String type) {
+        String metadataKey = toFileShardingMetadataKey(physicalShardingKey, type);
+        return db.update(FILE_SHARDING)
                 .set(FILE_SHARDING.COUNT, FILE_SHARDING.COUNT.plus(delta))
                 .set(FILE_SHARDING.MTIME, LocalDateTime.now())
-                .where(FILE_SHARDING.KEY.eq(key))
+                .where(FILE_SHARDING.KEY.eq(metadataKey))
                 .and(FILE_SHARDING.TYPE.eq(type))
                 .execute();
+    }
+
+    static String toFileShardingMetadataKey(String physicalShardingKey, String type) {
+        if(type.equals(physicalShardingKey)) {
+            return "";
+        }
+
+        String prefix = type + "_";
+        if(physicalShardingKey.startsWith(prefix)) {
+            return physicalShardingKey.substring(prefix.length());
+        }
+
+        throw new IllegalArgumentException(
+                "Invalid physical file sharding key: " + physicalShardingKey + ", type: " + type);
     }
 
     public Page<FileDB> pageFiles(PageFileOps ops) {
