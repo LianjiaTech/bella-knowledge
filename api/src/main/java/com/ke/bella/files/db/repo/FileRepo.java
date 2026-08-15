@@ -743,6 +743,9 @@ public class FileRepo implements BaseRepo {
             db.execute(createTableLikeSql(FILE.getName(), FileType.SYSTEM.getType(), key));
         } else if(fileType == FileType.TEMP) {
             db.execute(createTableLikeSql(FILE.getName(), FileType.TEMP.getType(), key));
+            // temp 分片上存在需要进度追踪的文件（如 vision、assistants_chat），
+            // 滚表时必须同步创建对应的进度分表，否则进度读写会因缺表失败
+            db.execute(createTableLikeSql(FILE_PROGRESS.getName(), FileType.TEMP.getType(), key));
         }
 
         addFileSharding(keyTime, lastKey, key, type);
