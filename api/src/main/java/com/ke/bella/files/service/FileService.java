@@ -655,7 +655,8 @@ public class FileService {
         }
     }
 
-    public OpenAIFile mkdir(String name, String ancestorId, String description, String purpose) {
+    public OpenAIFile mkdir(String name, String ancestorId, String description, String purpose, String metadata,
+            List<String> cities, List<String> tags) {
         String spaceCode = BellaContextHelper.getOperateSpaceCode();
 
         FileType fileType = FileType.DIRECTORY;
@@ -673,14 +674,14 @@ public class FileService {
         fileDB.setBytes(0L);
         fileDB.setSpaceCode(spaceCode);
         fileDB.setPurpose(purpose);
-        fileDB.setMetaData("{}");
+        fileDB.setMetaData(metadata == null ? "{}" : metadata);
         fileDB.setAkCode(akCode);
         fileDB.setIsDir(1);
         fileDB.setNodeType(NodeType.DIRECTORY.getValue());
         fileDB.setResourceId("");
         fileDB.setDescription(description == null ? "" : description);
-        fileDB.setCities("");
-        fileDB.setTags("");
+        fileDB.setCities(cities == null ? "" : JsonUtils.toJson(cities));
+        fileDB.setTags(tags == null ? "" : JsonUtils.toJson(tags));
 
         fileRepo.addFile(fileDB, ancestorId, fileType);
 
@@ -694,7 +695,7 @@ public class FileService {
         FileBroadcasting<OpenAIFile> message = new FileBroadcasting<>();
         message.setEvent(EventType.FILE_CREATED);
         message.setData(openAIFile);
-        message.setMetadata("{}");
+        message.setMetadata(res.getMetaData());
         message.setUserId(BellaContextHelper.getOperatorUserId());
         message.setUserName(BellaContextHelper.getOperatorUserName());
         message.setAkCode(BellaContextHelper.getOperatorAkCode());
