@@ -317,6 +317,37 @@ public class FileEntryRepoTest {
         assertTrue(fileRepo.listFile(null, 2, "asc", missingCursorId, SOURCE_SPACE, null).isEmpty());
     }
 
+    @Test
+    public void closureListUsesStableCursorForEqualCtimesInBothDirections() {
+        FileDB first = addFile(SOURCE_SPACE, "closure-first.txt", null, "closure-cursor-first");
+        FileDB second = addFile(SOURCE_SPACE, "closure-second.txt", null, "closure-cursor-second");
+        FileDB third = addFile(SOURCE_SPACE, "closure-third.txt", null, "closure-cursor-third");
+        FileDB fourth = addFile(SOURCE_SPACE, "closure-fourth.txt", null, "closure-cursor-fourth");
+        DSLContext shardDsl = DSLContextHolder.get(FileRepo.getShardingKeyBySpaceCode(SOURCE_SPACE), dsl);
+        LocalDateTime sharedCtime = LocalDateTime.of(2026, 8, 9, 0, 0);
+        shardDsl.update(FILE).set(FILE.CTIME, sharedCtime).execute();
+
+        List<FileDB> ascFirstPage = fileRepo.listFile(null, 2, "asc", null, SOURCE_SPACE, null);
+        List<FileDB> ascSecondPage = fileRepo.listFile(null, 2, "asc",
+                ascFirstPage.get(ascFirstPage.size() - 1).getFileId(), SOURCE_SPACE, null);
+        assertEquals(2, ascFirstPage.size());
+        assertEquals(2, ascSecondPage.size());
+        assertEquals(java.util.Arrays.asList(first.getFileId(), second.getFileId(), third.getFileId(), fourth.getFileId()),
+                java.util.stream.Stream.concat(ascFirstPage.stream(), ascSecondPage.stream())
+                        .map(FileDB::getFileId).collect(Collectors.toList()));
+
+        List<FileDB> descFirstPage = fileRepo.listFile(null, 2, "desc", null, SOURCE_SPACE, null);
+        List<FileDB> descSecondPage = fileRepo.listFile(null, 2, "desc",
+                descFirstPage.get(descFirstPage.size() - 1).getFileId(), SOURCE_SPACE, null);
+        assertEquals(2, descFirstPage.size());
+        assertEquals(2, descSecondPage.size());
+        assertEquals(java.util.Arrays.asList(fourth.getFileId(), third.getFileId(), second.getFileId(), first.getFileId()),
+                java.util.stream.Stream.concat(descFirstPage.stream(), descSecondPage.stream())
+                        .map(FileDB::getFileId).collect(Collectors.toList()));
+        String missingCursorId = first.getFileId().replaceFirst("260808", "260807");
+        assertTrue(fileRepo.listFile(null, 2, "asc", missingCursorId, SOURCE_SPACE, null).isEmpty());
+    }
+
     private FileDB addDirectory(String spaceCode, String filename, String ancestorId, String seed) {
         return add(spaceCode, filename, ancestorId, seed, FileType.DIRECTORY, 1, NodeType.DIRECTORY, "");
     }

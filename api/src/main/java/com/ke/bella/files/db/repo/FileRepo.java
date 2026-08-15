@@ -388,15 +388,26 @@ public class FileRepo implements BaseRepo {
         }
         if(StringUtils.isNotEmpty(after)) {
             after = queryNewFileId(after);
-            LocalDateTime afterCtime = db(shardingKey).select(FILE.CTIME)
-                    .from(FILE)
+            FileDB afterFile = db(shardingKey).selectFrom(FILE)
                     .where(FILE.FILE_ID.eq(after))
-                    .fetchOneInto(LocalDateTime.class);
-            query = query.and("asc".equalsIgnoreCase(order) ? FILE.CTIME.gt(afterCtime) : FILE.CTIME.lt(afterCtime));
+                    .fetchOneInto(FileDB.class);
+            if(afterFile == null) {
+                return Collections.emptyList();
+            }
+            boolean isAsc = "asc".equalsIgnoreCase(order);
+            Condition sameIdAfterFile = FILE.ID.eq(afterFile.getId())
+                    .and(isAsc ? FILE.FILE_ID.gt(afterFile.getFileId()) : FILE.FILE_ID.lt(afterFile.getFileId()));
+            Condition sameTimeAfterId = FILE.CTIME.eq(afterFile.getCtime())
+                    .and((isAsc ? FILE.ID.gt(afterFile.getId()) : FILE.ID.lt(afterFile.getId())).or(sameIdAfterFile));
+            query = query.and(isAsc ? FILE.CTIME.gt(afterFile.getCtime()).or(sameTimeAfterId)
+                    : FILE.CTIME.lt(afterFile.getCtime()).or(sameTimeAfterId));
         }
 
+        boolean isAsc = "asc".equalsIgnoreCase(order);
         return query
-                .orderBy("asc".equalsIgnoreCase(order) ? FILE.CTIME.asc() : FILE.CTIME.desc())
+                .orderBy(isAsc ? FILE.CTIME.asc() : FILE.CTIME.desc(),
+                        isAsc ? FILE.ID.asc() : FILE.ID.desc(),
+                        isAsc ? FILE.FILE_ID.asc() : FILE.FILE_ID.desc())
                 .limit(limit)
                 .fetchInto(FileDB.class);
     }
