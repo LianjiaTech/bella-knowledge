@@ -8,7 +8,6 @@ import java.time.LocalDateTime;
 import javax.annotation.Resource;
 
 import org.jooq.DSLContext;
-import org.jooq.ResultQuery;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,20 +44,17 @@ public class InstanceRepo {
     }
 
     private InstanceRecord findIdle() {
-        InstanceRecord rec = idleInstanceQuery(db).fetchOne();
+        InstanceRecord rec = db.selectFrom(INSTANCE)
+                .where(INSTANCE.STATUS.eq(0))
+                .orderBy(INSTANCE.ID)
+                .limit(1)
+                .forUpdate()
+                .fetchOne();
         if(rec == null) {
             rec = INSTANCE.newRecord();
             rec.set(INSTANCE.CTIME, LocalDateTime.now());
             rec.attach(db.configuration());
         }
         return rec;
-    }
-
-    static ResultQuery<InstanceRecord> idleInstanceQuery(DSLContext db) {
-        return db.selectFrom(INSTANCE)
-                .where(INSTANCE.STATUS.eq(0))
-                .orderBy(INSTANCE.ID)
-                .limit(1)
-                .forUpdate();
     }
 }
