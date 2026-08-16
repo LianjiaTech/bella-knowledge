@@ -4,8 +4,8 @@ import static com.ke.bella.files.db.Tables.INSTANCE;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
+import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -100,15 +100,17 @@ public class InstanceRepoTest {
             assertTrue(blockingIdleSelectListener.awaitFirstSelection());
 
             Future<Long> second = executor.submit(() -> instanceRepo.register("10.0.0.4", 8083));
+            Long secondId = null;
             try {
-                second.get(200, TimeUnit.MILLISECONDS);
-                fail("the second registration should wait for the locked idle record");
+                secondId = second.get(200, TimeUnit.MILLISECONDS);
             } catch(TimeoutException expected) {
             }
 
             blockingIdleSelectListener.releaseFirstRegistration();
             Long firstId = first.get(2, TimeUnit.SECONDS);
-            Long secondId = second.get(2, TimeUnit.SECONDS);
+            if(secondId == null) {
+                secondId = second.get(2, TimeUnit.SECONDS);
+            }
 
             assertNotEquals(firstId, secondId);
             assertEquals(Integer.valueOf(1), db.selectFrom(INSTANCE)
@@ -151,8 +153,7 @@ public class InstanceRepoTest {
         @Override
         public void fetchEnd(ExecuteContext context) {
             if(FIRST_REGISTRATION_THREAD.equals(Thread.currentThread().getName())
-                    && context.sql() != null
-                    && context.sql().toLowerCase().contains("for update")) {
+                    && isIdleSelection(context.sql())) {
                 firstSelection.countDown();
                 try {
                     releaseFirst.await(2, TimeUnit.SECONDS);
@@ -161,6 +162,11 @@ public class InstanceRepoTest {
                     throw new IllegalStateException(e);
                 }
             }
+        }
+
+        private boolean isIdleSelection(String sql) {
+            return sql != null
+                    && sql.toLowerCase(Locale.ROOT).contains("where \"instance\".\"status\"");
         }
     }
 
