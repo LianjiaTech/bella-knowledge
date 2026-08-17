@@ -21,7 +21,7 @@ public class FileRepoShardingCountTest {
     @Before
     public void setUp() throws Exception {
         connection = DriverManager.getConnection(
-                "jdbc:h2:mem:fileRepoShardingCount;MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", "");
+                "jdbc:h2:mem:fileRepoShardingCount;MODE=MySQL;DATABASE_TO_LOWER=TRUE", "sa", "");
         dsl = DSL.using(connection, SQLDialect.H2);
         dsl.execute("create table file_sharding (type varchar(32) not null, `key` varchar(255) not null, "
                 + "count bigint not null, mtime timestamp, primary key (type, `key`))");
