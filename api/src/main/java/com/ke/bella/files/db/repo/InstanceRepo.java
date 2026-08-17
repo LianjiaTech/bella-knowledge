@@ -1,7 +1,7 @@
 package com.ke.bella.files.db.repo;
 
 import static com.ke.bella.files.db.Tables.INSTANCE;
-import static org.springframework.transaction.annotation.Isolation.SERIALIZABLE;
+import static org.springframework.transaction.annotation.Isolation.READ_COMMITTED;
 
 import java.time.LocalDateTime;
 
@@ -18,7 +18,7 @@ public class InstanceRepo {
     @Resource
     private DSLContext db;
 
-    @Transactional(isolation = SERIALIZABLE)
+    @Transactional(isolation = READ_COMMITTED)
     public Long register(String ip, int port) {
         InstanceRecord rec = db.selectFrom(INSTANCE)
                 .where(INSTANCE.IP.eq(ip).and(INSTANCE.PORT.eq(port))).fetchOne();
@@ -45,7 +45,11 @@ public class InstanceRepo {
 
     private InstanceRecord findIdle() {
         InstanceRecord rec = db.selectFrom(INSTANCE)
-                .where(INSTANCE.STATUS.eq(0)).limit(1).fetchAny();
+                .where(INSTANCE.STATUS.eq(0))
+                .orderBy(INSTANCE.ID)
+                .limit(1)
+                .forUpdate()
+                .fetchOne();
         if(rec == null) {
             rec = INSTANCE.newRecord();
             rec.set(INSTANCE.CTIME, LocalDateTime.now());
