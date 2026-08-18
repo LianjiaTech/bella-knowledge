@@ -421,6 +421,11 @@ public class S3StorageService implements StorageService {
         }
     }
 
+    @Override
+    public long objectSize(String bucketName, String fileKey) {
+        return s3Client.headObject(HeadObjectRequest.builder().bucket(bucketName).key(fileKey).build()).contentLength();
+    }
+
     private String buildContentType(String mimeType, String charset) {
         if(StringUtils.isEmpty(mimeType)) {
             return null;

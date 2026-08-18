@@ -49,6 +49,8 @@ public class UploadService {
     public static final long PART_SIZE_MIN = 5L * 1024 * 1024;
     public static final long PART_SIZE_MAX = 5L * 1024 * 1024 * 1024;
     public static final int MAX_PARTS = 10000;
+    // declared_bytes 列非空，未声明大小的会话用 -1 占位
+    public static final long UNDECLARED_BYTES = -1L;
     private static final long FILE_LOCK_TIMEOUT_MS = 10000L;
     private static final IDGenerator UPLOAD_ID_GENERATOR = new IDGenerator("upload-");
 
@@ -70,9 +72,10 @@ public class UploadService {
     public Upload create(CreateUploadOp op) {
         Assert.notNull(op, "request body is required");
         Assert.hasText(op.getFilename(), "filename is required");
-        Assert.notNull(op.getBytes(), "bytes is required");
-        Assert.isTrue(op.getBytes() > 0, "bytes must be greater than 0");
-        Assert.isTrue(op.getBytes() <= maxBytes, "bytes exceeds the maximum of " + maxBytes);
+        if(op.getBytes() != null) {
+            Assert.isTrue(op.getBytes() > 0, "bytes must be greater than 0");
+            Assert.isTrue(op.getBytes() <= maxBytes, "bytes exceeds the maximum of " + maxBytes);
+        }
         Assert.isTrue(StringUtils.length(op.getDescription()) <= 256, "description cannot exceed 256 characters");
         validateJsonLength(op.getCities(), 512, "cities");
         validateJsonLength(op.getTags(), 512, "tags");
@@ -110,7 +113,7 @@ public class UploadService {
         row.setCharset("");
         row.setBucket(bucket);
         row.setPath(path);
-        row.setDeclaredBytes(op.getBytes());
+        row.setDeclaredBytes(op.getBytes() == null ? UNDECLARED_BYTES : op.getBytes());
         row.setStorageUploadId(storageUploadId);
         row.setAncestorId(StringUtils.defaultString(op.getAncestorId()));
         row.setMetadata(op.getMetadata());
@@ -186,8 +189,10 @@ public class UploadService {
             } else if("PENDING".equals(current.getStatus()) && !fileUploadRepo.casStatus(uploadId, "PENDING", "COMPLETING")) {
                 throw conflict("upload_completing", "upload state changed while completing");
             }
+            // 未声明大小时以存储侧的实际对象大小落库
+            long finalBytes = isDeclared(current) ? current.getDeclaredBytes() : storageService.objectSize(current.getBucket(), current.getPath());
             FileService.FileUploadContext fileContext = fileService.createFileWithId(current.getSpaceCode(), current.getFileId(), current.getBucket(),
-                    current.getPath(), current.getFilename(), current.getDeclaredBytes(), current.getPurpose(), current.getMetadata(), current.getMimeType(),
+                    current.getPath(), current.getFilename(), finalBytes, current.getPurpose(), current.getMetadata(), current.getMimeType(),
                     current.getType(), current.getExtension(), emptyToNull(current.getAncestorId()), current.getDescription(),
                     jsonList(current.getCities()), jsonList(current.getTags()));
             OpenAIFile file = fileService.finalizeFileUpload(fileContext.getFileDB(), current.getMetadata());
@@ -246,8 +251,13 @@ public class UploadService {
             }
             total += part.getSize();
         }
-        if(total != session.getDeclaredBytes()) {
-            throw badRequest("invalid_parts", "uploaded bytes " + total + " does not match declared bytes " + session.getDeclaredBytes());
+        if(isDeclared(session)) {
+            if(total != session.getDeclaredBytes()) {
+                throw badRequest("invalid_parts", "uploaded bytes " + total + " does not match declared bytes " + session.getDeclaredBytes());
+            }
+        } else if(total > maxBytes) {
+            // 未声明大小时，总量上限只能在 complete 时校验，且必须在 CAS 之前拒绝
+            throw badRequest("invalid_parts", "uploaded bytes " + total + " exceeds the maximum of " + maxBytes);
         }
         if(op != null && op.getPartIds() != null) {
             Map<Integer, String> expected = new HashMap<>();
@@ -280,6 +290,10 @@ public class UploadService {
         return session;
     }
 
+    private boolean isDeclared(FileUploadDB session) {
+        return session.getDeclaredBytes() != null && session.getDeclaredBytes() >= 0;
+    }
+
     private void requirePending(FileUploadDB session) {
         if(!"PENDING".equals(session.getStatus())) {
             throw conflict("upload_state_conflict", "upload is in state " + session.getStatus());
@@ -299,8 +313,9 @@ public class UploadService {
     }
 
     private Upload toUpload(FileUploadDB session, OpenAIFile file) {
+        Long bytes = isDeclared(session) ? session.getDeclaredBytes() : (file == null ? null : file.getBytes());
         return Upload.builder().id(session.getUploadId()).filename(session.getFilename()).purpose(session.getPurpose())
-                .bytes(session.getDeclaredBytes()).status(session.getStatus().toLowerCase())
+                .bytes(bytes).status(session.getStatus().toLowerCase())
                 .createdAt(epochSeconds(session.getCtime())).expiresAt(epochSeconds(session.getExpiresAt())).file(file)
                 .partSizeMin(PART_SIZE_MIN).partSizeMax(PART_SIZE_MAX).maxParts(MAX_PARTS).build();
     }

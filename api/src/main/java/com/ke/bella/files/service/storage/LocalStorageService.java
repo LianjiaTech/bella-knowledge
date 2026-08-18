@@ -161,4 +161,14 @@ public class LocalStorageService implements StorageService {
         return Files.exists(Paths.get(config.getRootPath(), bucketName, fileKey));
     }
 
+    @Override
+    public long objectSize(String bucketName, String fileKey) {
+        try {
+            return Files.size(Paths.get(config.getRootPath(), bucketName, fileKey));
+        } catch (IOException e) {
+            LOGGER.error("Failed to read local object size: {}", fileKey, e);
+            throw new RuntimeException("Failed to read local object size", e);
+        }
+    }
+
 }
