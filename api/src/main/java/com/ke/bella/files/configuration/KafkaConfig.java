@@ -19,6 +19,7 @@ import org.springframework.kafka.support.serializer.JsonSerializer;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyNamingStrategy;
+import com.ke.bella.files.protocol.OpenAIFile;
 import com.ke.bella.files.service.broadcast.BroadcastService;
 import com.ke.bella.openapi.BellaContext;
 
@@ -58,7 +59,12 @@ public class KafkaConfig {
     public BroadcastService kafkaBroadcastService(KafkaTemplate<String, Object> kafkaTemplate) {
         return (message, successCallback, failCallback) -> {
             Map<String, Object> snapshot = BellaContext.snapshot();
-            kafkaTemplate.send(topic, message).addCallback(
+            OpenAIFile file = (OpenAIFile) message.getData();
+            String key = file.getSpaceCode();
+            if(key == null || key.isEmpty()) {
+                key = file.getId();
+            }
+            kafkaTemplate.send(topic, key, message).addCallback(
                     success -> {
                         BellaContext.replace(snapshot);
                         successCallback.run();
