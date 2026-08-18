@@ -26,6 +26,7 @@ import com.ke.bella.files.db.repo.FileRepo;
 import com.ke.bella.files.db.repo.Page;
 import com.ke.bella.files.db.tables.pojos.FileDB;
 import com.ke.bella.files.db.tables.pojos.FileProgressDB;
+import com.ke.bella.files.enums.FilePurpose;
 import com.ke.bella.files.enums.FileType;
 import com.ke.bella.files.enums.NodeType;
 import com.ke.bella.files.protocol.BroadcastStatus;
@@ -95,6 +96,16 @@ public class FileService {
             LOGGER.error(msg, e);
             throw new IllegalStateException(msg, e);
         }
+    }
+
+    private void broadcast(FileDB fileDB, FileBroadcasting<?> message) {
+        FileType fileType = FileType.fromFileId(fileDB.getFileId());
+        if(fileType == FileType.TEMP && !FilePurpose.ASSISTANTS_CHAT.getValue().equals(fileDB.getPurpose())) {
+            return;
+        }
+        broadcastService.broadcast(message,
+                () -> updateBroadcastStatus(fileDB.getFileId(), BroadcastStatus.SUCCESS),
+                () -> updateBroadcastStatus(fileDB.getFileId(), BroadcastStatus.FAILED));
     }
 
     private OpenAIFile transferToOpenAIFile(FileDB fileDB) {
@@ -417,9 +428,7 @@ public class FileService {
         message.setUserId(BellaContextHelper.getOperatorUserId());
         message.setUserName(BellaContextHelper.getOperatorUserName());
         message.setAkCode(BellaContextHelper.getOperatorAkCode());
-        broadcastService.broadcast(message,
-                () -> updateBroadcastStatus(fileDB.getFileId(), BroadcastStatus.SUCCESS),
-                () -> updateBroadcastStatus(fileDB.getFileId(), BroadcastStatus.FAILED));
+        broadcast(fileDB, message);
 
         return openAIFile;
     }
@@ -511,8 +520,7 @@ public class FileService {
         message.setUserId(BellaContextHelper.getOperatorUserId());
         message.setUserName(BellaContextHelper.getOperatorUserName());
         message.setAkCode(BellaContextHelper.getOperatorAkCode());
-        broadcastService.broadcast(message, () -> updateBroadcastStatus(finalOpenAIFile.getId(), BroadcastStatus.SUCCESS),
-                () -> updateBroadcastStatus(finalOpenAIFile.getId(), BroadcastStatus.FAILED));
+        broadcast(fileDB, message);
 
         return finalOpenAIFile;
     }
@@ -550,9 +558,7 @@ public class FileService {
             message.setUserId(BellaContextHelper.getOperatorUserId());
             message.setUserName(BellaContextHelper.getOperatorUserName());
             message.setAkCode(BellaContextHelper.getOperatorAkCode());
-            broadcastService.broadcast(message,
-                    () -> updateBroadcastStatus(fileId, BroadcastStatus.SUCCESS),
-                    () -> updateBroadcastStatus(fileId, BroadcastStatus.FAILED));
+            broadcast(fileDB, message);
         } catch (Exception e) {
             throw new IllegalStateException("Failed to update file status (indicating deletion), fileId: "
                     + fileId + ", status: " + FileStatus.DELETED, e);
@@ -699,8 +705,7 @@ public class FileService {
         message.setUserId(BellaContextHelper.getOperatorUserId());
         message.setUserName(BellaContextHelper.getOperatorUserName());
         message.setAkCode(BellaContextHelper.getOperatorAkCode());
-        broadcastService.broadcast(message, () -> updateBroadcastStatus(fileId, BroadcastStatus.SUCCESS),
-                () -> updateBroadcastStatus(fileId, BroadcastStatus.FAILED));
+        broadcast(res, message);
         return openAIFile;
     }
 
@@ -743,8 +748,7 @@ public class FileService {
         message.setUserId(BellaContextHelper.getOperatorUserId());
         message.setUserName(BellaContextHelper.getOperatorUserName());
         message.setAkCode(BellaContextHelper.getOperatorAkCode());
-        broadcastService.broadcast(message, () -> updateBroadcastStatus(fileId, BroadcastStatus.SUCCESS),
-                () -> updateBroadcastStatus(fileId, BroadcastStatus.FAILED));
+        broadcast(created, message);
         return resource;
     }
 
