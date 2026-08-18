@@ -106,6 +106,31 @@ public class UploadServiceTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    public void validatePartsSkipsTotalCheckWhenBytesUndeclared() {
+        ReflectionTestUtils.setField(uploadService, "maxBytes", 1024L);
+        session.setDeclaredBytes(UploadService.UNDECLARED_BYTES);
+        List<StoragePart> parts = Collections.singletonList(new StoragePart(1, 10L, "etag-1"));
+
+        List<StoragePart> result = (List<StoragePart>) ReflectionTestUtils.invokeMethod(uploadService, "validateParts", session, parts, null);
+
+        assertEquals(1, result.size());
+    }
+
+    @Test
+    public void validatePartsRejectsUndeclaredTotalExceedingMaxBytes() {
+        ReflectionTestUtils.setField(uploadService, "maxBytes", 5L);
+        session.setDeclaredBytes(UploadService.UNDECLARED_BYTES);
+        List<StoragePart> parts = Collections.singletonList(new StoragePart(1, 10L, "etag-1"));
+
+        UploadException error = assertThrows(UploadException.class,
+                () -> ReflectionTestUtils.invokeMethod(uploadService, "validateParts", session, parts, null));
+
+        assertEquals("invalid_parts", error.getErrorCode());
+        assertEquals(400, error.getHttpStatus());
+    }
+
+    @Test
     public void validatePartsRejectsEtagMismatch() {
         session.setDeclaredBytes(UploadService.PART_SIZE_MIN + 6L);
         List<StoragePart> parts = Arrays.asList(new StoragePart(1, UploadService.PART_SIZE_MIN, "etag-1"), new StoragePart(2, 6L, "etag-2"));

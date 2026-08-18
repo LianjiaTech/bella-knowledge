@@ -36,4 +36,6 @@ public interface StorageService {
     void abortMultipartUpload(String bucketName, String fileKey, String uploadId);
 
     boolean objectExists(String bucketName, String fileKey);
+
+    long objectSize(String bucketName, String fileKey);
 }
