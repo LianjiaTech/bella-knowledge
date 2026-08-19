@@ -100,7 +100,8 @@ public class FileService {
 
     private void broadcast(FileDB fileDB, FileBroadcasting<?> message) {
         FileType fileType = FileType.fromFileId(fileDB.getFileId());
-        if(fileType == FileType.TEMP && !FilePurpose.ASSISTANTS_CHAT.getValue().equals(fileDB.getPurpose())) {
+        if(fileType == FileType.SYSTEM
+                || (fileType == FileType.TEMP && !FilePurpose.ASSISTANTS_CHAT.getValue().equals(fileDB.getPurpose()))) {
             return;
         }
         broadcastService.broadcast(message,
