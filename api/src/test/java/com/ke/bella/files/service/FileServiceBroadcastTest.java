@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import java.time.LocalDateTime;
@@ -71,6 +72,19 @@ public class FileServiceBroadcastTest {
     }
 
     @Test
+    public void finalizeUploadSkipsBroadcastForSystemFiles() {
+        for (FilePurpose purpose : new FilePurpose[] {
+                FilePurpose.PDF,
+                FilePurpose.DOM_TREE,
+                FilePurpose.DATASETS_EXPORT }) {
+            fileService.finalizeFileUpload(systemFile(purpose), "{}");
+        }
+
+        verifyNoInteractions(broadcastService);
+        verifyNoInteractions(fileRepo);
+    }
+
+    @Test
     public void updateSkipsBroadcastForNonAssistantTempFile() {
         FileDB file = tempFile(FilePurpose.VISION);
         FileOps ops = FileOps.builder().fileId(file.getFileId()).filename("updated.png").build();
@@ -94,9 +108,44 @@ public class FileServiceBroadcastTest {
         verifyNoInteractions(broadcastService);
     }
 
+    @Test
+    public void updateSkipsBroadcastForSystemFile() {
+        FileDB file = systemFile(FilePurpose.PDF);
+        FileOps ops = FileOps.builder().fileId(file.getFileId()).filename("updated.pdf").build();
+        when(fileRepo.queryFile(file.getFileId(), FileType.SYSTEM)).thenReturn(file);
+
+        fileService.updateFile(ops, false, Scope.FILENAME);
+
+        verify(fileRepo).updateFile(ops, false);
+        verify(fileRepo).queryFile(file.getFileId(), FileType.SYSTEM);
+        verifyNoMoreInteractions(fileRepo);
+        verifyNoInteractions(broadcastService);
+    }
+
+    @Test
+    public void deleteSkipsBroadcastForSystemFile() {
+        FileDB file = systemFile(FilePurpose.DATASETS_EXPORT);
+
+        fileService.delete(file);
+
+        ArgumentCaptor<FileOps> opsCaptor = ArgumentCaptor.forClass(FileOps.class);
+        verify(fileRepo).updateFile(opsCaptor.capture(), eq(false));
+        assertEquals(FileStatus.DELETED, opsCaptor.getValue().getStatus());
+        verifyNoMoreInteractions(fileRepo);
+        verifyNoInteractions(broadcastService);
+    }
+
     private FileDB tempFile(FilePurpose purpose) {
+        return file("file-test-t", purpose);
+    }
+
+    private FileDB systemFile(FilePurpose purpose) {
+        return file("file-test-s", purpose);
+    }
+
+    private FileDB file(String fileId, FilePurpose purpose) {
         FileDB file = new FileDB();
-        file.setFileId("file-test-t");
+        file.setFileId(fileId);
         file.setFilename("test.txt");
         file.setPurpose(purpose.getValue());
         file.setMetaData("{}");
