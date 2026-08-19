@@ -80,8 +80,10 @@ public class FileServiceBroadcastTest {
             fileService.finalizeFileUpload(systemFile(purpose), "{}");
         }
 
+        verify(fileRepo).queryFileByPdfFileId("file-test-s");
+        verify(fileRepo).queryFileByDomTreeFileId("file-test-s");
+        verifyNoMoreInteractions(fileRepo);
         verifyNoInteractions(broadcastService);
-        verifyNoInteractions(fileRepo);
     }
 
     @Test
@@ -110,8 +112,8 @@ public class FileServiceBroadcastTest {
 
     @Test
     public void updateSkipsBroadcastForSystemFile() {
-        FileDB file = systemFile(FilePurpose.PDF);
-        FileOps ops = FileOps.builder().fileId(file.getFileId()).filename("updated.pdf").build();
+        FileDB file = systemFile(FilePurpose.DATASETS_EXPORT);
+        FileOps ops = FileOps.builder().fileId(file.getFileId()).filename("updated.json").build();
         when(fileRepo.queryFile(file.getFileId(), FileType.SYSTEM)).thenReturn(file);
 
         fileService.updateFile(ops, false, Scope.FILENAME);
