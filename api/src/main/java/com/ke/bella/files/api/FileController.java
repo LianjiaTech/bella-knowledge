@@ -223,8 +223,6 @@ public class FileController {
         final Long bytes = op.getBytes();
         final String mimeType = op.getMimeType();
         final String metadata = op.getMetadata();
-        final boolean getUrl = op.isGetUrl();
-        final long expires = op.getExpires() == null ? FileService.ONE_DAY : op.getExpires();
         final String ancestorId = op.getAncestorId();
         final String description = StringUtils.defaultString(op.getDescription());
         final List<String> cities = op.getCities();
@@ -274,12 +272,8 @@ public class FileController {
                     throw new IllegalArgumentException(
                             String.format("File '%s' already exists in current directory, ancestor_id: '%s'", filename, ancestorId));
                 }
-                OpenAIFile result = fileService.importObject(spaceCode, bucket, path, contentLength, filename, finalPurpose, metadata,
+                return fileService.importObject(spaceCode, bucket, path, contentLength, filename, finalPurpose, metadata,
                         finalMimeType, type, extension, ancestorId, description, cities, tags);
-                if(getUrl) {
-                    result.setUrl(fileService.getUrl(result.getId(), expires));
-                }
-                return result;
             });
         } catch (IllegalArgumentException e) {
             throw e;

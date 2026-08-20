@@ -14,8 +14,6 @@ public class ImportOps {
         private Long bytes;
         private String mimeType;
         private String metadata;
-        private boolean getUrl;
-        private Long expires;
         private String spaceCode;
         private String ancestorId;
         private String description;
