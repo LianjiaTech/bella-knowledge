@@ -111,6 +111,56 @@ public class FileControllerImportFromPathTest {
     }
 
     @Test
+    public void importFromPathAllowsWhitelistedExternalBucketWithoutImportPrefix() throws Exception {
+        String path = "legacy/2024/a.txt";
+        when(fileService.isAllowedImportSource("biz-bucket")).thenReturn(true);
+        when(fileService.objectExists("biz-bucket", path)).thenReturn(true);
+        when(fileService.objectSize("biz-bucket", path)).thenReturn(11L);
+        when(fileService.exists(SPACE_CODE, null, "a.txt")).thenReturn(false);
+        when(fileUniquenessLock.executeWithLock(eq(SPACE_CODE), eq(null), eq("a.txt"), anyLong(), any()))
+                .thenAnswer(invocation -> ((Supplier<?>) invocation.getArgument(4)).get());
+        when(fileService.importFromPath(eq("biz-bucket"), eq(path), eq(11L), eq("a.txt"), eq("assistants"),
+                eq(null), eq(""), eq(""), eq("txt"), eq(null), eq(""), eq(null), eq(null)))
+                        .thenReturn(OpenAIFile.builder().id("file-2").filename("a.txt").bytes(11L).build());
+
+        mockMvc.perform(post("/v1/files/import-from-path")
+                .param("path", path)
+                .param("filename", "a.txt")
+                .param("bucket", "biz-bucket")
+                .param("purpose", "assistants"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("file-2"));
+
+        verify(fileService, never()).bucketForPurpose(any());
+    }
+
+    @Test
+    public void importFromPathRejectsBucketOutsideAllowlist() throws Exception {
+        mockMvc.perform(post("/v1/files/import-from-path")
+                .param("path", "legacy/a.txt")
+                .param("filename", "a.txt")
+                .param("bucket", "unknown-bucket")
+                .param("purpose", "assistants"))
+                .andExpect(status().isBadRequest());
+
+        verify(fileService, never()).objectExists(any(), any());
+    }
+
+    @Test
+    public void importFromPathRejectsTraversalInExternalBucket() throws Exception {
+        when(fileService.isAllowedImportSource("biz-bucket")).thenReturn(true);
+
+        mockMvc.perform(post("/v1/files/import-from-path")
+                .param("path", "legacy/../secret.txt")
+                .param("filename", "secret.txt")
+                .param("bucket", "biz-bucket")
+                .param("purpose", "assistants"))
+                .andExpect(status().isBadRequest());
+
+        verify(fileService, never()).objectExists(any(), any());
+    }
+
+    @Test
     public void importFromPathRejectsExistingFile() throws Exception {
         String path = "import/a.txt";
         when(fileService.bucketForPurpose("assistants")).thenReturn("private-bucket");

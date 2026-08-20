@@ -81,6 +81,16 @@ public class FileService {
         return VISION.equals(purpose) ? bucketConfig.getPublicBucket() : bucketConfig.getPrivateBucket();
     }
 
+    /**
+     * Internal buckets are excluded even if configured, so an external-bucket
+     * import can never bypass the import/ path restriction on our own buckets.
+     */
+    public boolean isAllowedImportSource(String bucket) {
+        return bucketConfig.getImportSourceBuckets().contains(bucket)
+                && !StringUtils.equals(bucket, bucketConfig.getPrivateBucket())
+                && !StringUtils.equals(bucket, bucketConfig.getPublicBucket());
+    }
+
     public boolean objectExists(String bucket, String path) {
         return storageService.objectExists(bucket, path);
     }

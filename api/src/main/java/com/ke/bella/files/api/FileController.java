@@ -217,6 +217,7 @@ public class FileController {
     public OpenAIFile importFromPath(
             @RequestParam("path") String path,
             @RequestParam("filename") String filename,
+            @RequestParam(value = "bucket", required = false) String sourceBucket,
             @RequestParam(value = "purpose", required = false) String purpose,
             @RequestParam(value = "bytes", required = false) Long bytes,
             @RequestParam(value = "mime_type", required = false) String mimeType,
@@ -229,7 +230,12 @@ public class FileController {
             @RequestParam(value = "tags", required = false) List<String> tags) {
         Assert.hasText(path, "path is required");
         Assert.hasText(filename, "filename is required");
-        validateObjectPath(path);
+        final boolean externalBucket = StringUtils.isNotEmpty(sourceBucket);
+        if(externalBucket) {
+            Assert.isTrue(fileService.isAllowedImportSource(sourceBucket),
+                    String.format("bucket '%s' is not an allowed import source", sourceBucket));
+        }
+        validateObjectPath(path, !externalBucket);
         validateDescription(description);
         validateCitiesJson(cities);
         validateTagsJson(tags);
@@ -241,7 +247,7 @@ public class FileController {
 
         final String spaceCode = BellaContextHelper.getOperateSpaceCode();
         validateAncestorDirectory(spaceCode, ancestorId);
-        final String bucket = fileService.bucketForPurpose(purpose);
+        final String bucket = externalBucket ? sourceBucket : fileService.bucketForPurpose(purpose);
         if(!fileService.objectExists(bucket, path)) {
             throw new IllegalArgumentException(String.format("Object '%s' does not exist in bucket '%s'", path, bucket));
         }
@@ -280,10 +286,12 @@ public class FileController {
         }
     }
 
-    private static void validateObjectPath(String path) {
-        Assert.isTrue(path.startsWith(IMPORT_PATH_PREFIX),
-                String.format("path must start with '%s'", IMPORT_PATH_PREFIX));
-        Assert.isTrue(!path.endsWith("/"), "path must be an object key");
+    private static void validateObjectPath(String path, boolean requireImportPrefix) {
+        if(requireImportPrefix) {
+            Assert.isTrue(path.startsWith(IMPORT_PATH_PREFIX),
+                    String.format("path must start with '%s'", IMPORT_PATH_PREFIX));
+        }
+        Assert.isTrue(!path.startsWith("/") && !path.endsWith("/"), "path must be an object key");
         for (String segment : path.split("/")) {
             Assert.isTrue(!segment.isEmpty() && !".".equals(segment) && !"..".equals(segment),
                     "path contains an invalid segment");
