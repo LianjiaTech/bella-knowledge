@@ -26,6 +26,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ke.bella.files.api.interceptor.FileApiResponseAdvice;
 import com.ke.bella.files.db.tables.pojos.FileDB;
 import com.ke.bella.files.enums.NodeType;
+import com.ke.bella.files.protocol.FileNodeCount;
 import com.ke.bella.files.protocol.OpenAIFile;
 import com.ke.bella.files.service.FileService;
 import com.ke.bella.files.service.lock.FileUniquenessLock;
@@ -53,6 +54,21 @@ public class FileControllerResourceTest {
                 .build();
 
         BellaContext.setOperator(Operator.builder().userId(1L).userName("tester").spaceCode("sp-a").build());
+    }
+
+    @Test
+    public void countNodesReturnsStableFields() throws Exception {
+        FileNodeCount count = new FileNodeCount();
+        count.setFileCount(2);
+        count.setDirectoryCount(1);
+        count.setResourceCount(3);
+        when(fileService.countNodes("sp-a", null)).thenReturn(count);
+
+        mockMvc.perform(get("/v1/files/count").param("space_code", "sp-a"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.file_count").value(2))
+                .andExpect(jsonPath("$.directory_count").value(1))
+                .andExpect(jsonPath("$.resource_count").value(3));
     }
 
     @Test

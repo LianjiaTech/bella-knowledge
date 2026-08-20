@@ -35,6 +35,7 @@ import com.ke.bella.files.db.tables.pojos.FileDB;
 import com.ke.bella.files.db.tables.pojos.FileEntryDB;
 import com.ke.bella.files.enums.FileType;
 import com.ke.bella.files.enums.NodeType;
+import com.ke.bella.files.protocol.FileNodeCount;
 import com.ke.bella.files.protocol.FileOps;
 import com.ke.bella.files.protocol.FileStatus;
 import com.ke.bella.files.protocol.PageFileOps;
@@ -253,6 +254,35 @@ public class FileEntryRepoTest {
         entryRepo.setCrossSpaceMoveEnabled(true);
         assertThrows(IllegalStateException.class,
                 () -> entryRepo.moveAcrossSpace(root.getFileId(), TARGET_SPACE, null));
+    }
+
+    @Test
+    public void countNodesUsesEntriesForSpaceAndDirectChildren() {
+        FileDB directory = addDirectory(SOURCE_SPACE, "count-dir", null, "count-dir");
+        FileDB rootFile = addFile(SOURCE_SPACE, "count-root.txt", null, "count-root");
+        FileDB childFile = addFile(SOURCE_SPACE, "count-child.txt", directory.getFileId(), "count-child");
+        FileDB resource = addResource(SOURCE_SPACE, "count-resource", directory.getFileId(), "count-resource");
+        FileDB nestedDirectory = addDirectory(SOURCE_SPACE, "count-nested", directory.getFileId(), "count-nested");
+        addFile(SOURCE_SPACE, "count-grandchild.txt", nestedDirectory.getFileId(), "count-grandchild");
+
+        DSLContextHolder.get(FileRepo.getShardingKeyBySpaceCode(SOURCE_SPACE), dsl)
+                .dropTable(FILE_CLOSURE)
+                .execute();
+
+        FileNodeCount spaceCount = entryRepo.countNodes(SOURCE_SPACE, null);
+        assertEquals(3L, spaceCount.getFileCount());
+        assertEquals(2L, spaceCount.getDirectoryCount());
+        assertEquals(1L, spaceCount.getResourceCount());
+
+        FileNodeCount childCount = entryRepo.countNodes(SOURCE_SPACE, directory.getFileId());
+        assertEquals(1L, childCount.getFileCount());
+        assertEquals(1L, childCount.getDirectoryCount());
+        assertEquals(1L, childCount.getResourceCount());
+
+        fileRepo.updateFile(FileOps.builder().fileId(rootFile.getFileId()).status(FileStatus.DELETED).build());
+        assertEquals(2L, entryRepo.countNodes(SOURCE_SPACE, null).getFileCount());
+        assertEquals(FileEntryRepo.TYPE_RESOURCE, entryRepo.queryActiveByFileId(SOURCE_SPACE, resource.getFileId()).getType());
+        assertEquals(FileEntryRepo.TYPE_FILE, entryRepo.queryActiveByFileId(SOURCE_SPACE, childFile.getFileId()).getType());
     }
 
     @Test
