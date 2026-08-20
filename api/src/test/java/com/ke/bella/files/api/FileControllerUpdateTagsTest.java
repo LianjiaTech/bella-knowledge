@@ -123,7 +123,7 @@ public class FileControllerUpdateTagsTest {
         // When & Then
         mockMvc.perform(put("/v1/files/{fileId}/tags", fileId)
                 .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isInternalServerError());
+                .andExpect(status().isBadRequest());
     }
 
     @Test

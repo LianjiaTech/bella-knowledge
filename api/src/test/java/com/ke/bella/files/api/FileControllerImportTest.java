@@ -222,6 +222,27 @@ public class FileControllerImportTest {
     }
 
     @Test
+    public void importRejectsEmptyBody() throws Exception {
+        mockMvc.perform(importRequest(""))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    public void importRejectsMalformedJson() throws Exception {
+        mockMvc.perform(importRequest("{\"path\":"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    public void importRejectsFormContentType() throws Exception {
+        mockMvc.perform(post("/v1/files/import")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .param("path", "import/a.txt")
+                .param("filename", "a.txt"))
+                .andExpect(status().isUnsupportedMediaType());
+    }
+
+    @Test
     public void importRejectsTraversalBeforeStorageAccess() throws Exception {
         mockMvc.perform(importRequest(
                 "{\"path\":\"import/../outside.txt\",\"filename\":\"outside.txt\",\"purpose\":\"assistants\"}"))

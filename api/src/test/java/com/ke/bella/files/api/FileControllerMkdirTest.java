@@ -242,14 +242,14 @@ public class FileControllerMkdirTest {
     }
 
     @Test
-    public void mkdir_NullRequestBody_InternalServerError() throws Exception {
+    public void mkdir_NullRequestBody_BadRequest() throws Exception {
         String spaceCode = "sp-a";
 
         BellaContext.setOperator(Operator.builder().userId(1L).userName("tester").spaceCode(spaceCode).build());
         mockMvc.perform(post("/v1/files/mkdir")
                 .header("X-BELLA-SPACE-CODE", spaceCode)
                 .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isInternalServerError());
+                .andExpect(status().isBadRequest());
 
         verify(fileUniquenessLock, never()).executeWithLock(any(), any(), any(), anyLong(), any());
         verify(fileService, never()).mkdir(any(), any(), any(), any(), any(), any(), any());

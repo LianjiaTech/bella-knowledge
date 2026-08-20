@@ -119,7 +119,7 @@ public class FileControllerUpdateDescriptionTest {
         // When & Then
         mockMvc.perform(put("/v1/files/{fileId}/description", fileId)
                 .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isInternalServerError()); // 缺少请求体会导致500
+                .andExpect(status().isBadRequest());
     }
 
     @Test
