@@ -77,6 +77,40 @@ public class FileService {
         return fileRepo.exists(spaceCode, ancestorId, filename);
     }
 
+    public String bucketForPurpose(String purpose) {
+        return VISION.equals(purpose) ? bucketConfig.getPublicBucket() : bucketConfig.getPrivateBucket();
+    }
+
+    public boolean objectExists(String bucket, String path) {
+        return storageService.objectExists(bucket, path);
+    }
+
+    public long objectSize(String bucket, String path) {
+        return storageService.objectSize(bucket, path);
+    }
+
+    public OpenAIFile importFromPath(
+            String bucket,
+            String path,
+            long contentLength,
+            String filename,
+            String purpose,
+            String metadata,
+            String mimeType,
+            String type,
+            String extension,
+            String ancestorId,
+            String description,
+            List<String> cities,
+            List<String> tags) {
+        String spaceCode = BellaContextHelper.getOperateSpaceCode();
+        FileType fileType = FilePurposeClassifier.classify(purpose);
+        String fileId = FILE_ID_GENERATOR.generateWithType(fileType, spaceCode);
+        FileUploadContext context = self.createFileWithId(spaceCode, fileId, bucket, path, filename, contentLength,
+                purpose, metadata, mimeType, type, extension, ancestorId, description, cities, tags);
+        return self.finalizeFileUpload(context.getFileDB(), metadata);
+    }
+
     public OpenAIFile getFile(String spaceCode, String ancestorId, String filename) {
         FileDB fileDB = fileRepo.queryFile(spaceCode, ancestorId, filename);
         if(fileDB == null) {

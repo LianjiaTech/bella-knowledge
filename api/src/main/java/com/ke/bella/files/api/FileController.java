@@ -87,6 +87,8 @@ public class FileController {
 
     private static final long FILE_LOCK_TIMEOUT_MS = 30000L;
 
+    private static final String IMPORT_PATH_PREFIX = "import/";
+
     private static final int MAX_DIRECTORY_NAME_LENGTH = 255;
 
     private static final int MAX_DESCRIPTION_LENGTH = 256;
@@ -208,6 +210,83 @@ public class FileController {
         } catch (Exception e) {
             LOGGER.error("File upload failed, filename: {}, error: {}", filename, e.getMessage(), e);
             throw new IllegalStateException("File upload failed", e);
+        }
+    }
+
+    @PostMapping("/import-from-path")
+    public OpenAIFile importFromPath(
+            @RequestParam("path") String path,
+            @RequestParam("filename") String filename,
+            @RequestParam(value = "purpose", required = false) String purpose,
+            @RequestParam(value = "bytes", required = false) Long bytes,
+            @RequestParam(value = "mime_type", required = false) String mimeType,
+            @RequestParam(value = "metadata", required = false) String metadata,
+            @RequestParam(value = "get_url", required = false, defaultValue = "false") boolean getUrl,
+            @RequestParam(value = "expires", required = false, defaultValue = ONE_DAY_STRING) long expires,
+            @RequestParam(value = "ancestor_id", required = false) String ancestorId,
+            @RequestParam(value = "description", required = false, defaultValue = "") String description,
+            @RequestParam(value = "cities", required = false) List<String> cities,
+            @RequestParam(value = "tags", required = false) List<String> tags) {
+        Assert.hasText(path, "path is required");
+        Assert.hasText(filename, "filename is required");
+        validateObjectPath(path);
+        validateDescription(description);
+        validateCitiesJson(cities);
+        validateTagsJson(tags);
+
+        if(!FilePurposeClassifier.allowedPurposes().contains(purpose)) {
+            LOGGER.info("Invalid purpose '{}', force to '{}'", purpose, FilePurpose.TEMP.getValue());
+            purpose = FilePurpose.TEMP.getValue();
+        }
+
+        final String spaceCode = BellaContextHelper.getOperateSpaceCode();
+        validateAncestorDirectory(spaceCode, ancestorId);
+        final String bucket = fileService.bucketForPurpose(purpose);
+        if(!fileService.objectExists(bucket, path)) {
+            throw new IllegalArgumentException(String.format("Object '%s' does not exist in bucket '%s'", path, bucket));
+        }
+
+        final long contentLength = fileService.objectSize(bucket, path);
+        Assert.isTrue(contentLength > 0, "object must not be empty");
+        if(bytes != null) {
+            Assert.isTrue(bytes == contentLength,
+                    String.format("bytes %d does not match object size %d", bytes, contentLength));
+        }
+
+        MediaType mediaType = StringUtils.isEmpty(mimeType) ? null : MediaType.parse(mimeType);
+        final String finalMimeType = mediaType == null ? "" : FileUtils.extraPureMediaType(mediaType);
+        final String type = mediaType == null ? "" : FileUtils.getType(mediaType);
+        final String extension = StringUtils.defaultString(FileUtils.getFileExtension(filename));
+        final String finalPurpose = purpose;
+
+        try {
+            return fl.executeWithLock(spaceCode, ancestorId, filename, FILE_LOCK_TIMEOUT_MS, () -> {
+                if(fileService.exists(spaceCode, ancestorId, filename)) {
+                    throw new IllegalArgumentException(
+                            String.format("File '%s' already exists in current directory, ancestor_id: '%s'", filename, ancestorId));
+                }
+                OpenAIFile result = fileService.importFromPath(bucket, path, contentLength, filename, finalPurpose, metadata,
+                        finalMimeType, type, extension, ancestorId, description, cities, tags);
+                if(getUrl) {
+                    result.setUrl(fileService.getUrl(result.getId(), expires));
+                }
+                return result;
+            });
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception e) {
+            LOGGER.error("File import failed, path: {}, filename: {}, error: {}", path, filename, e.getMessage(), e);
+            throw new IllegalStateException("File import failed", e);
+        }
+    }
+
+    private static void validateObjectPath(String path) {
+        Assert.isTrue(path.startsWith(IMPORT_PATH_PREFIX),
+                String.format("path must start with '%s'", IMPORT_PATH_PREFIX));
+        Assert.isTrue(!path.endsWith("/"), "path must be an object key");
+        for (String segment : path.split("/")) {
+            Assert.isTrue(!segment.isEmpty() && !".".equals(segment) && !"..".equals(segment),
+                    "path contains an invalid segment");
         }
     }
 
