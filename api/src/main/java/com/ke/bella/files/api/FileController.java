@@ -57,6 +57,7 @@ import com.ke.bella.files.protocol.FileOps;
 import com.ke.bella.files.protocol.FileSystemOps.MkdirOp;
 import com.ke.bella.files.protocol.FileSystemOps.CreateResourceOp;
 import com.ke.bella.files.protocol.FileUrl;
+import com.ke.bella.files.protocol.ImportOps.ImportObjectOp;
 import com.ke.bella.files.protocol.ListFileOps;
 import com.ke.bella.files.protocol.OpenAIFile;
 import com.ke.bella.files.protocol.OpenapiListResponse;
@@ -214,20 +215,22 @@ public class FileController {
     }
 
     @PostMapping("/import")
-    public OpenAIFile importObject(
-            @RequestParam("path") String path,
-            @RequestParam("filename") String filename,
-            @RequestParam(value = "bucket", required = false) String sourceBucket,
-            @RequestParam(value = "purpose", required = false) String purpose,
-            @RequestParam(value = "bytes", required = false) Long bytes,
-            @RequestParam(value = "mime_type", required = false) String mimeType,
-            @RequestParam(value = "metadata", required = false) String metadata,
-            @RequestParam(value = "get_url", required = false, defaultValue = "false") boolean getUrl,
-            @RequestParam(value = "expires", required = false, defaultValue = ONE_DAY_STRING) long expires,
-            @RequestParam(value = "ancestor_id", required = false) String ancestorId,
-            @RequestParam(value = "description", required = false, defaultValue = "") String description,
-            @RequestParam(value = "cities", required = false) List<String> cities,
-            @RequestParam(value = "tags", required = false) List<String> tags) {
+    public OpenAIFile importObject(@RequestBody ImportObjectOp op) {
+        Assert.notNull(op, "request body is required");
+        final String path = op.getPath();
+        final String filename = op.getFilename();
+        final String sourceBucket = op.getBucket();
+        final Long bytes = op.getBytes();
+        final String mimeType = op.getMimeType();
+        final String metadata = op.getMetadata();
+        final boolean getUrl = op.isGetUrl();
+        final long expires = op.getExpires() == null ? FileService.ONE_DAY : op.getExpires();
+        final String ancestorId = op.getAncestorId();
+        final String description = StringUtils.defaultString(op.getDescription());
+        final List<String> cities = op.getCities();
+        final List<String> tags = op.getTags();
+        String purpose = op.getPurpose();
+
         Assert.hasText(path, "path is required");
         Assert.hasText(filename, "filename is required");
         final boolean externalBucket = StringUtils.isNotEmpty(sourceBucket);
@@ -245,7 +248,7 @@ public class FileController {
             purpose = FilePurpose.TEMP.getValue();
         }
 
-        final String spaceCode = BellaContextHelper.getOperateSpaceCode();
+        final String spaceCode = StringUtils.defaultIfBlank(op.getSpaceCode(), BellaContextHelper.getOperateSpaceCode());
         validateAncestorDirectory(spaceCode, ancestorId);
         final String bucket = externalBucket ? sourceBucket : fileService.bucketForPurpose(purpose);
         if(!fileService.objectExists(bucket, path)) {
@@ -271,7 +274,7 @@ public class FileController {
                     throw new IllegalArgumentException(
                             String.format("File '%s' already exists in current directory, ancestor_id: '%s'", filename, ancestorId));
                 }
-                OpenAIFile result = fileService.importObject(bucket, path, contentLength, filename, finalPurpose, metadata,
+                OpenAIFile result = fileService.importObject(spaceCode, bucket, path, contentLength, filename, finalPurpose, metadata,
                         finalMimeType, type, extension, ancestorId, description, cities, tags);
                 if(getUrl) {
                     result.setUrl(fileService.getUrl(result.getId(), expires));

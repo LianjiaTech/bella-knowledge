@@ -100,6 +100,7 @@ public class FileService {
     }
 
     public OpenAIFile importObject(
+            String spaceCode,
             String bucket,
             String path,
             long contentLength,
@@ -113,7 +114,6 @@ public class FileService {
             String description,
             List<String> cities,
             List<String> tags) {
-        String spaceCode = BellaContextHelper.getOperateSpaceCode();
         FileType fileType = FilePurposeClassifier.classify(purpose);
         String fileId = FILE_ID_GENERATOR.generateWithType(fileType, spaceCode);
         FileUploadContext context = self.createFileWithId(spaceCode, fileId, bucket, path, filename, contentLength,
