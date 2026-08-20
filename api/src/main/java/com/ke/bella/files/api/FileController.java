@@ -276,7 +276,7 @@ public class FileController {
                         throw new IllegalArgumentException(String.format(
                                 "Object '%s' in bucket '%s' is already imported as '%s'", path, bucket, existing.getFileId()));
                     }
-                    finalName = nextAvailableFilename(spaceCode, ancestorId, filename);
+                    finalName = renameForConflict(filename);
                 }
                 return fileService.importObject(spaceCode, bucket, path, contentLength, finalName, finalPurpose, metadata,
                         finalMimeType, type, extension, ancestorId, description, cities, tags);
@@ -289,17 +289,11 @@ public class FileController {
         }
     }
 
-    private String nextAvailableFilename(String spaceCode, String ancestorId, String filename) {
+    private static String renameForConflict(String filename) {
         int dot = filename.lastIndexOf('.');
         String base = dot > 0 ? filename.substring(0, dot) : filename;
         String ext = dot > 0 ? filename.substring(dot) : "";
-        for (int i = 1; i <= 1000; i++) {
-            String candidate = base + "(" + i + ")" + ext;
-            if(!fileService.exists(spaceCode, ancestorId, candidate)) {
-                return candidate;
-            }
-        }
-        throw new IllegalStateException("Unable to find an available filename for " + filename);
+        return base + "_" + System.currentTimeMillis() + ext;
     }
 
     private static void validateObjectPath(String path, boolean requireImportPrefix) {

@@ -2,6 +2,7 @@ package com.ke.bella.files.api;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -193,8 +194,6 @@ public class FileControllerImportTest {
         when(fileService.objectExists("private-bucket", path)).thenReturn(true);
         when(fileService.objectSize("private-bucket", path)).thenReturn(11L);
         when(fileService.exists(SPACE_CODE, null, "a.txt")).thenReturn(true);
-        when(fileService.exists(SPACE_CODE, null, "a(1).txt")).thenReturn(true);
-        when(fileService.exists(SPACE_CODE, null, "a(2).txt")).thenReturn(false);
         FileDB existing = new FileDB();
         existing.setFileId("file-0");
         existing.setBucket("private-bucket");
@@ -202,15 +201,15 @@ public class FileControllerImportTest {
         when(fileService.queryFile(SPACE_CODE, null, "a.txt")).thenReturn(existing);
         when(fileUniquenessLock.executeWithLock(eq(SPACE_CODE), eq(null), eq("a.txt"), anyLong(), any()))
                 .thenAnswer(invocation -> ((Supplier<?>) invocation.getArgument(4)).get());
-        when(fileService.importObject(eq(SPACE_CODE), eq("private-bucket"), eq(path), eq(11L), eq("a(2).txt"), eq("assistants"),
+        when(fileService.importObject(eq(SPACE_CODE), eq("private-bucket"), eq(path), eq(11L),
+                argThat(name -> name.matches("a_\\d+\\.txt")), eq("assistants"),
                 eq(null), eq(""), eq(""), eq("txt"), eq(null), eq(""), eq(null), eq(null)))
-                        .thenReturn(OpenAIFile.builder().id("file-4").filename("a(2).txt").bytes(11L).build());
+                        .thenReturn(OpenAIFile.builder().id("file-4").bytes(11L).build());
 
         mockMvc.perform(importRequest(
                 "{\"path\":\"import/b.txt\",\"filename\":\"a.txt\",\"purpose\":\"assistants\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value("file-4"))
-                .andExpect(jsonPath("$.filename").value("a(2).txt"));
+                .andExpect(jsonPath("$.id").value("file-4"));
     }
 
     @Test
