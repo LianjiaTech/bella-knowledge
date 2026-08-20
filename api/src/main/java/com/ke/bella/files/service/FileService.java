@@ -626,7 +626,10 @@ public class FileService {
     }
 
     public String getUrl(String bucketName, String keyName, String purpose, long expires) {
-        return purpose.equals(VISION) ? storageService.getPublicUrl(bucketName, keyName)
+        // Public URLs only work for the public bucket; vision files imported
+        // from an external source bucket fall back to a presigned URL.
+        return purpose.equals(VISION) && StringUtils.equals(bucketName, bucketConfig.getPublicBucket())
+                ? storageService.getPublicUrl(bucketName, keyName)
                 : storageService.getPresignedUrl(bucketName, keyName, expires);
     }
 
