@@ -99,7 +99,7 @@ public class FileService {
         return storageService.objectSize(bucket, path);
     }
 
-    public OpenAIFile importFromPath(
+    public OpenAIFile importObject(
             String bucket,
             String path,
             long contentLength,

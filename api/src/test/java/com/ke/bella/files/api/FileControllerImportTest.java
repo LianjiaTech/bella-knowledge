@@ -29,7 +29,7 @@ import com.ke.bella.files.service.lock.FileUniquenessLock;
 import com.ke.bella.openapi.BellaContext;
 import com.ke.bella.openapi.Operator;
 
-public class FileControllerImportFromPathTest {
+public class FileControllerImportTest {
     private static final String SPACE_CODE = "sp-a";
 
     private MockMvc mockMvc;
@@ -59,7 +59,7 @@ public class FileControllerImportFromPathTest {
     }
 
     @Test
-    public void importFromPathCreatesFileWithoutUploadingContent() throws Exception {
+    public void importObjectCreatesFileWithoutUploadingContent() throws Exception {
         String path = "import/a.txt";
         when(fileService.bucketForPurpose("assistants")).thenReturn("private-bucket");
         when(fileService.objectExists("private-bucket", path)).thenReturn(true);
@@ -67,11 +67,11 @@ public class FileControllerImportFromPathTest {
         when(fileService.exists(SPACE_CODE, null, "a.txt")).thenReturn(false);
         when(fileUniquenessLock.executeWithLock(eq(SPACE_CODE), eq(null), eq("a.txt"), anyLong(), any()))
                 .thenAnswer(invocation -> ((Supplier<?>) invocation.getArgument(4)).get());
-        when(fileService.importFromPath(eq("private-bucket"), eq(path), eq(11L), eq("a.txt"), eq("assistants"),
+        when(fileService.importObject(eq("private-bucket"), eq(path), eq(11L), eq("a.txt"), eq("assistants"),
                 eq(null), eq("text/plain"), eq("text"), eq("txt"), eq(null), eq(""), eq(null), eq(null)))
                         .thenReturn(OpenAIFile.builder().id("file-1").filename("a.txt").bytes(11L).build());
 
-        mockMvc.perform(post("/v1/files/import-from-path")
+        mockMvc.perform(post("/v1/files/import")
                 .param("path", path)
                 .param("filename", "a.txt")
                 .param("purpose", "assistants")
@@ -80,28 +80,28 @@ public class FileControllerImportFromPathTest {
                 .andExpect(jsonPath("$.id").value("file-1"))
                 .andExpect(jsonPath("$.bytes").value(11));
 
-        verify(fileService).importFromPath(eq("private-bucket"), eq(path), eq(11L), eq("a.txt"), eq("assistants"),
+        verify(fileService).importObject(eq("private-bucket"), eq(path), eq(11L), eq("a.txt"), eq("assistants"),
                 eq(null), eq("text/plain"), eq("text"), eq("txt"), eq(null), eq(""), eq(null), eq(null));
     }
 
     @Test
-    public void importFromPathRejectsMissingObjectBeforeLocking() throws Exception {
+    public void importObjectRejectsMissingObjectBeforeLocking() throws Exception {
         when(fileService.bucketForPurpose("assistants")).thenReturn("private-bucket");
         when(fileService.objectExists("private-bucket", "import/missing.txt")).thenReturn(false);
 
-        mockMvc.perform(post("/v1/files/import-from-path")
+        mockMvc.perform(post("/v1/files/import")
                 .param("path", "import/missing.txt")
                 .param("filename", "missing.txt")
                 .param("purpose", "assistants"))
                 .andExpect(status().isBadRequest());
 
         verify(fileUniquenessLock, never()).executeWithLock(any(), any(), any(), anyLong(), any());
-        verify(fileService, never()).importFromPath(any(), any(), anyLong(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(fileService, never()).importObject(any(), any(), anyLong(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
-    public void importFromPathRejectsTraversalBeforeStorageAccess() throws Exception {
-        mockMvc.perform(post("/v1/files/import-from-path")
+    public void importObjectRejectsTraversalBeforeStorageAccess() throws Exception {
+        mockMvc.perform(post("/v1/files/import")
                 .param("path", "import/../outside.txt")
                 .param("filename", "outside.txt")
                 .param("purpose", "assistants"))
@@ -111,7 +111,7 @@ public class FileControllerImportFromPathTest {
     }
 
     @Test
-    public void importFromPathAllowsWhitelistedExternalBucketWithoutImportPrefix() throws Exception {
+    public void importObjectAllowsWhitelistedExternalBucketWithoutImportPrefix() throws Exception {
         String path = "legacy/2024/a.txt";
         when(fileService.isAllowedImportSource("biz-bucket")).thenReturn(true);
         when(fileService.objectExists("biz-bucket", path)).thenReturn(true);
@@ -119,11 +119,11 @@ public class FileControllerImportFromPathTest {
         when(fileService.exists(SPACE_CODE, null, "a.txt")).thenReturn(false);
         when(fileUniquenessLock.executeWithLock(eq(SPACE_CODE), eq(null), eq("a.txt"), anyLong(), any()))
                 .thenAnswer(invocation -> ((Supplier<?>) invocation.getArgument(4)).get());
-        when(fileService.importFromPath(eq("biz-bucket"), eq(path), eq(11L), eq("a.txt"), eq("assistants"),
+        when(fileService.importObject(eq("biz-bucket"), eq(path), eq(11L), eq("a.txt"), eq("assistants"),
                 eq(null), eq(""), eq(""), eq("txt"), eq(null), eq(""), eq(null), eq(null)))
                         .thenReturn(OpenAIFile.builder().id("file-2").filename("a.txt").bytes(11L).build());
 
-        mockMvc.perform(post("/v1/files/import-from-path")
+        mockMvc.perform(post("/v1/files/import")
                 .param("path", path)
                 .param("filename", "a.txt")
                 .param("bucket", "biz-bucket")
@@ -135,8 +135,8 @@ public class FileControllerImportFromPathTest {
     }
 
     @Test
-    public void importFromPathRejectsBucketOutsideAllowlist() throws Exception {
-        mockMvc.perform(post("/v1/files/import-from-path")
+    public void importObjectRejectsBucketOutsideAllowlist() throws Exception {
+        mockMvc.perform(post("/v1/files/import")
                 .param("path", "legacy/a.txt")
                 .param("filename", "a.txt")
                 .param("bucket", "unknown-bucket")
@@ -147,10 +147,10 @@ public class FileControllerImportFromPathTest {
     }
 
     @Test
-    public void importFromPathRejectsTraversalInExternalBucket() throws Exception {
+    public void importObjectRejectsTraversalInExternalBucket() throws Exception {
         when(fileService.isAllowedImportSource("biz-bucket")).thenReturn(true);
 
-        mockMvc.perform(post("/v1/files/import-from-path")
+        mockMvc.perform(post("/v1/files/import")
                 .param("path", "legacy/../secret.txt")
                 .param("filename", "secret.txt")
                 .param("bucket", "biz-bucket")
@@ -161,7 +161,7 @@ public class FileControllerImportFromPathTest {
     }
 
     @Test
-    public void importFromPathRejectsExistingFile() throws Exception {
+    public void importObjectRejectsExistingFile() throws Exception {
         String path = "import/a.txt";
         when(fileService.bucketForPurpose("assistants")).thenReturn("private-bucket");
         when(fileService.objectExists("private-bucket", path)).thenReturn(true);
@@ -170,18 +170,18 @@ public class FileControllerImportFromPathTest {
         when(fileUniquenessLock.executeWithLock(eq(SPACE_CODE), eq(null), eq("a.txt"), anyLong(), any()))
                 .thenAnswer(invocation -> ((Supplier<?>) invocation.getArgument(4)).get());
 
-        mockMvc.perform(post("/v1/files/import-from-path")
+        mockMvc.perform(post("/v1/files/import")
                 .param("path", path)
                 .param("filename", "a.txt")
                 .param("purpose", "assistants"))
                 .andExpect(status().isBadRequest());
 
-        verify(fileService, never()).importFromPath(any(), any(), anyLong(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(fileService, never()).importObject(any(), any(), anyLong(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
-    public void importFromPathRejectsPathOutsideImportPrefix() throws Exception {
-        mockMvc.perform(post("/v1/files/import-from-path")
+    public void importObjectRejectsPathOutsideImportPrefix() throws Exception {
+        mockMvc.perform(post("/v1/files/import")
                 .param("path", "assistants/file-1.txt")
                 .param("filename", "file-1.txt")
                 .param("purpose", "assistants"))

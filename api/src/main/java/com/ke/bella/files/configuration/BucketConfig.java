@@ -19,7 +19,7 @@ public class BucketConfig {
     @Value("${bella.file-api.bucket-name.private}")
     private String privateBucket;
     /**
-     * Comma-separated buckets that import-from-path may read from directly,
+     * Comma-separated buckets that the import endpoint may read from directly,
      * so business teams can migrate without copying objects first.
      */
     @Value("${bella.file-api.bucket-name.import-sources:}")

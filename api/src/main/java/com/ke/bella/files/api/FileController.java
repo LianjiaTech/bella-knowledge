@@ -213,8 +213,8 @@ public class FileController {
         }
     }
 
-    @PostMapping("/import-from-path")
-    public OpenAIFile importFromPath(
+    @PostMapping("/import")
+    public OpenAIFile importObject(
             @RequestParam("path") String path,
             @RequestParam("filename") String filename,
             @RequestParam(value = "bucket", required = false) String sourceBucket,
@@ -271,7 +271,7 @@ public class FileController {
                     throw new IllegalArgumentException(
                             String.format("File '%s' already exists in current directory, ancestor_id: '%s'", filename, ancestorId));
                 }
-                OpenAIFile result = fileService.importFromPath(bucket, path, contentLength, filename, finalPurpose, metadata,
+                OpenAIFile result = fileService.importObject(bucket, path, contentLength, filename, finalPurpose, metadata,
                         finalMimeType, type, extension, ancestorId, description, cities, tags);
                 if(getUrl) {
                     result.setUrl(fileService.getUrl(result.getId(), expires));
