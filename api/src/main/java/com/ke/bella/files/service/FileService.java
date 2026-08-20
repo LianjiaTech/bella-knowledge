@@ -121,6 +121,10 @@ public class FileService {
         return self.finalizeFileUpload(context.getFileDB(), metadata);
     }
 
+    public FileDB queryFile(String spaceCode, String ancestorId, String filename) {
+        return fileRepo.queryFile(spaceCode, ancestorId, filename);
+    }
+
     public OpenAIFile getFile(String spaceCode, String ancestorId, String filename) {
         FileDB fileDB = fileRepo.queryFile(spaceCode, ancestorId, filename);
         if(fileDB == null) {

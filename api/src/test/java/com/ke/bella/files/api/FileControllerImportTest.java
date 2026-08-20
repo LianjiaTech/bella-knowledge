@@ -24,6 +24,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ke.bella.files.api.interceptor.FileApiResponseAdvice;
+import com.ke.bella.files.db.tables.pojos.FileDB;
 import com.ke.bella.files.protocol.OpenAIFile;
 import com.ke.bella.files.service.FileService;
 import com.ke.bella.files.service.lock.FileUniquenessLock;
@@ -163,12 +164,17 @@ public class FileControllerImportTest {
     }
 
     @Test
-    public void importRejectsExistingFile() throws Exception {
+    public void importRejectsDuplicateOfSameObject() throws Exception {
         String path = "import/a.txt";
         when(fileService.bucketForPurpose("assistants")).thenReturn("private-bucket");
         when(fileService.objectExists("private-bucket", path)).thenReturn(true);
         when(fileService.objectSize("private-bucket", path)).thenReturn(11L);
         when(fileService.exists(SPACE_CODE, null, "a.txt")).thenReturn(true);
+        FileDB existing = new FileDB();
+        existing.setFileId("file-0");
+        existing.setBucket("private-bucket");
+        existing.setPath(path);
+        when(fileService.queryFile(SPACE_CODE, null, "a.txt")).thenReturn(existing);
         when(fileUniquenessLock.executeWithLock(eq(SPACE_CODE), eq(null), eq("a.txt"), anyLong(), any()))
                 .thenAnswer(invocation -> ((Supplier<?>) invocation.getArgument(4)).get());
 
@@ -178,6 +184,33 @@ public class FileControllerImportTest {
 
         verify(fileService, never()).importObject(any(), any(), any(), anyLong(), any(), any(), any(), any(), any(), any(), any(), any(), any(),
                 any());
+    }
+
+    @Test
+    public void importRenamesWhenExistingFilePointsToDifferentObject() throws Exception {
+        String path = "import/b.txt";
+        when(fileService.bucketForPurpose("assistants")).thenReturn("private-bucket");
+        when(fileService.objectExists("private-bucket", path)).thenReturn(true);
+        when(fileService.objectSize("private-bucket", path)).thenReturn(11L);
+        when(fileService.exists(SPACE_CODE, null, "a.txt")).thenReturn(true);
+        when(fileService.exists(SPACE_CODE, null, "a(1).txt")).thenReturn(true);
+        when(fileService.exists(SPACE_CODE, null, "a(2).txt")).thenReturn(false);
+        FileDB existing = new FileDB();
+        existing.setFileId("file-0");
+        existing.setBucket("private-bucket");
+        existing.setPath("import/other.txt");
+        when(fileService.queryFile(SPACE_CODE, null, "a.txt")).thenReturn(existing);
+        when(fileUniquenessLock.executeWithLock(eq(SPACE_CODE), eq(null), eq("a.txt"), anyLong(), any()))
+                .thenAnswer(invocation -> ((Supplier<?>) invocation.getArgument(4)).get());
+        when(fileService.importObject(eq(SPACE_CODE), eq("private-bucket"), eq(path), eq(11L), eq("a(2).txt"), eq("assistants"),
+                eq(null), eq(""), eq(""), eq("txt"), eq(null), eq(""), eq(null), eq(null)))
+                        .thenReturn(OpenAIFile.builder().id("file-4").filename("a(2).txt").bytes(11L).build());
+
+        mockMvc.perform(importRequest(
+                "{\"path\":\"import/b.txt\",\"filename\":\"a.txt\",\"purpose\":\"assistants\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("file-4"))
+                .andExpect(jsonPath("$.filename").value("a(2).txt"));
     }
 
     @Test

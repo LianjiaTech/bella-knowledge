@@ -268,11 +268,17 @@ public class FileController {
 
         try {
             return fl.executeWithLock(spaceCode, ancestorId, filename, FILE_LOCK_TIMEOUT_MS, () -> {
+                String finalName = filename;
                 if(fileService.exists(spaceCode, ancestorId, filename)) {
-                    throw new IllegalArgumentException(
-                            String.format("File '%s' already exists in current directory, ancestor_id: '%s'", filename, ancestorId));
+                    FileDB existing = fileService.queryFile(spaceCode, ancestorId, filename);
+                    if(existing != null && StringUtils.equals(bucket, existing.getBucket())
+                            && StringUtils.equals(path, existing.getPath())) {
+                        throw new IllegalArgumentException(String.format(
+                                "Object '%s' in bucket '%s' is already imported as '%s'", path, bucket, existing.getFileId()));
+                    }
+                    finalName = nextAvailableFilename(spaceCode, ancestorId, filename);
                 }
-                return fileService.importObject(spaceCode, bucket, path, contentLength, filename, finalPurpose, metadata,
+                return fileService.importObject(spaceCode, bucket, path, contentLength, finalName, finalPurpose, metadata,
                         finalMimeType, type, extension, ancestorId, description, cities, tags);
             });
         } catch (IllegalArgumentException e) {
@@ -281,6 +287,19 @@ public class FileController {
             LOGGER.error("File import failed, path: {}, filename: {}, error: {}", path, filename, e.getMessage(), e);
             throw new IllegalStateException("File import failed", e);
         }
+    }
+
+    private String nextAvailableFilename(String spaceCode, String ancestorId, String filename) {
+        int dot = filename.lastIndexOf('.');
+        String base = dot > 0 ? filename.substring(0, dot) : filename;
+        String ext = dot > 0 ? filename.substring(dot) : "";
+        for (int i = 1; i <= 1000; i++) {
+            String candidate = base + "(" + i + ")" + ext;
+            if(!fileService.exists(spaceCode, ancestorId, candidate)) {
+                return candidate;
+            }
+        }
+        throw new IllegalStateException("Unable to find an available filename for " + filename);
     }
 
     private static void validateObjectPath(String path, boolean requireImportPrefix) {
