@@ -72,6 +72,15 @@ public class FileControllerResourceTest {
     }
 
     @Test
+    public void countNodesRequiresSpaceCodeOrAncestorId() throws Exception {
+        // must not fall back to the operator's space
+        mockMvc.perform(get("/v1/files/count"))
+                .andExpect(status().isBadRequest());
+
+        verify(fileService, never()).countNodes(any(), any());
+    }
+
+    @Test
     public void createResourceInDirectory() throws Exception {
         FileDB ancestor = new FileDB();
         ancestor.setFileId("file-parent-1-d");

@@ -1242,15 +1242,12 @@ public class FileController {
             Assert.isTrue(NodeType.from(ancestor) == NodeType.DIRECTORY, "ancestor_id must refer to a directory");
             if(StringUtils.isNotEmpty(spaceCode)) {
                 Assert.isTrue(StringUtils.equals(spaceCode, ancestor.getSpaceCode()),
-                        "space_code mismatch between context and ancestor_id");
+                        "space_code mismatch between space_code and ancestor_id");
             } else {
                 spaceCode = ancestor.getSpaceCode();
             }
         }
-        if(StringUtils.isEmpty(spaceCode)) {
-            spaceCode = BellaContextHelper.getOperateSpaceCode();
-        }
-        Assert.hasText(spaceCode, "space_code is required");
+        Assert.hasText(spaceCode, "space_code or ancestor_id is required");
         return fileService.countNodes(spaceCode, ancestor == null ? null : ancestor.getFileId());
     }
 
