@@ -62,7 +62,6 @@ import com.ke.bella.files.protocol.FileOps;
 import com.ke.bella.files.protocol.FileStatus;
 import com.ke.bella.files.protocol.ListFileOps;
 import com.ke.bella.files.protocol.PageFileOps;
-import com.ke.bella.files.utils.BellaContextHelper;
 import com.ke.bella.files.utils.CustomStringUtils;
 import com.ke.bella.files.utils.JsonUtils;
 
@@ -254,7 +253,7 @@ public class FileRepo implements BaseRepo {
 
         if(fileType.needsDirectorySupport()) {
             if(fileEntryRepo.closureWriteEnabled()) {
-                addFileClosures(fileDB.getFileId(), ancestorId);
+                addFileClosures(fileDB.getSpaceCode(), fileDB.getFileId(), ancestorId);
             }
             fileEntryRepo.addEntry(fileDB.getSpaceCode(), fileDB, ancestorId);
         }
@@ -488,16 +487,18 @@ public class FileRepo implements BaseRepo {
         return records.fetchInto(FileDB.class);
     }
 
-    private InsertSetMoreStep<FileClosureRecord> createFileClosureInsert(DSLContext dsl, String fileId, String ancestorId,
+    private InsertSetMoreStep<FileClosureRecord> createFileClosureInsert(DSLContext dsl, String spaceCode, String fileId, String ancestorId,
             Long depth) {
-        return createFileClosureInsert(dsl, fileId, ancestorId, depth, -1L);
+        return createFileClosureInsert(dsl, spaceCode, fileId, ancestorId, depth, -1L);
     }
 
-    private InsertSetMoreStep<FileClosureRecord> createFileClosureInsert(DSLContext dsl, String fileId, String ancestorId,
+    private InsertSetMoreStep<FileClosureRecord> createFileClosureInsert(DSLContext dsl, String spaceCode, String fileId, String ancestorId,
             Long depth,
             Long rootDepth) {
         FileClosureRecord rec = FILE_CLOSURE.newRecord();
-        rec.setSpaceCode(BellaContextHelper.getOperateSpaceCode());
+        // closure rows must live in the file's space, not the operator's:
+        // imports may target a space other than the login context
+        rec.setSpaceCode(spaceCode);
         rec.setAncestorId(ancestorId);
         rec.setDescendantId(fileId);
         rec.setDepth(depth);
@@ -508,7 +509,7 @@ public class FileRepo implements BaseRepo {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public void addFileClosures(String fileId, String ancestorId) {
+    public void addFileClosures(String spaceCode, String fileId, String ancestorId) {
         String shardingKey = getShardingKeyByFileId(fileId);
         DSLContext dsl = db(shardingKey);
         List<InsertSetMoreStep<FileClosureRecord>> inserts = new ArrayList<>();
@@ -524,11 +525,11 @@ public class FileRepo implements BaseRepo {
             rootDepth = (long) (ancestorClosures.size() + 1);
 
             for (FileClosureRecord ancestorClosure : ancestorClosures) {
-                inserts.add(createFileClosureInsert(dsl, fileId, ancestorClosure.getAncestorId(), ancestorClosure.getDepth() + 1));
+                inserts.add(createFileClosureInsert(dsl, spaceCode, fileId, ancestorClosure.getAncestorId(), ancestorClosure.getDepth() + 1));
             }
         }
 
-        inserts.add(createFileClosureInsert(dsl, fileId, fileId, 0L, rootDepth));
+        inserts.add(createFileClosureInsert(dsl, spaceCode, fileId, fileId, 0L, rootDepth));
 
         int[] results = dsl.batch(inserts).execute();
         if(results.length != inserts.size()) {
@@ -572,7 +573,7 @@ public class FileRepo implements BaseRepo {
             ClosureMoveSnapshot snapshot = loadClosureMoveSnapshot(dsl, fileId, targetAncestorId);
 
             deleteExternalClosures(dsl, snapshot);
-            insertExternalClosures(dsl, snapshot, fileId);
+            insertExternalClosures(dsl, snapshot, fileId, file.getSpaceCode());
             updateSubtreeRootDepths(dsl, snapshot, fileId);
         }
         fileEntryRepo.move(file.getSpaceCode(), fileId, targetAncestorId);
@@ -644,7 +645,7 @@ public class FileRepo implements BaseRepo {
         }
     }
 
-    private void insertExternalClosures(DSLContext dsl, ClosureMoveSnapshot snapshot, String fileId) {
+    private void insertExternalClosures(DSLContext dsl, ClosureMoveSnapshot snapshot, String fileId, String spaceCode) {
         if(StringUtils.isEmpty(snapshot.targetAncestorId)) {
             return;
         }
@@ -665,7 +666,7 @@ public class FileRepo implements BaseRepo {
                 FILE_CLOSURE.DEPTH, FILE_CLOSURE.ROOT_DEPTH, FILE_CLOSURE.CUID, FILE_CLOSURE.CU_NAME,
                 FILE_CLOSURE.CTIME, FILE_CLOSURE.MUID, FILE_CLOSURE.MU_NAME, FILE_CLOSURE.MTIME)
                 .select(dsl.select(targetAncestorId, subtreeDescendantId,
-                        DSL.val(BellaContextHelper.getOperateSpaceCode()), targetDepth.add(1L).add(subtreeDepth),
+                        DSL.val(spaceCode), targetDepth.add(1L).add(subtreeDepth),
                         DSL.val(-1L), DSL.val(audit.getCuid() == null ? 0L : audit.getCuid()),
                         DSL.val(audit.getCuName() == null ? "" : audit.getCuName()), DSL.val(audit.getCtime()),
                         DSL.val(audit.getMuid() == null ? 0L : audit.getMuid()),

@@ -347,6 +347,38 @@ public class FileEntryRepoTest {
         assertTrue(fileRepo.listFile(null, 2, "asc", missingCursorId, SOURCE_SPACE, null).isEmpty());
     }
 
+    @Test
+    public void addFileWritesClosureInFileSpaceNotOperatorSpace() {
+        // login context stays in SOURCE_SPACE while the file targets TARGET_SPACE,
+        // mimicking an import with space_code in the request body
+        setOperator(SOURCE_SPACE);
+        String hash = String.valueOf(Math.abs(CustomStringUtils.hashCode(TARGET_SPACE)));
+        String fileId = "file-260808000000000321-" + hash + FileType.USER.getSuffix();
+        FileDB file = new FileDB();
+        file.setFileId(fileId);
+        file.setFilename("import.txt");
+        file.setIsDir(0);
+        file.setNodeType(NodeType.FILE.getValue());
+        file.setResourceId("");
+        file.setSpaceCode(TARGET_SPACE);
+        file.setPurpose("assistants");
+        file.setStatus(FileStatus.NOT_DELETED.getValue());
+        file.setBucket("bucket");
+        file.setPath("import/import.txt");
+        file.setMetaData("{}");
+        fileRepo.addFile(file, null, FileType.USER);
+
+        DSLContext shardDsl = DSLContextHolder.get(FileRepo.getShardingKeyBySpaceCode(TARGET_SPACE), dsl);
+        List<String> closureSpaces = shardDsl.select(FILE_CLOSURE.SPACE_CODE).from(FILE_CLOSURE)
+                .where(FILE_CLOSURE.DESCENDANT_ID.eq(fileId))
+                .fetchInto(String.class);
+        assertFalse(closureSpaces.isEmpty());
+        assertTrue(closureSpaces.stream().allMatch(TARGET_SPACE::equals));
+
+        // duplicate detection in the target space now sees the file
+        assertTrue(fileRepo.exists(TARGET_SPACE, null, "import.txt"));
+    }
+
     private FileDB addDirectory(String spaceCode, String filename, String ancestorId, String seed) {
         return add(spaceCode, filename, ancestorId, seed, FileType.DIRECTORY, 1, NodeType.DIRECTORY, "");
     }
