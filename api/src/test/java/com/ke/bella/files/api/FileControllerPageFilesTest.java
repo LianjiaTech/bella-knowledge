@@ -121,7 +121,7 @@ public class FileControllerPageFilesTest {
     public void pageFiles_NullRequestBody() throws Exception {
         mockMvc.perform(post("/v1/files/page")
                 .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isInternalServerError());
+                .andExpect(status().isBadRequest());
     }
 
     @Test

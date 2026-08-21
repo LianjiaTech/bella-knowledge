@@ -11,6 +11,8 @@ import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.HttpMessageConverter;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.http.server.ServerHttpRequest;
 import org.springframework.http.server.ServerHttpResponse;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -80,6 +82,11 @@ public class FileApiResponseAdvice implements ResponseBodyAdvice<Object> {
             msg = String.format("File size exceeds the maximum limit of %s.", MAX_FILE_SIZE);
         } else if(e instanceof IllegalArgumentException) {
             code = 400;
+        } else if(e instanceof HttpMessageNotReadableException) {
+            code = 400;
+            msg = "Request body is missing or malformed";
+        } else if(e instanceof HttpMediaTypeNotSupportedException) {
+            code = 415;
         } else if(e instanceof NotImplementedException) {
             code = 405;
         } else if (e instanceof AccessDeniedException) {

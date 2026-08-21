@@ -77,6 +77,54 @@ public class FileService {
         return fileRepo.exists(spaceCode, ancestorId, filename);
     }
 
+    public String bucketForPurpose(String purpose) {
+        return VISION.equals(purpose) ? bucketConfig.getPublicBucket() : bucketConfig.getPrivateBucket();
+    }
+
+    /**
+     * Internal buckets are excluded even if configured, so an external-bucket
+     * import can never bypass the import/ path restriction on our own buckets.
+     */
+    public boolean isAllowedImportSource(String bucket) {
+        return bucketConfig.getImportSourceBuckets().contains(bucket)
+                && !StringUtils.equals(bucket, bucketConfig.getPrivateBucket())
+                && !StringUtils.equals(bucket, bucketConfig.getPublicBucket());
+    }
+
+    public boolean objectExists(String bucket, String path) {
+        return storageService.objectExists(bucket, path);
+    }
+
+    public long objectSize(String bucket, String path) {
+        return storageService.objectSize(bucket, path);
+    }
+
+    public OpenAIFile importObject(
+            String spaceCode,
+            String bucket,
+            String path,
+            long contentLength,
+            String filename,
+            String purpose,
+            String metadata,
+            String mimeType,
+            String type,
+            String extension,
+            String ancestorId,
+            String description,
+            List<String> cities,
+            List<String> tags) {
+        FileType fileType = FilePurposeClassifier.classify(purpose);
+        String fileId = FILE_ID_GENERATOR.generateWithType(fileType, spaceCode);
+        FileUploadContext context = self.createFileWithId(spaceCode, fileId, bucket, path, filename, contentLength,
+                purpose, metadata, mimeType, type, extension, ancestorId, description, cities, tags);
+        return self.finalizeFileUpload(context.getFileDB(), metadata);
+    }
+
+    public FileDB queryFile(String spaceCode, String ancestorId, String filename) {
+        return fileRepo.queryFile(spaceCode, ancestorId, filename);
+    }
+
     public OpenAIFile getFile(String spaceCode, String ancestorId, String filename) {
         FileDB fileDB = fileRepo.queryFile(spaceCode, ancestorId, filename);
         if(fileDB == null) {
@@ -582,7 +630,10 @@ public class FileService {
     }
 
     public String getUrl(String bucketName, String keyName, String purpose, long expires) {
-        return purpose.equals(VISION) ? storageService.getPublicUrl(bucketName, keyName)
+        // Public URLs only work for the public bucket; vision files imported
+        // from an external source bucket fall back to a presigned URL.
+        return purpose.equals(VISION) && StringUtils.equals(bucketName, bucketConfig.getPublicBucket())
+                ? storageService.getPublicUrl(bucketName, keyName)
                 : storageService.getPresignedUrl(bucketName, keyName, expires);
     }
 

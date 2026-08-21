@@ -452,11 +452,11 @@ public class FileControllerMoveTest {
     }
 
     @Test
-    public void moveNullRequestBodyInternalServerError() throws Exception {
+    public void moveNullRequestBodyBadRequest() throws Exception {
         BellaContext.setOperator(Operator.builder().spaceCode("sp-a").build());
         mockMvc.perform(post("/v1/files/move")
                 .header("X-BELLA-SPACE-CODE", "sp-a")
                 .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isInternalServerError());
+                .andExpect(status().isBadRequest());
     }
 }

@@ -111,7 +111,7 @@ public class FileServiceMoveTransactionTest {
             Future<?> create = executor.submit(() -> {
                 setOperator();
                 createStarted.countDown();
-                fileRepo.addFileClosures(CREATED_FILE, CHILD);
+                fileRepo.addFileClosures("sp-a", CREATED_FILE, CHILD);
                 createCompleted.countDown();
             });
             assertTrue(createStarted.await(5, TimeUnit.SECONDS));

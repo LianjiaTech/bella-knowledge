@@ -185,6 +185,6 @@ public class FileControllerGetFileAncestorIdsTest {
         mockMvc.perform(post("/v1/files/ancestor-ids")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(""))
-                .andExpect(status().isInternalServerError());
+                .andExpect(status().isBadRequest());
     }
 }
