@@ -818,9 +818,6 @@ public class FileEntryRepo implements BaseRepo {
         List<String> frontier = Collections.singletonList(root.getEntryId());
         int depth = 0;
         while (!frontier.isEmpty()) {
-            if(++depth > MAX_TREE_DEPTH) {
-                throw new IllegalStateException("file_entry subtree exceeds max depth, fileId: " + root.getFileId());
-            }
             // 只取迁移必需的三列，行数据本身由 insert-select 在库内搬迁，不经应用层
             List<FileEntryDB> children = entryDb(spaceCode)
                     .select(FILE_ENTRY.ENTRY_ID, FILE_ENTRY.FILE_ID, FILE_ENTRY.TYPE)
@@ -829,6 +826,11 @@ public class FileEntryRepo implements BaseRepo {
                     .and(FILE_ENTRY.PARENT_ENTRY_ID.in(frontier))
                     .forUpdate()
                     .fetchInto(FileEntryDB.class);
+            // 深度在查到非空下一层后才累加：最深层是空目录时的“确认无子节点”查询不计入，
+            // 恰好 MAX_TREE_DEPTH 层的合法子树可以迁移
+            if(!children.isEmpty() && ++depth > MAX_TREE_DEPTH) {
+                throw new IllegalStateException("file_entry subtree exceeds max depth, fileId: " + root.getFileId());
+            }
             result.addAll(children);
             frontier = children.stream()
                     .filter(entry -> TYPE_DIR.equals(entry.getType()))

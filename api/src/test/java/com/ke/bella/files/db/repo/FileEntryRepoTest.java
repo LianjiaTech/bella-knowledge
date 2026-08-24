@@ -316,6 +316,34 @@ public class FileEntryRepoTest {
     }
 
     @Test
+    public void crossSpaceMoveHandlesSubtreeAtMaxDepthAndRejectsBeyond() {
+        entryRepo.setFileEntryWriteMode("entry");
+        entryRepo.setCrossSpaceMoveEnabled(true);
+        FileDB root = addDirectory(SOURCE_SPACE, "depth-root", null, "depth-root");
+        FileDB deepest = root;
+        for (int level = 1; level <= FileEntryRepo.MAX_TREE_DEPTH; level++) {
+            deepest = addDirectory(SOURCE_SPACE, "d-" + level, deepest.getFileId(), "depth-" + level);
+        }
+        setOperator(TARGET_SPACE);
+        FileDB targetParent = addDirectory(TARGET_SPACE, "depth-target", null, "depth-target");
+
+        // 恰好 MAX_TREE_DEPTH 层且最深节点是空目录：确认无子节点的查询不计入深度，迁移成功
+        setOperator(SOURCE_SPACE);
+        assertNotNull(entryRepo.moveAcrossSpace(root.getFileId(), TARGET_SPACE, targetParent.getFileId()));
+        assertNotNull(entryRepo.queryActiveByFileId(TARGET_SPACE, deepest.getFileId()));
+
+        // 超过 MAX_TREE_DEPTH 层的子树拒绝迁移
+        FileDB overRoot = addDirectory(SOURCE_SPACE, "over-root", null, "over-root");
+        FileDB overDeepest = overRoot;
+        for (int level = 1; level <= FileEntryRepo.MAX_TREE_DEPTH + 1; level++) {
+            overDeepest = addDirectory(SOURCE_SPACE, "o-" + level, overDeepest.getFileId(), "over-" + level);
+        }
+        IllegalStateException error = assertThrows(IllegalStateException.class,
+                () -> entryRepo.moveAcrossSpace(overRoot.getFileId(), TARGET_SPACE, null));
+        assertTrue(error.getMessage().contains("exceeds max depth"));
+    }
+
+    @Test
     public void crossSpaceMoveRejectsMovingIntoOwnSubtree() {
         entryRepo.setFileEntryWriteMode("entry");
         entryRepo.setCrossSpaceMoveEnabled(true);
