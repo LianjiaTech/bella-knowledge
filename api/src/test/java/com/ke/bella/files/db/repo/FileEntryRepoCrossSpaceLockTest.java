@@ -1,7 +1,9 @@
 package com.ke.bella.files.db.repo;
 
 import static com.ke.bella.files.db.Tables.FILE_ENTRY;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.util.concurrent.CountDownLatch;
@@ -150,6 +152,65 @@ public class FileEntryRepoCrossSpaceLockTest {
             assertTrue(sourceRoot.getEntryId().equals(sourceChild.getParentEntryId()));
             DSLContext targetDsl = DSLContextHolder.get(FileRepo.getShardingKeyBySpaceCode(TARGET_SPACE), dsl);
             assertTrue(targetDsl.fetchCount(FILE_ENTRY, FILE_ENTRY.SPACE_CODE.eq(TARGET_SPACE)) == 0);
+        } finally {
+            allowCommit.countDown();
+        }
+    }
+
+    @Test
+    public void crossSpaceMoveWaitsForRootLockAndUsesRenamedFilename() throws Exception {
+        FileDB movedDir = addDirectory(SOURCE_SPACE, "root-old-name", null, "root-lock-src");
+        FileDB child = addFile(SOURCE_SPACE, "root-lock-child.txt", movedDir.getFileId(), "root-lock-child");
+        setOperator(TARGET_SPACE);
+        FileDB targetParent = addDirectory(TARGET_SPACE, "root-lock-target", null, "root-lock-target");
+        String rootEntryId = entryRepo.queryActiveByFileId(SOURCE_SPACE, movedDir.getFileId()).getEntryId();
+
+        CountDownLatch rootLocked = new CountDownLatch(1);
+        CountDownLatch allowCommit = new CountDownLatch(1);
+        CountDownLatch moveFinished = new CountDownLatch(1);
+        AtomicReference<Throwable> moveError = new AtomicReference<>();
+        TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+
+        try {
+            // 事务一：并发 rename 根节点，提交前挂起
+            Future<?> rename = executor.submit(() -> transactionTemplate.executeWithoutResult(status -> {
+                DSLContext sourceDsl = DSLContextHolder.get(FileRepo.getShardingKeyBySpaceCode(SOURCE_SPACE), dsl);
+                sourceDsl.update(FILE_ENTRY)
+                        .set(FILE_ENTRY.FILENAME, "root-new-name")
+                        .where(FILE_ENTRY.SPACE_CODE.eq(SOURCE_SPACE))
+                        .and(FILE_ENTRY.ENTRY_ID.eq(rootEntryId))
+                        .execute();
+                rootLocked.countDown();
+                await(allowCommit);
+            }));
+            assertTrue(rootLocked.await(5, TimeUnit.SECONDS));
+
+            // 事务二：跨空间迁移必须阻塞在根 entry 锁上，锁定后以最新 filename 为准
+            Future<?> move = executor.submit(() -> {
+                setOperator(SOURCE_SPACE);
+                try {
+                    entryRepo.moveAcrossSpace(movedDir.getFileId(), TARGET_SPACE, targetParent.getFileId());
+                } catch (Throwable t) {
+                    moveError.set(t);
+                }
+                moveFinished.countDown();
+            });
+            if(moveFinished.await(200, TimeUnit.MILLISECONDS)) {
+                throw new AssertionError("moveAcrossSpace did not block on source root lock", moveError.get());
+            }
+
+            allowCommit.countDown();
+            rename.get(5, TimeUnit.SECONDS);
+            assertTrue(moveFinished.await(5, TimeUnit.SECONDS));
+            move.get(5, TimeUnit.SECONDS);
+
+            assertNull(moveError.get());
+            FileEntryDB movedRoot = entryRepo.queryActiveByFileId(TARGET_SPACE, movedDir.getFileId());
+            assertNotNull(movedRoot);
+            assertEquals("root-new-name", movedRoot.getFilename());
+            FileEntryDB movedChild = entryRepo.queryActiveByFileId(TARGET_SPACE, child.getFileId());
+            assertNotNull(movedChild);
+            assertEquals(movedRoot.getEntryId(), movedChild.getParentEntryId());
         } finally {
             allowCommit.countDown();
         }

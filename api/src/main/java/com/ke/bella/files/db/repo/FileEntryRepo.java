@@ -672,6 +672,9 @@ public class FileEntryRepo implements BaseRepo {
             move(sourceSpaceCode, fileId, targetAncestorId);
             return queryActiveByFileId(targetSpaceCode, fileId);
         }
+        // 先锁根再遍历子树：迁移期间不允许并发修改命中子树的目录关系，
+        // 根不加锁时并发 rename/move/delete 会让迁移使用过期的 filename 或父关系
+        source = lockSourceEntry(sourceSpaceCode, source.getEntryId());
         List<FileEntryDB> descendants = TYPE_DIR.equals(source.getType())
                 ? collectSubtreeDescendants(sourceSpaceCode, source)
                 : Collections.emptyList();
@@ -688,6 +691,22 @@ public class FileEntryRepo implements BaseRepo {
             moveSubtreeAcrossSpace(source, descendants, sourceSpaceCode, targetSpaceCode, targetParentEntryId);
         }
         return queryActiveByFileId(targetSpaceCode, fileId);
+    }
+
+    /**
+     * 子树根 entry FOR UPDATE 锁定并以锁后行为准：ensureLegacyEntry 是普通读，
+     * 加锁前的并发 rename/move/delete 在锁定重读后会反映为最新状态或行缺失。
+     */
+    private FileEntryDB lockSourceEntry(String spaceCode, String entryId) {
+        FileEntryDB locked = entryDb(spaceCode).selectFrom(FILE_ENTRY)
+                .where(FILE_ENTRY.SPACE_CODE.eq(spaceCode))
+                .and(FILE_ENTRY.ENTRY_ID.eq(entryId))
+                .forUpdate()
+                .fetchOneInto(FileEntryDB.class);
+        if(locked == null) {
+            throw new IllegalStateException("source file_entry no longer exists, entryId: " + entryId);
+        }
+        return locked;
     }
 
     /**
