@@ -680,14 +680,22 @@ public class FileEntryRepo implements BaseRepo {
             move(sourceSpaceCode, fileId, targetAncestorId);
             return queryActiveByFileId(targetSpaceCode, fileId);
         }
-        // 先锁根再遍历子树：迁移期间不允许并发修改命中子树的目录关系，
-        // 根不加锁时并发 rename/move/delete 会让迁移使用过期的 filename 或父关系
-        source = lockSourceEntry(sourceSpaceCode, source.getEntryId());
+        String targetParentEntryId = resolveParentEntryId(targetSpaceCode, targetAncestorId);
+        // 源根与目标父两把锚点锁统一按 (物理分片, entry_id) 全序获取，消除 A→B 与 B→A
+        // 并发迁移的环形等待；先锁锚点再 BFS 遍历子树，根不加锁时并发 rename/move/delete
+        // 会让迁移使用过期的 filename 或父关系。子树行锁仍按 BFS 层序追加，
+        // 与锚点构成的残余复合环依赖数据库死锁检测回滚兜底。
+        if(ROOT_ENTRY_ID.equals(targetParentEntryId) || lockOrderKey(sourceSpaceCode, source.getEntryId())
+                .compareTo(lockOrderKey(targetSpaceCode, targetParentEntryId)) <= 0) {
+            source = lockSourceEntry(sourceSpaceCode, source.getEntryId());
+            lockTargetParentEntry(targetSpaceCode, targetParentEntryId);
+        } else {
+            lockTargetParentEntry(targetSpaceCode, targetParentEntryId);
+            source = lockSourceEntry(sourceSpaceCode, source.getEntryId());
+        }
         List<FileEntryDB> descendants = TYPE_DIR.equals(source.getType())
                 ? collectSubtreeDescendants(sourceSpaceCode, source)
                 : Collections.emptyList();
-        String targetParentEntryId = resolveParentEntryId(targetSpaceCode, targetAncestorId);
-        lockTargetParentEntry(targetSpaceCode, targetParentEntryId);
         if(source.getEntryId().equals(targetParentEntryId)
                 || descendants.stream().anyMatch(entry -> entry.getEntryId().equals(targetParentEntryId))) {
             throw new IllegalArgumentException("cannot move a node into itself or its descendant, fileId: " + fileId);
@@ -699,6 +707,13 @@ public class FileEntryRepo implements BaseRepo {
             moveSubtreeAcrossSpace(source, descendants, sourceSpaceCode, targetSpaceCode, targetParentEntryId);
         }
         return queryActiveByFileId(targetSpaceCode, fileId);
+    }
+
+    /**
+     * 锚点锁的全序键：分片号定宽补零，避免字符串比较把 "10" 排在 "2" 前面。
+     */
+    private static String lockOrderKey(String spaceCode, String entryId) {
+        return String.format("%02d", Integer.parseInt(FileRepo.getShardingKeyBySpaceCode(spaceCode))) + ':' + entryId;
     }
 
     /**
