@@ -15,7 +15,7 @@
 1. 删除上一次 benchmark 的容器和数据卷。
 2. 构建并启动隔离环境。
 3. 生成 1 MiB 上传样本。
-4. 依次运行 `smoke`、`files-read`、`files-upload`、`files-move`、`datasets`、`mixed`。
+4. 依次运行 `smoke`、`files-read`、`files-upload`、`files-move`、`files-cross-shard-move`、`datasets`、`mixed`。
 5. 将完整 k6 JSON 和汇总报告写入 `benchmark/results/`。
 
 环境会在执行后保持运行，方便检查指标和日志。完成后执行：
@@ -49,6 +49,7 @@
 | `files-read` | 单文件查询、文件列表、首页/深页分页、批量祖先查询 |
 | `files-upload` | 不同文件名的并发流式上传 |
 | `files-move` | 不同目标深度、指定子树规模下的并发目录移动 |
+| `files-cross-shard-move` | 将大目录树从源空间迁移到不同数据库分片的目标空间，并单独统计迁移耗时 |
 | `datasets` | dataset 分页、QA 查询/分页以及并发写入 |
 | `mixed` | 文件读、分页、上传、建目录和移动的混合负载 |
 
@@ -67,6 +68,11 @@ BENCH_SEED_FILES=1000 ./benchmark/bench run files-read
 # 移动 100 个节点的子树，目标目录深度为 10
 BENCH_MOVE_SUBTREE_SIZE=100 BENCH_MOVE_TARGET_DEPTH=10 ./benchmark/bench run files-move
 
+# 将 5000 节点、分支因子 20 的目录树跨空间跨分片移动一次
+BENCH_CROSS_SHARD_SUBTREE_SIZE=5000 \
+BENCH_CROSS_SHARD_BRANCHING=20 \
+./benchmark/bench run files-cross-shard-move
+
 # 复用已经构建好的 API 镜像
 BENCH_BUILD=0 ./benchmark/bench run smoke
 ```
@@ -83,6 +89,11 @@ BENCH_BUILD=0 ./benchmark/bench run smoke
 | `BENCH_DATASET_SEED_QAS` | `30` | datasets 预置 QA 条数 |
 | `BENCH_MOVE_SUBTREE_SIZE` | `10` | files-move 子树节点总数 |
 | `BENCH_MOVE_TARGET_DEPTH` | `3` | files-move 目标目录深度 |
+| `BENCH_CROSS_SHARD_TARGET_SPACE` | `cross-shard-benchmark` | 跨分片移动的目标空间；必须与 `BENCH_SPACE_CODE` 落在不同分片 |
+| `BENCH_CROSS_SHARD_SUBTREE_SIZE` | `1000` | 跨分片移动的目录树节点总数 |
+| `BENCH_CROSS_SHARD_BRANCHING` | `10` | 大子树每个目录最多创建的直接子目录数 |
+| `BENCH_CROSS_SHARD_MOVE_WORKERS` | `1` | 独立大子树迁移样本数 |
+| `BENCH_CROSS_SHARD_P95_MS` | `10000` | 跨分片迁移独立 p95 门禁，单位毫秒 |
 | `BENCH_TASK_THREADS` | `16` | API 后台任务工作线程数 |
 | `BENCH_TASK_QUEUE_CAPACITY` | `1000` | API 后台任务队列容量 |
 | `BENCH_API_HEAP` | `1024m` | API 的固定 Xms/Xmx |

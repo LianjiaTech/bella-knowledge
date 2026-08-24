@@ -4,7 +4,7 @@ set -Eeuo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BENCH_DIR="$ROOT_DIR/benchmark"
 COMPOSE_FILE="$BENCH_DIR/docker-compose.yml"
-SCENARIOS=(smoke files-read files-upload files-move datasets mixed)
+SCENARIOS=(smoke files-read files-upload files-move files-cross-shard-move datasets mixed)
 
 log() {
   printf '[benchmark] %s\n' "$*"
@@ -153,8 +153,8 @@ run_all() {
 usage() {
   cat <<'USAGE'
 Usage:
-  ./benchmark/bench                 Run all six scenarios
-  ./benchmark/bench all             Run all six scenarios
+  ./benchmark/bench                 Run all seven scenarios
+  ./benchmark/bench all             Run all seven scenarios
   ./benchmark/bench run <scenario>  Run one scenario
   ./benchmark/bench up              Start the isolated stack
   ./benchmark/bench report          Rebuild results/report.md
@@ -162,11 +162,12 @@ Usage:
   ./benchmark/bench clean           Stop containers and delete benchmark data
 
 Scenarios:
-  smoke, files-read, files-upload, files-move, datasets, mixed
+  smoke, files-read, files-upload, files-move, files-cross-shard-move, datasets, mixed
 
 Common overrides:
   BENCH_DURATION=60s BENCH_VUS=8 ./benchmark/bench run files-read
   BENCH_UPLOAD_BYTES=16777216 BENCH_VUS=4 ./benchmark/bench run files-upload
+  BENCH_CROSS_SHARD_SUBTREE_SIZE=1000 ./benchmark/bench run files-cross-shard-move
   BENCH_BUILD=0 ./benchmark/bench all
 USAGE
 }

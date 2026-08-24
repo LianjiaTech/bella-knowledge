@@ -14,7 +14,7 @@ function consoleSummary(data, runId) {
   const failures = (metrics.http_req_failed || {}).values || {};
   const checks = (metrics.checks || {}).values || {};
   const operationLines = Object.keys(metrics)
-    .filter((name) => name.startsWith('mixed_') && name.endsWith('_duration'))
+    .filter((name) => (name.startsWith('mixed_') && name.endsWith('_duration')) || name === 'cross_shard_move_duration')
     .sort()
     .map((name) => trendLine(name, metrics[name].values || {}));
   return [
@@ -30,7 +30,9 @@ function consoleSummary(data, runId) {
 }
 
 function trendLine(name, values) {
-  const operation = name.slice('mixed_'.length, -'_duration'.length);
+  const operation = name === 'cross_shard_move_duration'
+    ? 'cross-shard move'
+    : name.slice('mixed_'.length, -'_duration'.length);
   return `${operation} p50/p95/p99: ${format(values.med)} / ${format(values['p(95)'])} / ${format(values['p(99)'])} ms`;
 }
 
