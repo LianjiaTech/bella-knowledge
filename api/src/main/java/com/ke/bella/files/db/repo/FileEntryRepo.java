@@ -595,7 +595,8 @@ public class FileEntryRepo implements BaseRepo {
         assertNameAvailable(spaceCode, entry.getParentEntryId(), filename, entry.getEntryId());
         int updated = entryDb(spaceCode).update(FILE_ENTRY)
                 .set(FILE_ENTRY.FILENAME, filename)
-                .where(FILE_ENTRY.ENTRY_ID.eq(entry.getEntryId()))
+                .where(FILE_ENTRY.SPACE_CODE.eq(spaceCode))
+                .and(FILE_ENTRY.ENTRY_ID.eq(entry.getEntryId()))
                 .execute();
         if(updated != 1) {
             throw new IllegalStateException("rename file_entry failed, fileId: " + fileId);
@@ -612,7 +613,8 @@ public class FileEntryRepo implements BaseRepo {
         assertNameAvailable(spaceCode, parentEntryId, entry.getFilename(), entry.getEntryId());
         int updated = entryDb(spaceCode).update(FILE_ENTRY)
                 .set(FILE_ENTRY.PARENT_ENTRY_ID, parentEntryId)
-                .where(FILE_ENTRY.ENTRY_ID.eq(entry.getEntryId()))
+                .where(FILE_ENTRY.SPACE_CODE.eq(spaceCode))
+                .and(FILE_ENTRY.ENTRY_ID.eq(entry.getEntryId()))
                 .execute();
         if(updated != 1) {
             throw new IllegalStateException("move file_entry failed, fileId: " + fileId);
