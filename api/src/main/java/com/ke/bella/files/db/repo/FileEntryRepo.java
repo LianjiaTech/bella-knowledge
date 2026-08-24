@@ -814,6 +814,7 @@ public class FileEntryRepo implements BaseRepo {
      * 仅根 entry 的 parent_entry_id 指向目标父入口），并批量刷新 file.space_code 缓存。
      * 只迁窄表 file_entry，不随迁闭包，因此仅允许在 write-mode=entry（闭包已停写）下执行；
      * file 物理行、file_id、bucket/path 和对象内容均不变；失败整体回滚，源目录保持完好。
+     * 跨空间不一定跨分片：两个空间落在同一物理分片时原地 UPDATE 改写空间归属，仅跨分片才搬行。
      */
     private void moveSubtreeAcrossSpace(FileEntryDB source, List<FileEntryDB> descendants, String sourceSpaceCode,
             String targetSpaceCode, String targetParentEntryId) {
@@ -829,7 +830,54 @@ public class FileEntryRepo implements BaseRepo {
         List<String> entryIds = subtree.stream().map(FileEntryDB::getEntryId).collect(Collectors.toList());
         List<String> fileIds = subtree.stream().map(FileEntryDB::getFileId).collect(Collectors.toList());
 
-        // 源/目标分片表同库，单条 insert-select 整体搬迁，行数据不经应用层；再整体删除源行
+        String sourceShard = FileRepo.getShardingKeyBySpaceCode(sourceSpaceCode);
+        String targetShard = FileRepo.getShardingKeyBySpaceCode(targetSpaceCode);
+        if(sourceShard.equals(targetShard)) {
+            relabelSubtreeSpaceInPlace(source, entryIds, sourceSpaceCode, targetSpaceCode, targetParentEntryId);
+        } else {
+            migrateSubtreeBetweenShards(source, entryIds, sourceSpaceCode, targetSpaceCode, targetParentEntryId);
+        }
+        updateFileSpaceCache(fileIds, targetSpaceCode);
+        long elapsedMillis = System.currentTimeMillis() - startMillis;
+        if(subtree.size() > crossSpaceMoveWarnThreshold) {
+            LOGGER.warn("large cross-space subtree move, size: {}, source space: {}, target space: {}, elapsed: {}ms, fileId: {}",
+                    subtree.size(), sourceSpaceCode, targetSpaceCode, elapsedMillis, fileId);
+        }
+    }
+
+    /**
+     * 同分片快路径：源/目标空间同表，原地 UPDATE 改写 space_code（根 entry 同时改指目标父入口），
+     * 不搬行、无新自增 id，物理行的 id/ctime/cuid 天然保留。
+     */
+    private void relabelSubtreeSpaceInPlace(FileEntryDB source, List<String> entryIds, String sourceSpaceCode,
+            String targetSpaceCode, String targetParentEntryId) {
+        FileEntryRecord audit = FILE_ENTRY.newRecord();
+        fillUpdatorInfo(audit);
+        int updated = 0;
+        for (List<String> chunk : partition(entryIds, sqlInChunkSize)) {
+            updated += entryDb(sourceSpaceCode).update(FILE_ENTRY)
+                    .set(FILE_ENTRY.SPACE_CODE, targetSpaceCode)
+                    .set(FILE_ENTRY.PARENT_ENTRY_ID, DSL.when(FILE_ENTRY.ENTRY_ID.eq(source.getEntryId()), targetParentEntryId)
+                            .otherwise(FILE_ENTRY.PARENT_ENTRY_ID))
+                    .set(FILE_ENTRY.MUID, audit.getMuid() == null ? 0L : audit.getMuid())
+                    .set(FILE_ENTRY.MU_NAME, audit.getMuName() == null ? "" : audit.getMuName())
+                    .set(FILE_ENTRY.MTIME, audit.getMtime())
+                    .where(FILE_ENTRY.SPACE_CODE.eq(sourceSpaceCode))
+                    .and(FILE_ENTRY.ENTRY_ID.in(chunk))
+                    .execute();
+        }
+        if(updated != entryIds.size()) {
+            throw new IllegalStateException("relabel subtree file_entry space failed, fileId: " + source.getFileId()
+                    + ", expected: " + entryIds.size() + ", updated: " + updated);
+        }
+    }
+
+    /**
+     * 跨分片迁移：源/目标分片表同库，单条 insert-select 整体搬行（行数据不经应用层），再整体删除源行。
+     */
+    private void migrateSubtreeBetweenShards(FileEntryDB source, List<String> entryIds, String sourceSpaceCode,
+            String targetSpaceCode, String targetParentEntryId) {
+        String fileId = source.getFileId();
         FileEntryRecord audit = FILE_ENTRY.newRecord();
         fillUpdatorInfo(audit);
         Table<?> sourceTable = DSL.table(DSL.name("file_entry_" + FileRepo.getShardingKeyBySpaceCode(sourceSpaceCode)));
@@ -860,12 +908,6 @@ public class FileEntryRepo implements BaseRepo {
         }
         if(deleted != entryIds.size()) {
             throw new IllegalStateException("delete source subtree file_entry failed, fileId: " + fileId);
-        }
-        updateFileSpaceCache(fileIds, targetSpaceCode);
-        long elapsedMillis = System.currentTimeMillis() - startMillis;
-        if(subtree.size() > crossSpaceMoveWarnThreshold) {
-            LOGGER.warn("large cross-space subtree move, size: {}, source space: {}, target space: {}, elapsed: {}ms, fileId: {}",
-                    subtree.size(), sourceSpaceCode, targetSpaceCode, elapsedMillis, fileId);
         }
     }
 

@@ -390,7 +390,9 @@ public class FileEntryRepoTest {
     @Test
     public void crossSpaceMoveWithinSamePhysicalShardKeepsBothSpacesIsolated() {
         entryRepo.setFileEntryWriteMode("entry");
-        // 找一个与源空间落在同一物理分片的不同空间：insert-select 源表与目标表为同一张表
+        // 块大小压到 1，强制同分片 UPDATE 快路径也走分块
+        entryRepo.setSqlInChunkSize(1);
+        // 找一个与源空间落在同一物理分片的不同空间：走原地 UPDATE 快路径，源/目标为同一张表
         String sourceShard = FileRepo.getShardingKeyBySpaceCode(SOURCE_SPACE);
         String siblingSpace = null;
         for (int index = 0; index < 1000 && siblingSpace == null; index++) {
@@ -406,6 +408,7 @@ public class FileEntryRepoTest {
         FileDB targetParent = addDirectory(siblingSpace, "shard-target", null, "shard-target");
 
         setOperator(SOURCE_SPACE);
+        FileEntryDB childBefore = entryRepo.queryActiveByFileId(SOURCE_SPACE, child.getFileId());
         FileEntryDB moved = entryRepo.moveAcrossSpace(root, siblingSpace, targetParent);
         assertNotNull(moved);
         assertNull(entryRepo.queryActiveByFileId(SOURCE_SPACE, root.getFileId()));
@@ -414,6 +417,9 @@ public class FileEntryRepoTest {
         assertNotNull(movedChild);
         assertEquals(moved.getEntryId(), movedChild.getParentEntryId());
         assertEquals(siblingSpace, fileRepo.queryFile(child.getFileId()).getSpaceCode());
+        // 原地 UPDATE：物理行未搬迁，自增 id 与创建审计信息保留
+        assertEquals(childBefore.getId(), movedChild.getId());
+        assertEquals(childBefore.getCtime(), movedChild.getCtime());
     }
 
     @Test
