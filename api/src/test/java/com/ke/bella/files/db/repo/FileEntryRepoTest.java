@@ -46,6 +46,7 @@ import com.ke.bella.openapi.Operator;
 public class FileEntryRepoTest {
     private static final String SOURCE_SPACE = "sp-a";
     private static final String TARGET_SPACE = "sp-b";
+    private static final String SAME_SHARD_SPACE = "sp-collision-17";
 
     private static Connection connection;
     private static DSLContext dsl;
@@ -110,6 +111,36 @@ public class FileEntryRepoTest {
                 .fetchCount(FILE_ENTRY, FILE_ENTRY.FILE_ID.eq(file.getFileId())));
         FileDB recreated = addFile(SOURCE_SPACE, "renamed.txt", secondParent.getFileId(), "recreated");
         assertNotEquals(original.getEntryId(), entryRepo.queryActiveByFileId(SOURCE_SPACE, recreated.getFileId()).getEntryId());
+    }
+
+    @Test
+    public void renameAndMoveOnlyUpdateMatchingSpaceWhenEntryIdsCollide() {
+        assertEquals(FileRepo.getShardingKeyBySpaceCode(SOURCE_SPACE), FileRepo.getShardingKeyBySpaceCode(SAME_SHARD_SPACE));
+        FileDB firstParent = addDirectory(SOURCE_SPACE, "parent-a", null, "same-shard-source-parent-a");
+        FileDB secondParent = addDirectory(SOURCE_SPACE, "parent-b", null, "same-shard-source-parent-b");
+        FileDB sourceFile = addFile(SOURCE_SPACE, "source.txt", firstParent.getFileId(), "same-shard-source-file");
+        FileDB otherParent = addDirectory(SAME_SHARD_SPACE, "other-parent", null, "same-shard-other-parent");
+        FileDB otherFile = addFile(SAME_SHARD_SPACE, "other.txt", otherParent.getFileId(), "same-shard-other-file");
+
+        FileEntryDB sourceEntry = entryRepo.queryActiveByFileId(SOURCE_SPACE, sourceFile.getFileId());
+        FileEntryDB otherEntry = entryRepo.queryActiveByFileId(SAME_SHARD_SPACE, otherFile.getFileId());
+        DSLContext shardDsl = DSLContextHolder.get(FileRepo.getShardingKeyBySpaceCode(SOURCE_SPACE), dsl);
+        assertEquals(1, shardDsl.update(FILE_ENTRY)
+                .set(FILE_ENTRY.ENTRY_ID, sourceEntry.getEntryId())
+                .where(FILE_ENTRY.SPACE_CODE.eq(SAME_SHARD_SPACE))
+                .and(FILE_ENTRY.ENTRY_ID.eq(otherEntry.getEntryId()))
+                .execute());
+
+        entryRepo.rename(SOURCE_SPACE, sourceFile.getFileId(), "renamed.txt");
+        assertEquals("renamed.txt", entryRepo.queryActiveByFileId(SOURCE_SPACE, sourceFile.getFileId()).getFilename());
+        FileEntryDB unchangedOther = entryRepo.queryActiveByFileId(SAME_SHARD_SPACE, otherFile.getFileId());
+        assertEquals("other.txt", unchangedOther.getFilename());
+
+        entryRepo.move(SOURCE_SPACE, sourceFile.getFileId(), secondParent.getFileId());
+        assertEquals(entryRepo.queryActiveByFileId(SOURCE_SPACE, secondParent.getFileId()).getEntryId(),
+                entryRepo.queryActiveByFileId(SOURCE_SPACE, sourceFile.getFileId()).getParentEntryId());
+        assertEquals(otherEntry.getParentEntryId(),
+                entryRepo.queryActiveByFileId(SAME_SHARD_SPACE, otherFile.getFileId()).getParentEntryId());
     }
 
     @Test
