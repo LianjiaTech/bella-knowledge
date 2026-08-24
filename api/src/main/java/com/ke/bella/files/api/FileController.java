@@ -55,8 +55,8 @@ import com.ke.bella.files.protocol.FileExists;
 import com.ke.bella.files.protocol.FileMoveOps;
 import com.ke.bella.files.protocol.FileNodeCount;
 import com.ke.bella.files.protocol.FileOps;
-import com.ke.bella.files.protocol.FileSystemOps.MkdirOp;
 import com.ke.bella.files.protocol.FileSystemOps.CreateResourceOp;
+import com.ke.bella.files.protocol.FileSystemOps.MkdirOp;
 import com.ke.bella.files.protocol.FileUrl;
 import com.ke.bella.files.protocol.ImportOps.ImportObjectOp;
 import com.ke.bella.files.protocol.ListFileOps;
@@ -140,7 +140,6 @@ public class FileController {
             purpose = FilePurpose.TEMP.getValue();
         }
 
-        TmpFileInfo tmpFileInfo = null;
         final String spaceCode = BellaContextHelper.getOperateSpaceCode();
         final String filename = file.getOriginalFilename();
         validateAncestorDirectory(spaceCode, ancestorId);
@@ -331,27 +330,6 @@ public class FileController {
         }
         String tagsJson = JsonUtils.toJson(tags);
         Assert.isTrue(tagsJson.length() <= MAX_TAGS_JSON_LENGTH, "tags total length cannot exceed 512 characters");
-    }
-
-    private TmpFileInfo createTempFile(MultipartFile file) throws IOException {
-        MediaType mimeTypeSource = Optional.ofNullable(file.getContentType()).map(MediaType::parse).orElse(null);
-        String type = "";
-        String mimeType = "";
-        String charset = "";
-        if(mimeTypeSource != null) {
-            type = FileUtils.getType(mimeTypeSource);
-            mimeType = FileUtils.extraPureMediaType(mimeTypeSource);
-            charset = Optional.ofNullable(mimeTypeSource.charset()).map(Charset::name).orElse(null);
-        }
-
-        String extension = FileUtils.getFileExtension(file.getOriginalFilename());
-        String suffix = StringUtils.isEmpty(extension) ? "" : "." + extension;
-
-        File tmpDir = new File(tmpFileDir);
-        File tmpFile = File.createTempFile("tmp", suffix, tmpDir);
-        file.transferTo(tmpFile);
-
-        return new TmpFileInfo(tmpFile, type, mimeType, extension, charset);
     }
 
     private TmpFileInfo createTempFileFromObject(Object content, String extension) throws IOException {
