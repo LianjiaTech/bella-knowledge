@@ -30,8 +30,6 @@ import org.jooq.Result;
 import org.jooq.SelectConditionStep;
 import org.jooq.SortField;
 import org.jooq.Table;
-import org.jooq.exception.DataAccessException;
-import org.jooq.exception.SQLStateClass;
 import org.jooq.impl.DSL;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,7 +47,6 @@ import com.ke.bella.files.enums.NodeType;
 import com.ke.bella.files.protocol.FileNodeCount;
 import com.ke.bella.files.protocol.FileStatus;
 import com.ke.bella.files.protocol.PageFileOps;
-import com.ke.bella.files.utils.DigestUtils;
 import com.ke.bella.files.utils.JsonUtils;
 
 @Component
@@ -80,7 +77,7 @@ public class FileEntryRepo implements BaseRepo {
      * dual（默认）：闭包表和 entry 双写，任一失败整体回滚，保证两边严格一致；
      * entry：停写闭包，entry 是唯一记录，闭包读回退同时关闭；
      * closure：逃生阀——完全停写 entry，退回纯闭包链路。用于 dual 阶段 entry 侧出问题时不发版止血；
-     * 切回 dual 后窗口期缺失的 entry 由懒迁移/回填补齐，切 entry 读之前必须重跑回填校验。
+     * 切回 dual 后窗口期缺失的 entry 由离线回填补齐（懒迁移已随存量迁移完成移除），切 entry 读之前必须重跑回填校验。
      * 下闭包表的路径：write-mode 切 entry → 观察 → drop 表，中间不需要发布。
      */
     @Value("${bella.file-api.file-entry.write-mode:dual}")
@@ -116,10 +113,6 @@ public class FileEntryRepo implements BaseRepo {
 
     private DSLContext fileDb(String fileId) {
         return DSLContextHolder.get(FileRepo.getShardingKeyByFileIdStatic(fileId), db);
-    }
-
-    public static String legacyEntryId(String spaceCode, String fileId) {
-        return "entry-legacy-" + DigestUtils.sha256(spaceCode + ":" + fileId);
     }
 
     public FileEntryDB queryActiveByFileId(String spaceCode, String fileId) {
@@ -551,66 +544,26 @@ public class FileEntryRepo implements BaseRepo {
         if(StringUtils.isEmpty(ancestorId)) {
             return ROOT_ENTRY_ID;
         }
-        return ensureLegacyEntry(spaceCode, ancestorId).getEntryId();
+        return requireActiveEntry(spaceCode, ancestorId).getEntryId();
     }
 
-    @Transactional(rollbackFor = Exception.class)
-    public FileEntryDB ensureLegacyEntry(String spaceCode, String fileId) {
-        FileEntryDB current = queryActiveByFileId(spaceCode, fileId);
-        if(current != null) {
-            validateEntry(current, spaceCode, fileId);
-            return current;
+    /**
+     * 存量数据已全部回填（原 ensureLegacyEntry 的闭包懒迁移随之移除）：
+     * 活跃文件缺 entry 一律视为数据有洞直接报错，不再现场重建。
+     */
+    private FileEntryDB requireActiveEntry(String spaceCode, String fileId) {
+        FileEntryDB entry = queryActiveByFileId(spaceCode, fileId);
+        if(entry == null) {
+            throw new IllegalStateException("active file_entry not found, spaceCode: " + spaceCode + ", fileId: " + fileId);
         }
-
-        FileDB file = queryActiveFile(spaceCode, fileId);
-        if(file == null || !spaceCode.equals(file.getSpaceCode())) {
-            throw new IllegalStateException("cannot build legacy file_entry for fileId: " + fileId);
-        }
-        if(!closureWriteEnabled()) {
-            // 闭包已停写，数据可能陈旧，不能用于重建 entry；活跃文件缺 entry 说明数据有洞，必须报错
-            throw new IllegalStateException("file_entry missing while closure is no longer authoritative, fileId: " + fileId);
-        }
-        String parentFileId = entryDb(spaceCode).select(FILE_CLOSURE.ANCESTOR_ID)
-                .from(FILE_CLOSURE)
-                .where(FILE_CLOSURE.SPACE_CODE.eq(spaceCode))
-                .and(FILE_CLOSURE.DESCENDANT_ID.eq(fileId))
-                .and(FILE_CLOSURE.DEPTH.eq(1L))
-                .fetchOneInto(String.class);
-        String parentEntryId = StringUtils.isEmpty(parentFileId) ? ROOT_ENTRY_ID : ensureLegacyEntry(spaceCode, parentFileId).getEntryId();
-
-        FileEntryRecord record = FILE_ENTRY.newRecord();
-        record.setEntryId(legacyEntryId(spaceCode, fileId));
-        record.setSpaceCode(spaceCode);
-        record.setParentEntryId(parentEntryId);
-        record.setFileId(fileId);
-        record.setFilename(file.getFilename());
-        record.setType(entryType(file));
-        fillCreatorInfo(record);
-        try {
-            entryDb(spaceCode).insertInto(FILE_ENTRY).set(record).execute();
-        } catch (DataAccessException e) {
-            if(!isIntegrityConstraintViolation(e)) {
-                throw e;
-            }
-            // Concurrent legacy-entry creation converges on the deterministic ID.
-        }
-        FileEntryDB created = queryActiveByFileId(spaceCode, fileId);
-        validateEntry(created, spaceCode, fileId);
-        if(!parentEntryId.equals(created.getParentEntryId()) || !file.getFilename().equals(created.getFilename())) {
-            throw new IllegalStateException("legacy file_entry conflicts with closure/file state, fileId: " + fileId);
-        }
-        return created;
-    }
-
-    static boolean isIntegrityConstraintViolation(DataAccessException e) {
-        return e.sqlStateClass() == SQLStateClass.C23_INTEGRITY_CONSTRAINT_VIOLATION;
+        return entry;
     }
 
     public void rename(String spaceCode, String fileId, String filename) {
         if(!entryWriteEnabled()) {
             return;
         }
-        FileEntryDB entry = ensureLegacyEntry(spaceCode, fileId);
+        FileEntryDB entry = requireActiveEntry(spaceCode, fileId);
         assertNameAvailable(spaceCode, entry.getParentEntryId(), filename, entry.getEntryId());
         int updated = entryDb(spaceCode).update(FILE_ENTRY)
                 .set(FILE_ENTRY.FILENAME, filename)
@@ -626,7 +579,7 @@ public class FileEntryRepo implements BaseRepo {
         if(!entryWriteEnabled()) {
             return;
         }
-        FileEntryDB entry = ensureLegacyEntry(spaceCode, fileId);
+        FileEntryDB entry = requireActiveEntry(spaceCode, fileId);
         String parentEntryId = resolveParentEntryId(spaceCode, targetAncestorId);
         assertNotSelfOrDescendant(spaceCode, entry, parentEntryId);
         assertNameAvailable(spaceCode, parentEntryId, entry.getFilename(), entry.getEntryId());
@@ -665,7 +618,7 @@ public class FileEntryRepo implements BaseRepo {
         String fileId = file.getFileId();
         String sourceSpaceCode = file.getSpaceCode();
         String targetAncestorId = targetAncestor == null ? null : targetAncestor.getFileId();
-        FileEntryDB source = ensureLegacyEntry(sourceSpaceCode, fileId);
+        FileEntryDB source = requireActiveEntry(sourceSpaceCode, fileId);
         if(sourceSpaceCode.equals(targetSpaceCode) && !closureWriteEnabled()) {
             // 同空间调用退化为普通移动：只改根 entry 的 parent_entry_id，子树与 file 缓存都不用动。
             // 闭包仍在写（dual）时不走此捷径，让原路径维护闭包一致性。
@@ -711,7 +664,7 @@ public class FileEntryRepo implements BaseRepo {
     }
 
     /**
-     * 子树根 entry FOR UPDATE 锁定并以锁后行为准：ensureLegacyEntry 是普通读，
+     * 子树根 entry FOR UPDATE 锁定并以锁后行为准：requireActiveEntry 是普通读，
      * 加锁前的并发 rename/move/delete 在锁定重读后会反映为最新状态或行缺失。
      */
     private FileEntryDB lockSourceEntry(String spaceCode, String entryId) {
@@ -1039,12 +992,6 @@ public class FileEntryRepo implements BaseRepo {
                 .fetchOneInto(FileDB.class);
     }
 
-    private FileDB queryActiveFile(String spaceCode, String fileId) {
-        return entryDb(spaceCode).selectFrom(FILE)
-                .where(FILE.FILE_ID.eq(fileId))
-                .and(FILE.STATUS.eq(FileStatus.NOT_DELETED.getValue()))
-                .fetchOneInto(FileDB.class);
-    }
 
     private void assertNameAvailable(String spaceCode, String parentEntryId, String filename, @Nullable String currentEntryId) {
         FileEntryDB conflict = queryActiveByName(spaceCode, parentEntryId, filename);
@@ -1053,9 +1000,4 @@ public class FileEntryRepo implements BaseRepo {
         }
     }
 
-    private void validateEntry(FileEntryDB entry, String spaceCode, String fileId) {
-        if(entry == null || !spaceCode.equals(entry.getSpaceCode()) || !fileId.equals(entry.getFileId())) {
-            throw new IllegalStateException("invalid file_entry state, fileId: " + fileId);
-        }
-    }
 }

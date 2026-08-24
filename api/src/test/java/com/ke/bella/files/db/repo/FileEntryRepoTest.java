@@ -13,7 +13,6 @@ import static org.junit.Assert.assertTrue;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
-import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Collections;
@@ -23,7 +22,6 @@ import java.util.stream.Collectors;
 
 import org.jooq.DSLContext;
 import org.jooq.SQLDialect;
-import org.jooq.exception.DataAccessException;
 import org.jooq.impl.DSL;
 import org.junit.Before;
 import org.junit.AfterClass;
@@ -448,15 +446,6 @@ public class FileEntryRepoTest {
         assertThrows(IllegalArgumentException.class,
                 () -> entryRepo.moveAcrossSpace(root, SOURCE_SPACE, root));
         assertNotNull(entryRepo.queryActiveByFileId(SOURCE_SPACE, sub.getFileId()));
-    }
-
-    @Test
-    public void legacyEntryOnlyConvergesOnIntegrityConstraintViolation() {
-        DataAccessException duplicateKey = new DataAccessException("duplicate", new SQLException("duplicate", "23505"));
-        DataAccessException connectionFailure = new DataAccessException("connection", new SQLException("connection", "08006"));
-
-        assertTrue(FileEntryRepo.isIntegrityConstraintViolation(duplicateKey));
-        assertFalse(FileEntryRepo.isIntegrityConstraintViolation(connectionFailure));
     }
 
     @Test

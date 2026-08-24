@@ -62,6 +62,7 @@ public class FileRepoMoveTest {
         BellaContext.setOperator(Operator.builder().userId(1L).userName("tester").spaceCode("sp-0").build());
         insertTree();
         insertFiles();
+        insertEntries();
     }
 
     @AfterClass
@@ -157,6 +158,8 @@ public class FileRepoMoveTest {
 
     @Test
     public void entryReadFallsBackWhenDirectoryEntryIsMissing() {
+        // 读回退场景需要 entry 缺失：清空夹具预置的 entry，模拟极端数据洞
+        dsl.execute("delete from file_entry_0");
         fileRepo.setFileEntryReadMode("entry");
 
         List<String> children = fileRepo.findFiles("sp-0", SOURCE).stream()
@@ -185,6 +188,8 @@ public class FileRepoMoveTest {
 
     @Test
     public void entryReadFallsBackForExistsAndQueryFileWhenDirectoryEntryIsMissing() {
+        // 读回退场景需要 entry 缺失：清空夹具预置的 entry，模拟极端数据洞
+        dsl.execute("delete from file_entry_0");
         fileRepo.setFileEntryReadMode("entry");
 
         assertTrue(fileRepo.exists("sp-0", SOURCE, "child"));
@@ -323,6 +328,26 @@ public class FileRepoMoveTest {
         insertFile(LEAF, "leaf.txt", false);
         insertFile(NEW_ROOT, "new-root", true);
         insertFile(TARGET, "target", true);
+    }
+
+    /**
+     * 存量数据已全部回填：活跃文件必须有 entry，夹具与生产状态一致（镜像闭包树的父子关系）。
+     */
+    private void insertEntries() {
+        insertEntry(OLD_ROOT, null, "old-root", true);
+        insertEntry(SOURCE, OLD_ROOT, "source", true);
+        insertEntry(CHILD, SOURCE, "child", true);
+        insertEntry(LEAF, CHILD, "leaf.txt", false);
+        insertEntry(NEW_ROOT, null, "new-root", true);
+        insertEntry(TARGET, NEW_ROOT, "target", true);
+    }
+
+    private void insertEntry(String fileId, String parentFileId, String filename, boolean directory) {
+        dsl.execute("insert into file_entry_0 (entry_id, space_code, parent_entry_id, file_id, filename, type, "
+                        + "cuid, cu_name, ctime, muid, mu_name, mtime) values (?, ?, ?, ?, ?, ?, 1, 'tester', "
+                        + "timestamp '2026-01-01 00:00:00', 1, 'tester', timestamp '2026-01-01 00:00:00')",
+                "e-" + fileId, "sp-0", parentFileId == null ? "" : "e-" + parentFileId, fileId, filename,
+                directory ? FileEntryRepo.TYPE_DIR : FileEntryRepo.TYPE_FILE);
     }
 
     private void insertFile(String fileId, String filename, boolean directory) {

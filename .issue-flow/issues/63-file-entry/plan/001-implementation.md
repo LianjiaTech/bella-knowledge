@@ -47,7 +47,7 @@
 - 现有入口使用确定性 ID `entry-legacy-<sha256(space_code + ':' + file_id)>`，使重复执行、失败重试和双写并行期间不会生成不同入口。父入口由 `file_closure.depth = 1` 找到父 `file_id` 后使用同一算法换算；`root_depth = 1` 的节点写入空父入口。
 - 回填复制当前 `filename`、`is_dir`、状态和审计字段。写入前后按分片核对：活动用户文件数与活动入口数、每个文件恰好一个活动入口、根节点/直接父节点映射、目录类型、孤儿父入口和活动同名冲突。
 - 增加差异查询，逐空间比较旧闭包读出的直属子项集合与 `file_entry` 子项集合；任何缺失、重复、父级不一致或类型不一致都阻止切读。脚本输出分片、空间和文件 ID，支持修复后只重跑失败区间。
-- 双写窗口内任何 entry lookup miss 都不能退回只写旧模型。新增 `ensureLegacyEntry(space_code, file_id)`：依据现有 `file` 与 `file_closure` 快照，从命中节点沿直属父链回溯到根，再按根到叶顺序使用确定性 legacy ID 幂等 upsert 缺失 entry；创建子文件时对尚未回填的父目录执行同一流程，rename/move/delete 时先补齐自身及父链。
+- 双写窗口内任何 entry lookup miss 都不能退回只写旧模型。迁移期曾通过 `ensureLegacyEntry` 依据 `file`/`file_closure` 快照懒迁移缺失 entry；存量数据全部回填后该机制已移除，活跃文件缺 entry 一律按数据有洞报错。
 - on-demand 创建与离线回填必须复用同一 ID、字段映射和冲突校验。并发 upsert 命中既有 entry 后重新读取并校验空间、父级、file ID、名称和类型；无法从旧模型构造完整父链或发现冲突时使当前业务事务失败并报警，不允许生成孤儿 entry。
 
 ### 4. 以 `file_entry` 为真相源重构写链路
@@ -81,7 +81,7 @@
 ## 迁移
 
 1. 基于已合入的 #60 闭包子树移动实现，发布 `file_entry` DDL、jOOQ 代码和全部默认关闭的配置；验证 16 张分表、索引和映射均可用。
-2. 开启 entry 双写但保持 `read-mode=closure`，观察新创建、目录、重命名、移动、删除的 entry/closure 事务成功率；未回填对象通过 `ensureLegacyEntry` 现场补齐，任何补齐或 entry 写失败都回滚原写，不允许静默降级为只写旧模型。
+2. 开启 entry 双写但保持 `read-mode=closure`，观察新创建、目录、重命名、移动、删除的 entry/closure 事务成功率；未回填对象曾通过 `ensureLegacyEntry` 现场补齐（回填完成后该机制已移除），任何 entry 写失败都回滚原写，不允许静默降级为只写旧模型。
 3. 分片分批回填历史活动数据，反复运行计数、父级、重名和集合差异核对，直至全量一致；期间新写由确定性查重和活动唯一索引避免重复。
 4. 切换 `read-mode=compare`，对 exists、列表、父级和路径入口做采样双读，旧结果对外返回，差异进入指标和结构化日志。
 5. 先按小流量空间切 `read-mode=entry`，再逐步扩大；列表、重名和分页稳定后完成全量切换，closure 继续双写并承担祖先查询。
@@ -108,7 +108,7 @@
 - **DDL 与生成代码**：在项目声明支持的 MySQL 5.7+ 环境执行全量初始化和增量迁移，确认 16 张表、生成列、活动唯一索引和查询索引可创建；运行 jOOQ generate，确认 `FileEntryDB/Record/Table`、matcher 和 `DSLContextHolder` 映射正确，`mvn test` 编译不依赖手写生成类。
 - **仓储与事务**：新增 `FileEntryRepo` 集成测试覆盖空间 hash 与现有算法一致、根目录、子目录、活动重名、重复删除后重建、按 entry/file 查询、同空间移动保留 entry ID、跨空间移动重建 entry ID、`file.space_code` 同事务更新、目标冲突、事务失败整体回滚，以及 file 物理分片、`file_id`、bucket/path 和对象内容未变化。
 - **创建与删除**：覆盖新上传、mkdir、对象上传失败清理、文件删除、空目录删除和发现多活动入口时拒绝误删文件本体；断言 file、entry、closure 三者状态一致。
-- **双写 fallback**：构造父目录、自身或完整父链尚未回填的存量数据，分别执行 create、rename、move、delete；验证 `ensureLegacyEntry` 从根到叶幂等补齐、并发调用汇合到同一 legacy ID、离线回填不产生重复，旧模型不完整或冲突时业务事务整体失败。
+- **双写 fallback**（历史）：迁移期验证过 `ensureLegacyEntry` 幂等补齐与并发汇合；懒迁移随存量回填完成移除后，相应用例一并下线，缺 entry 场景改为断言直接报错。
 - **移动与重命名**：在 #60 子树测试基础上覆盖文件、空目录、非空目录同空间移动、防环、同名冲突、重命名双写；跨空间仅覆盖普通文件和空目录的内部原语，验证默认开关拒绝、显式开启后源入口不可见、目标入口可见、`file.space_code` 指向目标且 `file_id/bucket/path` 不变；非空目录支持由 #67 交付（单事务子树迁移，仅限 write-mode=entry）。
 - **读路径兼容**：对根目录、子目录、空目录、名称查询、exists、普通列表和分页执行 closure/entry 双读，比较顺序、分页总数、过滤结果和 `OpenAIFile` JSON；批量文件补充需按 `file_id` 路由分组，避免目标空间分片假设。
 - **路径与祖先**：复用并扩展 `FileControllerGetFileAncestorIdsTest`、目录信息和 #60 移动回归，确认 entry 切读后路径、直属父级、祖先链、批量 ancestor 和 `root_depth` 均无回退；增加跨空间数据证明旧 join 会漏行，并以此测试锁定跨空间开关在查询改造完成前不得开启。

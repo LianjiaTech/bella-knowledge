@@ -95,6 +95,7 @@ public class FileServiceMoveTransactionTest {
         FileRepoTestFixture.recreateUserFileTables(dsl, "1");
         insertTree();
         insertFile();
+        insertEntries();
         setOperator(SOURCE_SPACE);
         Mockito.reset(broadcastService);
     }
@@ -308,6 +309,23 @@ public class FileServiceMoveTransactionTest {
         dsl.execute("insert into file_1 (file_id, filename, is_dir, space_code, meta_data, mtime) "
                         + "values (?, ?, ?, ?, ?, timestamp '2026-01-01 00:00:00')",
                 TARGET, "target", 1, "sp-a", "{}");
+    }
+
+    /**
+     * 存量数据已全部回填：活跃文件必须有 entry，夹具与生产状态一致（镜像闭包树的父子关系）。
+     */
+    private void insertEntries() {
+        insertEntry(OLD_ROOT, null, "old-root");
+        insertEntry(SOURCE, OLD_ROOT, "source");
+        insertEntry(CHILD, SOURCE, "child");
+        insertEntry(TARGET, null, "target");
+    }
+
+    private void insertEntry(String fileId, String parentFileId, String filename) {
+        dsl.execute("insert into file_entry_1 (entry_id, space_code, parent_entry_id, file_id, filename, type, "
+                        + "cuid, cu_name, ctime, muid, mu_name, mtime) values (?, ?, ?, ?, ?, ?, 1, 'tester', "
+                        + "timestamp '2026-01-01 00:00:00', 1, 'tester', timestamp '2026-01-01 00:00:00')",
+                "e-" + fileId, "sp-a", parentFileId == null ? "" : "e-" + parentFileId, fileId, filename, "dir");
     }
 
     private void insertClosure(String ancestorId, String descendantId, long depth, long rootDepth) {
