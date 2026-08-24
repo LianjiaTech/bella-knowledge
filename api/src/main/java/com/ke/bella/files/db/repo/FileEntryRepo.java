@@ -618,13 +618,12 @@ public class FileEntryRepo implements BaseRepo {
         String fileId = file.getFileId();
         String sourceSpaceCode = file.getSpaceCode();
         String targetAncestorId = targetAncestor == null ? null : targetAncestor.getFileId();
-        FileEntryDB source = requireActiveEntry(sourceSpaceCode, fileId);
-        if(sourceSpaceCode.equals(targetSpaceCode) && !closureWriteEnabled()) {
-            // 同空间调用退化为普通移动：只改根 entry 的 parent_entry_id，子树与 file 缓存都不用动。
-            // 闭包仍在写（dual）时不走此捷径，让原路径维护闭包一致性。
-            move(sourceSpaceCode, fileId, targetAncestorId);
-            return queryActiveByFileId(targetSpaceCode, fileId);
+        if(sourceSpaceCode.equals(targetSpaceCode)) {
+            // 同空间移动由 FileService 分流到 move()，走到这里属于调用方路由错误
+            throw new IllegalArgumentException(
+                    "source and target space are the same, use move instead, fileId: " + fileId);
         }
+        FileEntryDB source = requireActiveEntry(sourceSpaceCode, fileId);
         String targetParentEntryId = resolveParentEntryId(targetSpaceCode, targetAncestorId);
         // 源根与目标父两把锚点锁统一按 (物理分片, entry_id) 全序获取，消除 A→B 与 B→A
         // 并发迁移的环形等待；先锁锚点再 BFS 遍历子树，根不加锁时并发 rename/move/delete
@@ -642,10 +641,8 @@ public class FileEntryRepo implements BaseRepo {
                 ? collectSubtreeDescendants(sourceSpaceCode, source)
                 : SubtreeSnapshot.EMPTY;
         List<FileEntryDB> descendants = subtree.descendants;
-        if(source.getEntryId().equals(targetParentEntryId)
-                || descendants.stream().anyMatch(entry -> entry.getEntryId().equals(targetParentEntryId))) {
-            throw new IllegalArgumentException("cannot move a node into itself or its descendant, fileId: " + fileId);
-        }
+        // 无需防环：源子树整体在源空间，目标父入口经 lockTargetParentEntry 复核在目标空间，
+        // 两个空间的 entry 集合不相交；同空间调用已在入口拒绝，环只可能出现在 move() 的路径上。
         assertNameAvailable(targetSpaceCode, targetParentEntryId, source.getFilename(), null);
         assertDepthWithinLimitAfterMove(targetSpaceCode, targetParentEntryId, subtree.depth, fileId);
         if(descendants.isEmpty()) {

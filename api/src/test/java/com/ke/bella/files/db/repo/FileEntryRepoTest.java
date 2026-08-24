@@ -287,19 +287,27 @@ public class FileEntryRepoTest {
     }
 
     @Test
-    public void crossSpaceMoveWithinSameSpaceDelegatesToPlainMove() {
+    public void moveAcrossSpaceRejectsSameSpaceCall() {
         entryRepo.setFileEntryWriteMode("entry");
         FileDB root = addDirectory(SOURCE_SPACE, "same-root", null, "same-root");
         FileDB child = addFile(SOURCE_SPACE, "same-a.txt", root.getFileId(), "same-a");
         FileDB sibling = addDirectory(SOURCE_SPACE, "same-target", null, "same-target");
 
-        // 目标空间与源空间相同：退化为只改根 parent_entry_id，子树不搬迁
+        // 同空间移动由 FileService 分流到 move()，跨空间原语直接拒绝同空间调用；
+        // 移动到自身/后代只在同空间可能，因此一并被此校验挡住
         FileEntryDB before = entryRepo.queryActiveByFileId(SOURCE_SPACE, root.getFileId());
-        FileEntryDB moved = entryRepo.moveAcrossSpace(root, SOURCE_SPACE, sibling);
-        assertEquals(before.getEntryId(), moved.getEntryId());
-        assertEquals(entryRepo.queryActiveByFileId(SOURCE_SPACE, sibling.getFileId()).getEntryId(), moved.getParentEntryId());
-        FileEntryDB childEntry = entryRepo.queryActiveByFileId(SOURCE_SPACE, child.getFileId());
-        assertEquals(before.getEntryId(), childEntry.getParentEntryId());
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+                () -> entryRepo.moveAcrossSpace(root, SOURCE_SPACE, sibling));
+        assertTrue(error.getMessage().contains("source and target space are the same"));
+        assertThrows(IllegalArgumentException.class,
+                () -> entryRepo.moveAcrossSpace(root, SOURCE_SPACE, root));
+
+        // 任何东西都没动
+        FileEntryDB after = entryRepo.queryActiveByFileId(SOURCE_SPACE, root.getFileId());
+        assertEquals(before.getEntryId(), after.getEntryId());
+        assertEquals(before.getParentEntryId(), after.getParentEntryId());
+        assertEquals(after.getEntryId(),
+                entryRepo.queryActiveByFileId(SOURCE_SPACE, child.getFileId()).getParentEntryId());
     }
 
     @Test
@@ -433,19 +441,6 @@ public class FileEntryRepoTest {
                 () -> entryRepo.moveAcrossSpace(movedDir, TARGET_SPACE, targetFile));
         assertTrue(error.getMessage().contains("not a directory"));
         assertNotNull(entryRepo.queryActiveByFileId(SOURCE_SPACE, movedDir.getFileId()));
-    }
-
-    @Test
-    public void crossSpaceMoveRejectsMovingIntoOwnSubtree() {
-        entryRepo.setFileEntryWriteMode("entry");
-        FileDB root = addDirectory(SOURCE_SPACE, "cycle-root", null, "cycle-root");
-        FileDB sub = addDirectory(SOURCE_SPACE, "cycle-sub", root.getFileId(), "cycle-sub");
-
-        assertThrows(IllegalArgumentException.class,
-                () -> entryRepo.moveAcrossSpace(root, SOURCE_SPACE, sub));
-        assertThrows(IllegalArgumentException.class,
-                () -> entryRepo.moveAcrossSpace(root, SOURCE_SPACE, root));
-        assertNotNull(entryRepo.queryActiveByFileId(SOURCE_SPACE, sub.getFileId()));
     }
 
     @Test
