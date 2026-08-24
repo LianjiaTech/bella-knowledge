@@ -5,6 +5,7 @@ import static com.ke.bella.files.db.Tables.FILE_CLOSURE;
 import static com.ke.bella.files.db.Tables.FILE_ENTRY;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -22,6 +23,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.jooq.Condition;
 import org.jooq.DSLContext;
+import org.jooq.Query;
 import org.jooq.Record;
 import org.jooq.Record2;
 import org.jooq.Result;
@@ -798,18 +800,19 @@ public class FileEntryRepo implements BaseRepo {
 
     /**
      * 子树 file.space_code 派生缓存批量刷新：file 物理行按 file_id hash 分片，不随空间迁移，只改缓存值。
+     * 每个分片一条 UPDATE，合并进同一个 JDBC batch 一次往返执行；
+     * batch 由未分片 context 渲染会丢失 RenderMapping，因此显式写物理表名。
      */
     private void updateFileSpaceCache(List<String> fileIds, String targetSpaceCode) {
         Map<String, List<String>> idsByShard = fileIds.stream()
                 .collect(Collectors.groupingBy(FileRepo::getShardingKeyByFileIdStatic));
-        int updated = 0;
-        for (Map.Entry<String, List<String>> shard : idsByShard.entrySet()) {
-            updated += DSLContextHolder.get(shard.getKey(), db).update(FILE)
-                    .set(FILE.SPACE_CODE, targetSpaceCode)
-                    .where(FILE.FILE_ID.in(shard.getValue()))
-                    .and(FILE.STATUS.eq(FileStatus.NOT_DELETED.getValue()))
-                    .execute();
-        }
+        List<Query> updates = idsByShard.entrySet().stream()
+                .map(shard -> db.query("update {0} set space_code = {1} where file_id in ({2}) and status = {3}",
+                        DSL.table(DSL.name("file_" + shard.getKey())), DSL.val(targetSpaceCode),
+                        DSL.list(shard.getValue().stream().map(DSL::val).collect(Collectors.toList())),
+                        DSL.val(FileStatus.NOT_DELETED.getValue())))
+                .collect(Collectors.toList());
+        int updated = Arrays.stream(db.batch(updates).execute()).sum();
         if(updated != fileIds.size()) {
             throw new IllegalStateException("update file space cache failed, expected: " + fileIds.size() + ", updated: " + updated);
         }
