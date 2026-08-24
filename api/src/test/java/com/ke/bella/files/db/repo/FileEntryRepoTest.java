@@ -319,12 +319,9 @@ public class FileEntryRepoTest {
         for (int level = 1; level <= FileEntryRepo.MAX_TREE_DEPTH; level++) {
             deepest = addDirectory(SOURCE_SPACE, "d-" + level, deepest.getFileId(), "depth-" + level);
         }
-        setOperator(TARGET_SPACE);
-        FileDB targetParent = addDirectory(TARGET_SPACE, "depth-target", null, "depth-target");
 
-        // 恰好 MAX_TREE_DEPTH 层且最深节点是空目录：确认无子节点的查询不计入深度，迁移成功
-        setOperator(SOURCE_SPACE);
-        assertNotNull(entryRepo.moveAcrossSpace(root.getFileId(), TARGET_SPACE, targetParent.getFileId()));
+        // 恰好 MAX_TREE_DEPTH 层且最深节点是空目录：确认无子节点的查询不计入深度，迁到空间根成功
+        assertNotNull(entryRepo.moveAcrossSpace(root.getFileId(), TARGET_SPACE, null));
         assertNotNull(entryRepo.queryActiveByFileId(TARGET_SPACE, deepest.getFileId()));
 
         // 超过 MAX_TREE_DEPTH 层的子树拒绝迁移
@@ -336,6 +333,36 @@ public class FileEntryRepoTest {
         IllegalStateException error = assertThrows(IllegalStateException.class,
                 () -> entryRepo.moveAcrossSpace(overRoot.getFileId(), TARGET_SPACE, null));
         assertTrue(error.getMessage().contains("exceeds max depth"));
+    }
+
+    @Test
+    public void crossSpaceMoveAccountsForTargetParentDepth() {
+        entryRepo.setFileEntryWriteMode("entry");
+        entryRepo.setCrossSpaceMoveEnabled(true);
+        FileDB targetDeepest = null;
+        for (int level = 1; level <= FileEntryRepo.MAX_TREE_DEPTH; level++) {
+            targetDeepest = addDirectory(TARGET_SPACE, "tp-" + level,
+                    targetDeepest == null ? null : targetDeepest.getFileId(), "tp-" + level);
+        }
+        FileDB targetParent = targetDeepest;
+
+        // 子树自身 1 层，挂到 MAX_TREE_DEPTH 层深的目标父下会产生超限深层节点：拒绝且无任何写入
+        FileDB comboRoot = addDirectory(SOURCE_SPACE, "combo-root", null, "combo-root");
+        FileDB comboChild = addFile(SOURCE_SPACE, "combo-child.txt", comboRoot.getFileId(), "combo-child");
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+                () -> entryRepo.moveAcrossSpace(comboRoot.getFileId(), TARGET_SPACE, targetParent.getFileId()));
+        assertTrue(error.getMessage().contains("exceeds max tree depth"));
+        assertNotNull(entryRepo.queryActiveByFileId(SOURCE_SPACE, comboRoot.getFileId()));
+        assertNotNull(entryRepo.queryActiveByFileId(SOURCE_SPACE, comboChild.getFileId()));
+        assertNull(entryRepo.queryActiveByFileId(TARGET_SPACE, comboRoot.getFileId()));
+        assertEquals(SOURCE_SPACE, fileRepo.queryFile(comboRoot.getFileId()).getSpaceCode());
+
+        // 叶子（子树 0 层）挂到同一目标父下恰好触及上限：允许，且迁移后完整路径仍可读
+        FileDB leaf = addFile(SOURCE_SPACE, "combo-leaf.txt", null, "combo-leaf");
+        assertNotNull(entryRepo.moveAcrossSpace(leaf.getFileId(), TARGET_SPACE, targetParent.getFileId()));
+        List<FileDB> path = entryRepo.pathFiles(TARGET_SPACE, leaf.getFileId());
+        assertEquals(FileEntryRepo.MAX_TREE_DEPTH + 1, path.size());
+        assertEquals(leaf.getFileId(), path.get(path.size() - 1).getFileId());
     }
 
     @Test

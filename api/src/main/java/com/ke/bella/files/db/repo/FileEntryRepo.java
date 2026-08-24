@@ -693,14 +693,16 @@ public class FileEntryRepo implements BaseRepo {
             lockTargetParentEntry(targetSpaceCode, targetParentEntryId);
             source = lockSourceEntry(sourceSpaceCode, source.getEntryId());
         }
-        List<FileEntryDB> descendants = TYPE_DIR.equals(source.getType())
+        SubtreeSnapshot subtree = TYPE_DIR.equals(source.getType())
                 ? collectSubtreeDescendants(sourceSpaceCode, source)
-                : Collections.emptyList();
+                : SubtreeSnapshot.EMPTY;
+        List<FileEntryDB> descendants = subtree.descendants;
         if(source.getEntryId().equals(targetParentEntryId)
                 || descendants.stream().anyMatch(entry -> entry.getEntryId().equals(targetParentEntryId))) {
             throw new IllegalArgumentException("cannot move a node into itself or its descendant, fileId: " + fileId);
         }
         assertNameAvailable(targetSpaceCode, targetParentEntryId, source.getFilename(), null);
+        assertDepthWithinLimitAfterMove(targetSpaceCode, targetParentEntryId, subtree.depth, fileId);
         if(descendants.isEmpty()) {
             moveLeafAcrossSpace(source, sourceSpaceCode, targetSpaceCode, targetParentEntryId, targetAncestorId);
         } else {
@@ -753,6 +755,31 @@ public class FileEntryRepo implements BaseRepo {
         if(!TYPE_DIR.equals(locked.getType())) {
             throw new IllegalArgumentException(
                     "target parent file_entry is not a directory, entryId: " + targetParentEntryId);
+        }
+    }
+
+    /**
+     * 迁移后总深度校验：目标父层级 + 子树自身层数不得超过 MAX_TREE_DEPTH。与迁入空间根时
+     * 允许恰好 MAX_TREE_DEPTH 层子树的语义一致（迁移根本身占一层，最深节点相对空间根为
+     * targetParentLevel + 1 + subtreeDepth 层）。不校验则迁移本身成功，但深层节点之后会被
+     * pathFiles/ancestorFileIds 的超深度防环检查判为数据异常而不可读。
+     * 目标父祖先链仅目标父本身持锁，链上并发结构变化与同空间 move 的防环校验同属接受的残余风险。
+     */
+    private void assertDepthWithinLimitAfterMove(String targetSpaceCode, String targetParentEntryId, int subtreeDepth,
+            String fileId) {
+        int targetParentLevel = 0;
+        String cursor = targetParentEntryId;
+        while (!ROOT_ENTRY_ID.equals(cursor)) {
+            // 超限即停，兼作目标父祖先链的成环保护，向上遍历最多 MAX_TREE_DEPTH 层
+            if(++targetParentLevel + subtreeDepth > MAX_TREE_DEPTH) {
+                throw new IllegalArgumentException(
+                        "target parent depth plus subtree depth exceeds max tree depth, fileId: " + fileId);
+            }
+            FileEntryDB parent = queryActiveByEntryId(targetSpaceCode, cursor);
+            if(parent == null) {
+                throw new EntryReadNotReadyException(targetSpaceCode, cursor);
+            }
+            cursor = parent.getParentEntryId();
         }
     }
 
@@ -851,10 +878,25 @@ public class FileEntryRepo implements BaseRepo {
     }
 
     /**
+     * BFS 快照：子孙列表（不含根）与子树在根以下的层数（叶子/空目录为 0）。
+     */
+    private static final class SubtreeSnapshot {
+        static final SubtreeSnapshot EMPTY = new SubtreeSnapshot(Collections.emptyList(), 0);
+
+        final List<FileEntryDB> descendants;
+        final int depth;
+
+        SubtreeSnapshot(List<FileEntryDB> descendants, int depth) {
+            this.descendants = descendants;
+            this.depth = depth;
+        }
+    }
+
+    /**
      * 逐层 BFS 枚举子树（不含根），层内批量 IN 查询并加锁，查询次数与树深同阶。
      * 层级数即目录深度，超过 MAX_TREE_DEPTH 视为成环等数据异常。
      */
-    private List<FileEntryDB> collectSubtreeDescendants(String spaceCode, FileEntryDB root) {
+    private SubtreeSnapshot collectSubtreeDescendants(String spaceCode, FileEntryDB root) {
         List<FileEntryDB> result = new ArrayList<>();
         List<String> frontier = Collections.singletonList(root.getEntryId());
         int depth = 0;
@@ -881,7 +923,7 @@ public class FileEntryRepo implements BaseRepo {
                     .map(FileEntryDB::getEntryId)
                     .collect(Collectors.toList());
         }
-        return result;
+        return new SubtreeSnapshot(result, depth);
     }
 
     /**
