@@ -149,7 +149,7 @@ public class FileService {
 
     private void broadcast(FileDB fileDB, FileBroadcasting<?> message) {
         FileType fileType = FileType.fromFileId(fileDB.getFileId());
-        if(fileType == FileType.SYSTEM
+        if((fileType == FileType.SYSTEM && !FilePurpose.DOM_TREE.getValue().equals(fileDB.getPurpose()))
                 || (fileType == FileType.TEMP && !FilePurpose.ASSISTANTS_CHAT.getValue().equals(fileDB.getPurpose()))) {
             return;
         }

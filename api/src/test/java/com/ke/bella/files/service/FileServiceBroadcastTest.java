@@ -72,18 +72,26 @@ public class FileServiceBroadcastTest {
     }
 
     @Test
-    public void finalizeUploadSkipsBroadcastForSystemFiles() {
+    public void finalizeUploadSkipsBroadcastForNonDomTreeSystemFiles() {
         for (FilePurpose purpose : new FilePurpose[] {
                 FilePurpose.PDF,
-                FilePurpose.DOM_TREE,
                 FilePurpose.DATASETS_EXPORT }) {
             fileService.finalizeFileUpload(systemFile(purpose), "{}");
         }
 
         verify(fileRepo).queryFileByPdfFileId("file-test-s");
-        verify(fileRepo).queryFileByDomTreeFileId("file-test-s");
         verifyNoMoreInteractions(fileRepo);
         verifyNoInteractions(broadcastService);
+    }
+
+    @Test
+    public void finalizeUploadBroadcastsDomTreeSystemFile() {
+        FileDB file = systemFile(FilePurpose.DOM_TREE);
+
+        fileService.finalizeFileUpload(file, "{}");
+
+        verify(fileRepo).queryFileByDomTreeFileId(file.getFileId());
+        assertBroadcastEvent(EventType.FILE_CREATED);
     }
 
     @Test
@@ -125,6 +133,20 @@ public class FileServiceBroadcastTest {
     }
 
     @Test
+    public void updateBroadcastsDomTreeSystemFile() {
+        FileDB file = systemFile(FilePurpose.DOM_TREE);
+        FileOps ops = FileOps.builder().fileId(file.getFileId()).filename("updated.json").build();
+        when(fileRepo.queryFile(file.getFileId(), FileType.SYSTEM)).thenReturn(file);
+
+        fileService.updateFile(ops, false, Scope.FILENAME);
+
+        verify(fileRepo).updateFile(ops, false);
+        verify(fileRepo).queryFile(file.getFileId(), FileType.SYSTEM);
+        verify(fileRepo).queryFileByDomTreeFileId(file.getFileId());
+        assertBroadcastEvent(EventType.FILE_UPDATED);
+    }
+
+    @Test
     public void deleteSkipsBroadcastForSystemFile() {
         FileDB file = systemFile(FilePurpose.DATASETS_EXPORT);
 
@@ -135,6 +157,25 @@ public class FileServiceBroadcastTest {
         assertEquals(FileStatus.DELETED, opsCaptor.getValue().getStatus());
         verifyNoMoreInteractions(fileRepo);
         verifyNoInteractions(broadcastService);
+    }
+
+    @Test
+    public void deleteBroadcastsDomTreeSystemFile() {
+        FileDB file = systemFile(FilePurpose.DOM_TREE);
+
+        fileService.delete(file);
+
+        ArgumentCaptor<FileOps> opsCaptor = ArgumentCaptor.forClass(FileOps.class);
+        verify(fileRepo).updateFile(opsCaptor.capture(), eq(false));
+        assertEquals(FileStatus.DELETED, opsCaptor.getValue().getStatus());
+        verify(fileRepo).queryFileByDomTreeFileId(file.getFileId());
+        assertBroadcastEvent(EventType.FILE_DELETED);
+    }
+
+    private void assertBroadcastEvent(EventType eventType) {
+        ArgumentCaptor<FileBroadcasting> messageCaptor = ArgumentCaptor.forClass(FileBroadcasting.class);
+        verify(broadcastService).broadcast(messageCaptor.capture(), any(Runnable.class), any(Runnable.class));
+        assertEquals(eventType.getValue(), messageCaptor.getValue().getEvent());
     }
 
     private FileDB tempFile(FilePurpose purpose) {
