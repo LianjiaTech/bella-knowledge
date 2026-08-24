@@ -676,6 +676,7 @@ public class FileEntryRepo implements BaseRepo {
                 ? collectSubtreeDescendants(sourceSpaceCode, source)
                 : Collections.emptyList();
         String targetParentEntryId = resolveParentEntryId(targetSpaceCode, targetAncestorId);
+        lockTargetParentEntry(targetSpaceCode, targetParentEntryId);
         if(source.getEntryId().equals(targetParentEntryId)
                 || descendants.stream().anyMatch(entry -> entry.getEntryId().equals(targetParentEntryId))) {
             throw new IllegalArgumentException("cannot move a node into itself or its descendant, fileId: " + fileId);
@@ -687,6 +688,26 @@ public class FileEntryRepo implements BaseRepo {
             moveSubtreeAcrossSpace(source, descendants, sourceSpaceCode, targetSpaceCode, targetParentEntryId);
         }
         return queryActiveByFileId(targetSpaceCode, fileId);
+    }
+
+    /**
+     * 目标父入口 FOR UPDATE 锁定并复核仍在目标空间：解析后若不持锁，
+     * 并发事务可能把目标父目录迁走，本事务插入的入口将指向目标空间不存在的 entry 形成断链。
+     * 空间根不是实体行、不会被迁走，无需加锁。
+     */
+    private void lockTargetParentEntry(String targetSpaceCode, String targetParentEntryId) {
+        if(ROOT_ENTRY_ID.equals(targetParentEntryId)) {
+            return;
+        }
+        FileEntryDB locked = entryDb(targetSpaceCode).selectFrom(FILE_ENTRY)
+                .where(FILE_ENTRY.SPACE_CODE.eq(targetSpaceCode))
+                .and(FILE_ENTRY.ENTRY_ID.eq(targetParentEntryId))
+                .forUpdate()
+                .fetchOneInto(FileEntryDB.class);
+        if(locked == null) {
+            throw new IllegalStateException(
+                    "target parent file_entry not found in target space, entryId: " + targetParentEntryId);
+        }
     }
 
     private void moveLeafAcrossSpace(FileEntryDB source, String sourceSpaceCode, String targetSpaceCode,
