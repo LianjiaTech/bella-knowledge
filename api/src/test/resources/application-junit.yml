@@ -4,6 +4,7 @@ bella:
       read-mode: closure
       write-mode: dual
       cross-space-move-enabled: false
+      cross-space-move-warn-threshold: 5000
     file:
       tmp-file-dir: .
 

@@ -193,6 +193,126 @@ public class FileEntryRepoTest {
     }
 
     @Test
+    public void crossSpaceMoveMigratesNonEmptyDirectorySubtreeInEntryMode() {
+        entryRepo.setFileEntryWriteMode("entry");
+        fileRepo.setFileEntryReadMode("entry");
+        entryRepo.setCrossSpaceMoveEnabled(true);
+
+        FileDB root = addDirectory(SOURCE_SPACE, "tree-root", null, "tree-root");
+        FileDB fileA = addFile(SOURCE_SPACE, "tree-a.txt", root.getFileId(), "tree-a");
+        FileDB sub = addDirectory(SOURCE_SPACE, "tree-sub", root.getFileId(), "tree-sub");
+        FileDB fileB = addFile(SOURCE_SPACE, "tree-b.txt", sub.getFileId(), "tree-b");
+        FileDB deep = addDirectory(SOURCE_SPACE, "tree-deep", sub.getFileId(), "tree-deep");
+        FileDB fileC = addFile(SOURCE_SPACE, "tree-c.txt", deep.getFileId(), "tree-c");
+        setOperator(TARGET_SPACE);
+        FileDB targetParent = addDirectory(TARGET_SPACE, "tree-target", null, "tree-target");
+
+        List<FileDB> subtree = Arrays.asList(root, fileA, sub, fileB, deep, fileC);
+        Map<String, FileEntryDB> before = subtree.stream()
+                .collect(Collectors.toMap(FileDB::getFileId, file -> entryRepo.queryActiveByFileId(SOURCE_SPACE, file.getFileId())));
+
+        FileEntryDB moved = entryRepo.moveAcrossSpace(root.getFileId(), TARGET_SPACE, targetParent.getFileId());
+
+        // 根 entry 保留 entry_id，仅 space_code 与 parent_entry_id 改写
+        assertEquals(before.get(root.getFileId()).getEntryId(), moved.getEntryId());
+        assertEquals(TARGET_SPACE, moved.getSpaceCode());
+        assertEquals(entryRepo.queryActiveByFileId(TARGET_SPACE, targetParent.getFileId()).getEntryId(), moved.getParentEntryId());
+        // 子孙 entry 全部迁到目标空间，entry_id 与父子关系原样保留
+        for (FileDB node : subtree) {
+            FileEntryDB migrated = entryRepo.queryActiveByFileId(TARGET_SPACE, node.getFileId());
+            assertNotNull(migrated);
+            assertEquals(before.get(node.getFileId()).getEntryId(), migrated.getEntryId());
+            if(node != root) {
+                assertEquals(before.get(node.getFileId()).getParentEntryId(), migrated.getParentEntryId());
+            }
+            // file 物理行不迁移：file_id、bucket、path 不变，space_code 缓存指向目标空间
+            FileDB unchanged = fileRepo.queryFile(node.getFileId());
+            assertEquals(TARGET_SPACE, unchanged.getSpaceCode());
+            assertEquals(node.getBucket(), unchanged.getBucket());
+            assertEquals(node.getPath(), unchanged.getPath());
+        }
+        // 源空间分片不残留任何子树 entry
+        DSLContext sourceDsl = DSLContextHolder.get(FileRepo.getShardingKeyBySpaceCode(SOURCE_SPACE), dsl);
+        assertEquals(0, sourceDsl.fetchCount(FILE_ENTRY, FILE_ENTRY.SPACE_CODE.eq(SOURCE_SPACE)));
+
+        // 迁移后双空间读取正确性
+        FileNodeCount sourceCount = entryRepo.countNodes(SOURCE_SPACE, null);
+        assertEquals(0L, sourceCount.getFileCount());
+        assertEquals(0L, sourceCount.getDirectoryCount());
+        assertTrue(fileRepo.listFile(null, 10, "asc", null, SOURCE_SPACE, null).isEmpty());
+        List<String> targetChildren = fileRepo.listFile(null, 10, "asc", null, TARGET_SPACE, targetParent.getFileId()).stream()
+                .map(FileDB::getFileId).collect(Collectors.toList());
+        assertEquals(Collections.singletonList(root.getFileId()), targetChildren);
+        assertEquals(Arrays.asList(targetParent.getFileId(), root.getFileId(), sub.getFileId(), deep.getFileId(), fileC.getFileId()),
+                fileRepo.getPathFiles(fileC.getFileId()).stream().map(FileDB::getFileId).collect(Collectors.toList()));
+        Page<FileDB> subPage = fileRepo.pageFiles(PageFileOps.builder()
+                .spaceCode(TARGET_SPACE).ancestorId(sub.getFileId()).page(1).pageSize(10).build());
+        assertEquals(2, subPage.getTotal());
+    }
+
+    @Test
+    public void crossSpaceMoveOfNonEmptyDirectoryExceedingWarnThresholdStillSucceeds() {
+        entryRepo.setFileEntryWriteMode("entry");
+        entryRepo.setCrossSpaceMoveEnabled(true);
+        entryRepo.setCrossSpaceMoveWarnThreshold(1);
+
+        FileDB root = addDirectory(SOURCE_SPACE, "warn-root", null, "warn-root");
+        addFile(SOURCE_SPACE, "warn-a.txt", root.getFileId(), "warn-a");
+        addFile(SOURCE_SPACE, "warn-b.txt", root.getFileId(), "warn-b");
+
+        // 超阈值只告警不拒绝
+        FileEntryDB moved = entryRepo.moveAcrossSpace(root.getFileId(), TARGET_SPACE, null);
+        assertEquals(TARGET_SPACE, moved.getSpaceCode());
+        assertEquals(2L, entryRepo.countNodes(TARGET_SPACE, root.getFileId()).getFileCount());
+    }
+
+    @Test
+    public void crossSpaceMoveOfNonEmptyDirectoryRequiresEntryWriteMode() {
+        entryRepo.setCrossSpaceMoveEnabled(true);
+        FileDB root = addDirectory(SOURCE_SPACE, "dual-root", null, "dual-root");
+        addFile(SOURCE_SPACE, "dual-a.txt", root.getFileId(), "dual-a");
+
+        // dual 模式闭包仍在写，非空目录不随迁闭包，必须拒绝；源目录保持完好
+        IllegalStateException error = assertThrows(IllegalStateException.class,
+                () -> entryRepo.moveAcrossSpace(root.getFileId(), TARGET_SPACE, null));
+        assertTrue(error.getMessage().contains("requires write-mode entry"));
+        assertNotNull(entryRepo.queryActiveByFileId(SOURCE_SPACE, root.getFileId()));
+        assertEquals(SOURCE_SPACE, fileRepo.queryFile(root.getFileId()).getSpaceCode());
+    }
+
+    @Test
+    public void crossSpaceMoveRejectsTargetNameConflictBeforeAnyWrite() {
+        entryRepo.setFileEntryWriteMode("entry");
+        entryRepo.setCrossSpaceMoveEnabled(true);
+        FileDB root = addDirectory(SOURCE_SPACE, "conflict-dir", null, "conflict-src");
+        FileDB child = addFile(SOURCE_SPACE, "conflict-a.txt", root.getFileId(), "conflict-a");
+        setOperator(TARGET_SPACE);
+        addDirectory(TARGET_SPACE, "conflict-dir", null, "conflict-dst");
+
+        assertThrows(IllegalStateException.class,
+                () -> entryRepo.moveAcrossSpace(root.getFileId(), TARGET_SPACE, null));
+        // 校验先于任何写入：源子树完好，目标空间无子树残留
+        assertNotNull(entryRepo.queryActiveByFileId(SOURCE_SPACE, root.getFileId()));
+        assertNotNull(entryRepo.queryActiveByFileId(SOURCE_SPACE, child.getFileId()));
+        assertNull(entryRepo.queryActiveByFileId(TARGET_SPACE, child.getFileId()));
+        assertEquals(SOURCE_SPACE, fileRepo.queryFile(root.getFileId()).getSpaceCode());
+    }
+
+    @Test
+    public void crossSpaceMoveRejectsMovingIntoOwnSubtree() {
+        entryRepo.setFileEntryWriteMode("entry");
+        entryRepo.setCrossSpaceMoveEnabled(true);
+        FileDB root = addDirectory(SOURCE_SPACE, "cycle-root", null, "cycle-root");
+        FileDB sub = addDirectory(SOURCE_SPACE, "cycle-sub", root.getFileId(), "cycle-sub");
+
+        assertThrows(IllegalArgumentException.class,
+                () -> entryRepo.moveAcrossSpace(root.getFileId(), SOURCE_SPACE, sub.getFileId()));
+        assertThrows(IllegalArgumentException.class,
+                () -> entryRepo.moveAcrossSpace(root.getFileId(), SOURCE_SPACE, root.getFileId()));
+        assertNotNull(entryRepo.queryActiveByFileId(SOURCE_SPACE, sub.getFileId()));
+    }
+
+    @Test
     public void legacyEntryOnlyConvergesOnIntegrityConstraintViolation() {
         DataAccessException duplicateKey = new DataAccessException("duplicate", new SQLException("duplicate", "23505"));
         DataAccessException connectionFailure = new DataAccessException("connection", new SQLException("connection", "08006"));

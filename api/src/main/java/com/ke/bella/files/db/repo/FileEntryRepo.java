@@ -30,6 +30,8 @@ import org.jooq.SortField;
 import org.jooq.exception.DataAccessException;
 import org.jooq.exception.SQLStateClass;
 import org.jooq.impl.DSL;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,10 +58,19 @@ public class FileEntryRepo implements BaseRepo {
     // 祖先链遍历的深度上限，超出视为数据成环等异常
     static final int MAX_TREE_DEPTH = 64;
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(FileEntryRepo.class);
+
     private final DSLContext db;
 
     @Value("${bella.file-api.file-entry.cross-space-move-enabled:false}")
     private boolean crossSpaceMoveEnabled;
+
+    /**
+     * 跨空间迁移子树规模的告警阈值：超过只记 warning（含规模、源/目标空间、耗时），不拒绝迁移。
+     * 告警数据用于评估是否需要异步分批迁移的 Phase 2。
+     */
+    @Value("${bella.file-api.file-entry.cross-space-move-warn-threshold:5000}")
+    private int crossSpaceMoveWarnThreshold;
 
     /**
      * dual（默认）：闭包表和 entry 双写，任一失败整体回滚，保证两边严格一致；
@@ -77,6 +88,10 @@ public class FileEntryRepo implements BaseRepo {
 
     void setCrossSpaceMoveEnabled(boolean enabled) {
         this.crossSpaceMoveEnabled = enabled;
+    }
+
+    void setCrossSpaceMoveWarnThreshold(int threshold) {
+        this.crossSpaceMoveWarnThreshold = threshold;
     }
 
     void setFileEntryWriteMode(String writeMode) {
@@ -648,12 +663,26 @@ public class FileEntryRepo implements BaseRepo {
         }
         String sourceSpaceCode = file.getSpaceCode();
         FileEntryDB source = ensureLegacyEntry(sourceSpaceCode, fileId);
-        if(TYPE_DIR.equals(source.getType()) && entryDb(sourceSpaceCode).fetchCount(FILE_ENTRY,
-                FILE_ENTRY.PARENT_ENTRY_ID.eq(source.getEntryId())) > 0) {
-            throw new IllegalArgumentException("cross-space move of non-empty directories is not supported");
-        }
+        List<FileEntryDB> descendants = TYPE_DIR.equals(source.getType())
+                ? collectSubtreeDescendants(sourceSpaceCode, source)
+                : Collections.emptyList();
         String targetParentEntryId = resolveParentEntryId(targetSpaceCode, targetAncestorId);
+        if(source.getEntryId().equals(targetParentEntryId)
+                || descendants.stream().anyMatch(entry -> entry.getEntryId().equals(targetParentEntryId))) {
+            throw new IllegalArgumentException("cannot move a node into itself or its descendant, fileId: " + fileId);
+        }
         assertNameAvailable(targetSpaceCode, targetParentEntryId, source.getFilename(), null);
+        if(descendants.isEmpty()) {
+            moveLeafAcrossSpace(source, sourceSpaceCode, targetSpaceCode, targetParentEntryId, targetAncestorId);
+        } else {
+            moveSubtreeAcrossSpace(source, descendants, sourceSpaceCode, targetSpaceCode, targetParentEntryId);
+        }
+        return queryActiveByFileId(targetSpaceCode, fileId);
+    }
+
+    private void moveLeafAcrossSpace(FileEntryDB source, String sourceSpaceCode, String targetSpaceCode,
+            String targetParentEntryId, @Nullable String targetAncestorId) {
+        String fileId = source.getFileId();
         FileEntryRecord target = FILE_ENTRY.newRecord();
         target.setEntryId(IDGenerator.FILE_ENTRY_ID_GEN.generate());
         target.setSpaceCode(targetSpaceCode);
@@ -674,12 +703,104 @@ public class FileEntryRepo implements BaseRepo {
         if(closureWriteEnabled()) {
             moveLeafClosureAcrossSpace(fileId, sourceSpaceCode, targetSpaceCode, targetAncestorId);
         }
-        int updated = fileDb(fileId).update(FILE).set(FILE.SPACE_CODE, targetSpaceCode)
-                .where(FILE.FILE_ID.eq(fileId)).and(FILE.STATUS.eq(FileStatus.NOT_DELETED.getValue())).execute();
-        if(updated != 1) {
-            throw new IllegalStateException("update file space cache failed, fileId: " + fileId);
+        updateFileSpaceCache(Collections.singletonList(fileId), targetSpaceCode);
+    }
+
+    /**
+     * 非空目录跨空间迁移：同一本地事务内把子树全部 file_entry 改写到目标空间分片（保留 entry_id 与父子关系，
+     * 仅根 entry 的 parent_entry_id 指向目标父入口），并批量刷新 file.space_code 缓存。
+     * 只迁窄表 file_entry，不随迁闭包，因此仅允许在 write-mode=entry（闭包已停写）下执行；
+     * file 物理行、file_id、bucket/path 和对象内容均不变；失败整体回滚，源目录保持完好。
+     */
+    private void moveSubtreeAcrossSpace(FileEntryDB source, List<FileEntryDB> descendants, String sourceSpaceCode,
+            String targetSpaceCode, String targetParentEntryId) {
+        if(closureWriteEnabled()) {
+            throw new IllegalStateException(
+                    "cross-space move of non-empty directories requires write-mode entry, closure is still being written");
         }
-        return queryActiveByFileId(targetSpaceCode, fileId);
+        long startMillis = System.currentTimeMillis();
+        String fileId = source.getFileId();
+        List<FileEntryDB> subtree = new ArrayList<>(descendants.size() + 1);
+        subtree.add(source);
+        subtree.addAll(descendants);
+        List<String> entryIds = subtree.stream().map(FileEntryDB::getEntryId).collect(Collectors.toList());
+        List<String> fileIds = subtree.stream().map(FileEntryDB::getFileId).collect(Collectors.toList());
+
+        int deleted = entryDb(sourceSpaceCode).deleteFrom(FILE_ENTRY)
+                .where(FILE_ENTRY.SPACE_CODE.eq(sourceSpaceCode))
+                .and(FILE_ENTRY.ENTRY_ID.in(entryIds))
+                .execute();
+        if(deleted != entryIds.size()) {
+            throw new IllegalStateException("delete source subtree file_entry failed, fileId: " + fileId);
+        }
+        DSLContext targetDsl = entryDb(targetSpaceCode);
+        for (FileEntryDB entry : subtree) {
+            FileEntryRecord record = FILE_ENTRY.newRecord();
+            record.setEntryId(entry.getEntryId());
+            record.setSpaceCode(targetSpaceCode);
+            record.setParentEntryId(entry == source ? targetParentEntryId : entry.getParentEntryId());
+            record.setFileId(entry.getFileId());
+            record.setFilename(entry.getFilename());
+            record.setType(entry.getType());
+            record.setCuid(entry.getCuid());
+            record.setCuName(entry.getCuName());
+            record.setCtime(entry.getCtime());
+            fillUpdatorInfo(record);
+            if(targetDsl.insertInto(FILE_ENTRY).set(record).execute() != 1) {
+                throw new IllegalStateException("insert target file_entry failed, entryId: " + entry.getEntryId());
+            }
+        }
+        updateFileSpaceCache(fileIds, targetSpaceCode);
+        long elapsedMillis = System.currentTimeMillis() - startMillis;
+        if(subtree.size() > crossSpaceMoveWarnThreshold) {
+            LOGGER.warn("large cross-space subtree move, size: {}, source space: {}, target space: {}, elapsed: {}ms, fileId: {}",
+                    subtree.size(), sourceSpaceCode, targetSpaceCode, elapsedMillis, fileId);
+        }
+    }
+
+    /**
+     * 逐层 BFS 枚举子树（不含根），层内批量 IN 查询并加锁，查询次数与树深同阶。
+     * 层级数即目录深度，超过 MAX_TREE_DEPTH 视为成环等数据异常。
+     */
+    private List<FileEntryDB> collectSubtreeDescendants(String spaceCode, FileEntryDB root) {
+        List<FileEntryDB> result = new ArrayList<>();
+        List<String> frontier = Collections.singletonList(root.getEntryId());
+        int depth = 0;
+        while (!frontier.isEmpty()) {
+            if(++depth > MAX_TREE_DEPTH) {
+                throw new IllegalStateException("file_entry subtree exceeds max depth, fileId: " + root.getFileId());
+            }
+            List<FileEntryDB> children = entryDb(spaceCode).selectFrom(FILE_ENTRY)
+                    .where(FILE_ENTRY.SPACE_CODE.eq(spaceCode))
+                    .and(FILE_ENTRY.PARENT_ENTRY_ID.in(frontier))
+                    .forUpdate()
+                    .fetchInto(FileEntryDB.class);
+            result.addAll(children);
+            frontier = children.stream()
+                    .filter(entry -> TYPE_DIR.equals(entry.getType()))
+                    .map(FileEntryDB::getEntryId)
+                    .collect(Collectors.toList());
+        }
+        return result;
+    }
+
+    /**
+     * 子树 file.space_code 派生缓存批量刷新：file 物理行按 file_id hash 分片，不随空间迁移，只改缓存值。
+     */
+    private void updateFileSpaceCache(List<String> fileIds, String targetSpaceCode) {
+        Map<String, List<String>> idsByShard = fileIds.stream()
+                .collect(Collectors.groupingBy(FileRepo::getShardingKeyByFileIdStatic));
+        int updated = 0;
+        for (Map.Entry<String, List<String>> shard : idsByShard.entrySet()) {
+            updated += DSLContextHolder.get(shard.getKey(), db).update(FILE)
+                    .set(FILE.SPACE_CODE, targetSpaceCode)
+                    .where(FILE.FILE_ID.in(shard.getValue()))
+                    .and(FILE.STATUS.eq(FileStatus.NOT_DELETED.getValue()))
+                    .execute();
+        }
+        if(updated != fileIds.size()) {
+            throw new IllegalStateException("update file space cache failed, expected: " + fileIds.size() + ", updated: " + updated);
+        }
     }
 
     private void moveLeafClosureAcrossSpace(String fileId, String sourceSpaceCode, String targetSpaceCode,

@@ -57,7 +57,7 @@
 - 删除时以 entry 为入口：将活动 entry 置删并删除其派生 closure，再按第一阶段“一个文件一个活动入口”约束置删 `file`。仓储中保留活动入口计数保护，若发现多入口则按数据不变量破坏处理：拒绝删除文件本体、记录告警并要求先修复异常数据。
 - 同空间移动更新原 entry 的 `parent_entry_id` 并保留 `entry_id`，随后调用 #60 的子树闭包迁移逻辑；名称锁、同名校验、防移动到自身/后代和 entry/closure 写入处于同一事务。
 - 跨空间移动原语接收 `file_id`、目标空间和目标父目录：先按 `file_id` 路由并锁定 file 行，从其 `space_code` 派生缓存得到源空间，再锁定源 entry 与目标名称；随后向目标分片插入新 `entry_id`、创建目标 closure、置删源 entry、移除源 closure，并在同一事务内把 `file.space_code` 更新为目标空间。file 物理行、`file_id`、bucket/path 和对象内容均不变化。
-- 第一阶段原语只允许普通文件和空目录；非空目录转交异步迁移 issue #67。同步原语必须受独立配置 `bella.file-api.file-entry.cross-space-move-enabled=false` 控制，默认关闭，且不由 `write-enabled` 或 `read-mode` 间接开启。
+- 第一阶段原语只允许普通文件和空目录；非空目录转交 issue #67（后调整为单事务同步迁移，见该 issue 现行正文）。同步原语必须受独立配置 `bella.file-api.file-entry.cross-space-move-enabled=false` 控制，默认关闭，且不由 `write-enabled` 或 `read-mode` 间接开启。
 - 现有 `/v1/files/move` 第一阶段继续维持同空间公开语义；后续公开普通文件/空目录跨空间移动时，仅增加可选 `target_space_code`，源空间继续由 file 缓存解析。这样不扫描分片，也不把缓存字段提升为入口真相。
 - 所有广播在 file、entry、closure 事务成功后沿用现有事件类型发送。位置事件中的公开对象继续返回 `file_id`；内部日志补充 source/target space 和 entry ID，便于核对和重试。
 
@@ -75,8 +75,8 @@
 - 后续 issue A 改造 `pageFiles`、`getPathFiles/info` 等同分片 join，并在现有 move 请求中仅增加 `target_space_code`，随后开放普通文件和空目录的同步跨空间移动；`entry_id` 不进入协议。
 - 后续 issue B' 如有共享需求，采用独立软链对象：`type='link'`，软链拥有自己的 file 行、`file_id` 和唯一 entry，并通过 `target_file_id` 指向目标。第一版仅允许链向普通文件、禁止链到链，目标目录子树不物化进 link 的 closure；位置操作使用软链自己的 `file_id` 寻址，删除软链不影响目标，无需引用计数。
 - 只有产品明确需要硬链/挂载语义，即多个位置共享同一文件生命周期且修改一处处处生效时，才重新评估多入口、引用计数和位置级 API；在此之前不排期原多入口方案。
-- 后续 issue C 为 #67：以异步任务、迁移根冻结和分批幂等复制支持非空目录跨空间移动。迁移期间读继续走源空间，全部 entry/closure 就绪后以小事务切换根 entry 与 `file.space_code` 缓存；源侧在最终切换前保持完整可回滚。
-- 后续顺序固定为 A（文件/空目录同步跨空间 API）→ B'（软链独立对象）→ #67（非空目录异步跨空间迁移）。closure 是否替换为 `file_entry_closure` 或增加反向索引，继续根据上述能力的真实查询压力单独立项。
+- 后续 issue C 为 #67：非空目录跨空间迁移。方案已调整（原设想为异步任务 + 分批幂等复制）：闭包切换为 entry 单写后只需迁移窄表 `file_entry`，改为单个本地事务内批量改写子树 entry 的 `space_code`（及根 entry 的 `parent_entry_id`）并刷新 `file.space_code` 缓存；迁移前统计子树规模，超过可配置阈值只记 warning 不拒绝，告警数据用于评估是否需要异步 Phase 2。
+- 后续顺序固定为 A（文件/空目录同步跨空间 API）→ B'（软链独立对象）→ #67（非空目录跨空间单事务迁移）。closure 是否替换为 `file_entry_closure` 或增加反向索引，继续根据上述能力的真实查询压力单独立项。
 
 ## 迁移
 
@@ -85,7 +85,7 @@
 3. 分片分批回填历史活动数据，反复运行计数、父级、重名和集合差异核对，直至全量一致；期间新写由确定性查重和活动唯一索引避免重复。
 4. 切换 `read-mode=compare`，对 exists、列表、父级和路径入口做采样双读，旧结果对外返回，差异进入指标和结构化日志。
 5. 先按小流量空间切 `read-mode=entry`，再逐步扩大；列表、重名和分页稳定后完成全量切换，closure 继续双写并承担祖先查询。
-6. 完成至少一个发布周期的数据核对后仍保持跨空间开关关闭；只有 issue A 完成 `pageFiles`、`getPathFiles/info` 的跨分片 hydration 并通过回归后，才允许在生产开启普通文件/空目录跨空间移动。非空目录由 #67 异步实现。
+6. 完成至少一个发布周期的数据核对后仍保持跨空间开关关闭；只有 issue A 完成 `pageFiles`、`getPathFiles/info` 的跨分片 hydration 并通过回归后，才允许在生产开启普通文件/空目录跨空间移动。非空目录由 #67 以单事务同步迁移实现（要求 write-mode 已切 entry）。
 
 ## 风险与边界
 
@@ -109,7 +109,7 @@
 - **仓储与事务**：新增 `FileEntryRepo` 集成测试覆盖空间 hash 与现有算法一致、根目录、子目录、活动重名、重复删除后重建、按 entry/file 查询、同空间移动保留 entry ID、跨空间移动重建 entry ID、`file.space_code` 同事务更新、目标冲突、事务失败整体回滚，以及 file 物理分片、`file_id`、bucket/path 和对象内容未变化。
 - **创建与删除**：覆盖新上传、mkdir、对象上传失败清理、文件删除、空目录删除和发现多活动入口时拒绝误删文件本体；断言 file、entry、closure 三者状态一致。
 - **双写 fallback**：构造父目录、自身或完整父链尚未回填的存量数据，分别执行 create、rename、move、delete；验证 `ensureLegacyEntry` 从根到叶幂等补齐、并发调用汇合到同一 legacy ID、离线回填不产生重复，旧模型不完整或冲突时业务事务整体失败。
-- **移动与重命名**：在 #60 子树测试基础上覆盖文件、空目录、非空目录同空间移动、防环、同名冲突、重命名双写；跨空间仅覆盖普通文件和空目录的内部原语，验证默认开关拒绝、显式开启后源入口不可见、目标入口可见、`file.space_code` 指向目标且 `file_id/bucket/path` 不变，非空目录路由到 #67 而非同步执行。
+- **移动与重命名**：在 #60 子树测试基础上覆盖文件、空目录、非空目录同空间移动、防环、同名冲突、重命名双写；跨空间仅覆盖普通文件和空目录的内部原语，验证默认开关拒绝、显式开启后源入口不可见、目标入口可见、`file.space_code` 指向目标且 `file_id/bucket/path` 不变；非空目录支持由 #67 交付（单事务子树迁移，仅限 write-mode=entry）。
 - **读路径兼容**：对根目录、子目录、空目录、名称查询、exists、普通列表和分页执行 closure/entry 双读，比较顺序、分页总数、过滤结果和 `OpenAIFile` JSON；批量文件补充需按 `file_id` 路由分组，避免目标空间分片假设。
 - **路径与祖先**：复用并扩展 `FileControllerGetFileAncestorIdsTest`、目录信息和 #60 移动回归，确认 entry 切读后路径、直属父级、祖先链、批量 ancestor 和 `root_depth` 均无回退；增加跨空间数据证明旧 join 会漏行，并以此测试锁定跨空间开关在查询改造完成前不得开启。
 - **回填与灰度**：构造含根节点、深层目录、历史删除和同名重建的数据集，验证回填幂等、断点重跑、差异报告和修复；演练 `closure -> compare -> entry -> closure` 配置切换，确认回滚不需要数据恢复。
