@@ -68,13 +68,7 @@ public class FileEntryRepoCrossSpaceLockTest {
         String sourceShard = FileRepo.getShardingKeyBySpaceCode(SOURCE_SPACE);
         String targetShard = FileRepo.getShardingKeyBySpaceCode(TARGET_SPACE);
         FileRepoTestFixture.recreateUserFileTables(dsl, sourceShard);
-        // jOOQ ddl() 的命名约束在同库不能重复创建，目标分片表复制源分片结构
-        dsl.execute("drop table if exists file_" + targetShard);
-        dsl.execute("drop table if exists file_closure_" + targetShard);
-        dsl.execute("drop table if exists file_entry_" + targetShard);
-        dsl.execute("create table file_" + targetShard + " as select * from file_" + sourceShard + " where 1 = 0");
-        dsl.execute("create table file_closure_" + targetShard + " as select * from file_closure_" + sourceShard + " where 1 = 0");
-        dsl.execute("create table file_entry_" + targetShard + " as select * from file_entry_" + sourceShard + " where 1 = 0");
+        FileRepoTestFixture.recreateUserFileTables(dsl, targetShard);
         IDGenerator.setInstanceId(1L);
         // @Value 注入在 @Bean 方法之后执行，开关必须在 bean 初始化完成后设置到代理背后的目标对象
         FileEntryRepo target = AopTestUtils.getTargetObject(entryRepo);

@@ -65,12 +65,7 @@ public class FileEntryRepoTest {
         String targetShard = FileRepo.getShardingKeyBySpaceCode(TARGET_SPACE);
         assertNotEquals(sourceShard, targetShard);
         FileRepoTestFixture.recreateUserFileTables(dsl, sourceShard);
-        dsl.execute("drop table if exists file_" + targetShard);
-        dsl.execute("drop table if exists file_closure_" + targetShard);
-        dsl.execute("drop table if exists file_entry_" + targetShard);
-        dsl.execute("create table file_" + targetShard + " as select * from file_" + sourceShard + " where 1 = 0");
-        dsl.execute("create table file_closure_" + targetShard + " as select * from file_closure_" + sourceShard + " where 1 = 0");
-        dsl.execute("create table file_entry_" + targetShard + " as select * from file_entry_" + sourceShard + " where 1 = 0");
+        FileRepoTestFixture.recreateUserFileTables(dsl, targetShard);
         IDGenerator.setInstanceId(1L);
         entryRepo = new FileEntryRepo(dsl);
         fileRepo = new FileRepo(dsl, entryRepo);
@@ -372,6 +367,36 @@ public class FileEntryRepoTest {
             assertNotNull(movedFile);
             assertEquals(TARGET_SPACE, movedFile.getSpaceCode());
         }
+    }
+
+    @Test
+    public void crossSpaceMoveWithinSamePhysicalShardKeepsBothSpacesIsolated() {
+        entryRepo.setFileEntryWriteMode("entry");
+        entryRepo.setCrossSpaceMoveEnabled(true);
+        // 找一个与源空间落在同一物理分片的不同空间：insert-select 源表与目标表为同一张表
+        String sourceShard = FileRepo.getShardingKeyBySpaceCode(SOURCE_SPACE);
+        String siblingSpace = null;
+        for (int index = 0; index < 1000 && siblingSpace == null; index++) {
+            String candidate = "sp-shard-" + index;
+            if(FileRepo.getShardingKeyBySpaceCode(candidate).equals(sourceShard)) {
+                siblingSpace = candidate;
+            }
+        }
+        assertNotNull(siblingSpace);
+        FileDB root = addDirectory(SOURCE_SPACE, "shard-root", null, "shard-root");
+        FileDB child = addFile(SOURCE_SPACE, "shard-child.txt", root.getFileId(), "shard-child");
+        setOperator(siblingSpace);
+        FileDB targetParent = addDirectory(siblingSpace, "shard-target", null, "shard-target");
+
+        setOperator(SOURCE_SPACE);
+        FileEntryDB moved = entryRepo.moveAcrossSpace(root.getFileId(), siblingSpace, targetParent.getFileId());
+        assertNotNull(moved);
+        assertNull(entryRepo.queryActiveByFileId(SOURCE_SPACE, root.getFileId()));
+        assertNull(entryRepo.queryActiveByFileId(SOURCE_SPACE, child.getFileId()));
+        FileEntryDB movedChild = entryRepo.queryActiveByFileId(siblingSpace, child.getFileId());
+        assertNotNull(movedChild);
+        assertEquals(moved.getEntryId(), movedChild.getParentEntryId());
+        assertEquals(siblingSpace, fileRepo.queryFile(child.getFileId()).getSpaceCode());
     }
 
     @Test
