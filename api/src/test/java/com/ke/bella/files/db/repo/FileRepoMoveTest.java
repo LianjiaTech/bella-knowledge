@@ -71,7 +71,7 @@ public class FileRepoMoveTest {
 
     @Test
     public void moveDirectoryPreservesSubtreeAndReplacesExternalAncestors() {
-        fileRepo.moveFile(SOURCE, TARGET);
+        fileRepo.moveFile(file(SOURCE), file(TARGET));
 
         assertFalse(hasClosure(OLD_ROOT, SOURCE));
         assertFalse(hasClosure(OLD_ROOT, CHILD));
@@ -97,7 +97,7 @@ public class FileRepoMoveTest {
     public void moveDirectoryAllowsMissingExternalClosureRows() {
         dsl.execute("delete from file_closure_0 where ancestor_id = ? and descendant_id = ?", OLD_ROOT, LEAF);
 
-        fileRepo.moveFile(SOURCE, TARGET);
+        fileRepo.moveFile(file(SOURCE), file(TARGET));
 
         assertFalse(hasClosure(OLD_ROOT, SOURCE));
         assertFalse(hasClosure(OLD_ROOT, CHILD));
@@ -108,7 +108,7 @@ public class FileRepoMoveTest {
 
     @Test
     public void movedSubtreeIsVisibleThroughHierarchyQueries() {
-        fileRepo.moveFile(SOURCE, TARGET);
+        fileRepo.moveFile(file(SOURCE), file(TARGET));
 
         List<String> pathIds = fileRepo.getPathFiles(LEAF).stream()
                 .map(FileDB::getFileId)
@@ -215,7 +215,7 @@ public class FileRepoMoveTest {
 
     @Test
     public void moveLeafUsesSameSubtreeAlgorithm() {
-        fileRepo.moveFile(LEAF, TARGET);
+        fileRepo.moveFile(file(LEAF), file(TARGET));
 
         assertFalse(hasClosure(OLD_ROOT, LEAF));
         assertFalse(hasClosure(SOURCE, LEAF));
@@ -227,7 +227,7 @@ public class FileRepoMoveTest {
 
     @Test
     public void moveDirectoryToRootRemovesExternalAncestorsAndResetsRootDepths() {
-        fileRepo.moveFile(SOURCE, null);
+        fileRepo.moveFile(file(SOURCE), null);
 
         assertFalse(hasClosure(OLD_ROOT, SOURCE));
         assertFalse(hasClosure(OLD_ROOT, CHILD));
@@ -243,7 +243,7 @@ public class FileRepoMoveTest {
 
     @Test
     public void moveLeafToRootResetsRootDepth() {
-        fileRepo.moveFile(LEAF, "");
+        fileRepo.moveFile(file(LEAF), null);
 
         assertFalse(hasClosure(OLD_ROOT, LEAF));
         assertFalse(hasClosure(SOURCE, LEAF));
@@ -253,7 +253,7 @@ public class FileRepoMoveTest {
 
     @Test
     public void movedSubtreeToRootIsVisibleThroughHierarchyQueries() {
-        fileRepo.moveFile(SOURCE, null);
+        fileRepo.moveFile(file(SOURCE), null);
 
         List<String> pathIds = fileRepo.getPathFiles(LEAF).stream()
                 .map(FileDB::getFileId)
@@ -282,15 +282,22 @@ public class FileRepoMoveTest {
         Map<String, String> before = snapshot();
 
         IllegalArgumentException selfError = assertThrows(IllegalArgumentException.class,
-                () -> fileRepo.moveFile(SOURCE, SOURCE));
+                () -> fileRepo.moveFile(file(SOURCE), file(SOURCE)));
         assertTrue(selfError.getMessage().contains("cannot move a directory"));
         assertEquals(before, snapshot());
 
-        assertThrows(IllegalArgumentException.class, () -> fileRepo.moveFile(SOURCE, CHILD));
+        assertThrows(IllegalArgumentException.class, () -> fileRepo.moveFile(file(SOURCE), file(CHILD)));
         assertEquals(before, snapshot());
 
-        assertThrows(IllegalArgumentException.class, () -> fileRepo.moveFile(SOURCE, LEAF));
+        assertThrows(IllegalArgumentException.class, () -> fileRepo.moveFile(file(SOURCE), file(LEAF)));
         assertEquals(before, snapshot());
+    }
+
+    private static FileDB file(String fileId) {
+        FileDB file = new FileDB();
+        file.setFileId(fileId);
+        file.setSpaceCode("sp-0");
+        return file;
     }
 
     private void insertTree() {

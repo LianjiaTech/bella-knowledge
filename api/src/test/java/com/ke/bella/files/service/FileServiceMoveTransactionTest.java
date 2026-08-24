@@ -199,7 +199,7 @@ public class FileServiceMoveTransactionTest {
         try {
             Future<?> move = executor.submit(() -> transactionTemplate.executeWithoutResult(status -> {
                 setOperator(SOURCE_SPACE);
-                fileRepo.moveFile(SOURCE, TARGET);
+                fileRepo.moveFile(buildFileDB(SOURCE, SOURCE_SPACE), buildFileDB(TARGET, SOURCE_SPACE));
                 moveCompleted.countDown();
                 await(allowMoveCommit);
             }));

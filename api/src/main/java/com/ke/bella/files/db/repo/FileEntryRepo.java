@@ -653,16 +653,18 @@ public class FileEntryRepo implements BaseRepo {
         }
     }
 
+    /**
+     * file 与 targetAncestor 是调用方已查出的快照，源空间取 file.space_code 缓存、不再回表；
+     * 快照过期由事务内对 entry 行的加锁重读兜底。
+     */
     @Transactional(rollbackFor = Exception.class)
-    public FileEntryDB moveAcrossSpace(String fileId, String targetSpaceCode, @Nullable String targetAncestorId) {
+    public FileEntryDB moveAcrossSpace(FileDB file, String targetSpaceCode, @Nullable FileDB targetAncestor) {
         if(!entryWriteEnabled()) {
             throw new IllegalStateException("cross-space move requires file_entry writes, current write-mode is closure");
         }
-        FileDB file = queryActiveFile(fileId);
-        if(file == null) {
-            throw new IllegalStateException("file not found, fileId: " + fileId);
-        }
+        String fileId = file.getFileId();
         String sourceSpaceCode = file.getSpaceCode();
+        String targetAncestorId = targetAncestor == null ? null : targetAncestor.getFileId();
         FileEntryDB source = ensureLegacyEntry(sourceSpaceCode, fileId);
         if(sourceSpaceCode.equals(targetSpaceCode) && !closureWriteEnabled()) {
             // 同空间调用退化为普通移动：只改根 entry 的 parent_entry_id，子树与 file 缓存都不用动。

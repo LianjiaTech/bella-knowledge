@@ -869,18 +869,17 @@ public class FileService {
     @Transactional(rollbackFor = Exception.class)
     public OpenAIFile moveFile(FileDB file, @Nullable String targetSpaceCode, @Nullable FileDB targetAncestor) {
         String fileId = file.getFileId();
-        String ancestorId = targetAncestor == null ? null : targetAncestor.getFileId();
         String targetSpace = StringUtils.defaultString(StringUtils.trimToNull(targetSpaceCode),
                 targetAncestor != null ? targetAncestor.getSpaceCode() : file.getSpaceCode());
         if(targetAncestor != null && !StringUtils.equals(targetSpace, targetAncestor.getSpaceCode())) {
             throw new IllegalArgumentException("space_code mismatch between target space and ancestor_id");
         }
         if(StringUtils.equals(targetSpace, file.getSpaceCode())) {
-            fileRepo.moveFile(fileId, ancestorId);
+            fileRepo.moveFile(file, targetAncestor);
         } else {
             LOGGER.info("cross-space move, fileId: {}, source space: {}, target space: {}",
                     fileId, file.getSpaceCode(), targetSpace);
-            fileRepo.moveFileAcrossSpace(fileId, targetSpace, ancestorId);
+            fileRepo.moveFileAcrossSpace(file, targetSpace, targetAncestor);
         }
 
         FileOps ops = FileOps.builder()

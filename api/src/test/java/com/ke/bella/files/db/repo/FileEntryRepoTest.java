@@ -91,7 +91,7 @@ public class FileEntryRepoTest {
         assertThrows(IllegalStateException.class,
                 () -> addFile(SOURCE_SPACE, "report.txt", firstParent.getFileId(), "duplicate"));
 
-        fileRepo.moveFile(file.getFileId(), secondParent.getFileId());
+        fileRepo.moveFile(file, secondParent);
         FileEntryDB moved = entryRepo.queryActiveByFileId(SOURCE_SPACE, file.getFileId());
         assertEquals(original.getEntryId(), moved.getEntryId());
         assertEquals(entryRepo.queryActiveByFileId(SOURCE_SPACE, secondParent.getFileId()).getEntryId(), moved.getParentEntryId());
@@ -146,8 +146,8 @@ public class FileEntryRepoTest {
         FileDB targetParent = addDirectory(TARGET_SPACE, "target", null, "target");
         String sourceEntryId = entryRepo.queryActiveByFileId(SOURCE_SPACE, source.getFileId()).getEntryId();
 
-        FileEntryDB target = entryRepo.moveAcrossSpace(source.getFileId(), TARGET_SPACE, targetParent.getFileId());
-        entryRepo.moveAcrossSpace(movedDirectory.getFileId(), TARGET_SPACE, targetParent.getFileId());
+        FileEntryDB target = entryRepo.moveAcrossSpace(source, TARGET_SPACE, targetParent);
+        entryRepo.moveAcrossSpace(movedDirectory, TARGET_SPACE, targetParent);
         FileDB child = addFile(TARGET_SPACE, "child.txt", movedDirectory.getFileId(), "child");
 
         assertNotEquals(sourceEntryId, target.getEntryId());
@@ -204,7 +204,7 @@ public class FileEntryRepoTest {
         Map<String, FileEntryDB> before = subtree.stream()
                 .collect(Collectors.toMap(FileDB::getFileId, file -> entryRepo.queryActiveByFileId(SOURCE_SPACE, file.getFileId())));
 
-        FileEntryDB moved = entryRepo.moveAcrossSpace(root.getFileId(), TARGET_SPACE, targetParent.getFileId());
+        FileEntryDB moved = entryRepo.moveAcrossSpace(root, TARGET_SPACE, targetParent);
 
         // 根 entry 保留 entry_id，仅 space_code 与 parent_entry_id 改写
         assertEquals(before.get(root.getFileId()).getEntryId(), moved.getEntryId());
@@ -253,7 +253,7 @@ public class FileEntryRepoTest {
         addFile(SOURCE_SPACE, "warn-b.txt", root.getFileId(), "warn-b");
 
         // 超阈值只告警不拒绝
-        FileEntryDB moved = entryRepo.moveAcrossSpace(root.getFileId(), TARGET_SPACE, null);
+        FileEntryDB moved = entryRepo.moveAcrossSpace(root, TARGET_SPACE, null);
         assertEquals(TARGET_SPACE, moved.getSpaceCode());
         assertEquals(2L, entryRepo.countNodes(TARGET_SPACE, root.getFileId()).getFileCount());
     }
@@ -265,7 +265,7 @@ public class FileEntryRepoTest {
 
         // dual 模式闭包仍在写，非空目录不随迁闭包，必须拒绝；源目录保持完好
         IllegalStateException error = assertThrows(IllegalStateException.class,
-                () -> entryRepo.moveAcrossSpace(root.getFileId(), TARGET_SPACE, null));
+                () -> entryRepo.moveAcrossSpace(root, TARGET_SPACE, null));
         assertTrue(error.getMessage().contains("requires write-mode entry"));
         assertNotNull(entryRepo.queryActiveByFileId(SOURCE_SPACE, root.getFileId()));
         assertEquals(SOURCE_SPACE, fileRepo.queryFile(root.getFileId()).getSpaceCode());
@@ -280,7 +280,7 @@ public class FileEntryRepoTest {
         addDirectory(TARGET_SPACE, "conflict-dir", null, "conflict-dst");
 
         assertThrows(IllegalStateException.class,
-                () -> entryRepo.moveAcrossSpace(root.getFileId(), TARGET_SPACE, null));
+                () -> entryRepo.moveAcrossSpace(root, TARGET_SPACE, null));
         // 校验先于任何写入：源子树完好，目标空间无子树残留
         assertNotNull(entryRepo.queryActiveByFileId(SOURCE_SPACE, root.getFileId()));
         assertNotNull(entryRepo.queryActiveByFileId(SOURCE_SPACE, child.getFileId()));
@@ -297,7 +297,7 @@ public class FileEntryRepoTest {
 
         // 目标空间与源空间相同：退化为只改根 parent_entry_id，子树不搬迁
         FileEntryDB before = entryRepo.queryActiveByFileId(SOURCE_SPACE, root.getFileId());
-        FileEntryDB moved = entryRepo.moveAcrossSpace(root.getFileId(), SOURCE_SPACE, sibling.getFileId());
+        FileEntryDB moved = entryRepo.moveAcrossSpace(root, SOURCE_SPACE, sibling);
         assertEquals(before.getEntryId(), moved.getEntryId());
         assertEquals(entryRepo.queryActiveByFileId(SOURCE_SPACE, sibling.getFileId()).getEntryId(), moved.getParentEntryId());
         FileEntryDB childEntry = entryRepo.queryActiveByFileId(SOURCE_SPACE, child.getFileId());
@@ -314,7 +314,7 @@ public class FileEntryRepoTest {
         }
 
         // 恰好 MAX_TREE_DEPTH 层且最深节点是空目录：确认无子节点的查询不计入深度，迁到空间根成功
-        assertNotNull(entryRepo.moveAcrossSpace(root.getFileId(), TARGET_SPACE, null));
+        assertNotNull(entryRepo.moveAcrossSpace(root, TARGET_SPACE, null));
         assertNotNull(entryRepo.queryActiveByFileId(TARGET_SPACE, deepest.getFileId()));
 
         // 超过 MAX_TREE_DEPTH 层的子树拒绝迁移
@@ -324,7 +324,7 @@ public class FileEntryRepoTest {
             overDeepest = addDirectory(SOURCE_SPACE, "o-" + level, overDeepest.getFileId(), "over-" + level);
         }
         IllegalStateException error = assertThrows(IllegalStateException.class,
-                () -> entryRepo.moveAcrossSpace(overRoot.getFileId(), TARGET_SPACE, null));
+                () -> entryRepo.moveAcrossSpace(overRoot, TARGET_SPACE, null));
         assertTrue(error.getMessage().contains("exceeds max depth"));
     }
 
@@ -342,7 +342,7 @@ public class FileEntryRepoTest {
         FileDB comboRoot = addDirectory(SOURCE_SPACE, "combo-root", null, "combo-root");
         FileDB comboChild = addFile(SOURCE_SPACE, "combo-child.txt", comboRoot.getFileId(), "combo-child");
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
-                () -> entryRepo.moveAcrossSpace(comboRoot.getFileId(), TARGET_SPACE, targetParent.getFileId()));
+                () -> entryRepo.moveAcrossSpace(comboRoot, TARGET_SPACE, targetParent));
         assertTrue(error.getMessage().contains("exceeds max tree depth"));
         assertNotNull(entryRepo.queryActiveByFileId(SOURCE_SPACE, comboRoot.getFileId()));
         assertNotNull(entryRepo.queryActiveByFileId(SOURCE_SPACE, comboChild.getFileId()));
@@ -351,7 +351,7 @@ public class FileEntryRepoTest {
 
         // 叶子（子树 0 层）挂到同一目标父下恰好触及上限：允许，且迁移后完整路径仍可读
         FileDB leaf = addFile(SOURCE_SPACE, "combo-leaf.txt", null, "combo-leaf");
-        assertNotNull(entryRepo.moveAcrossSpace(leaf.getFileId(), TARGET_SPACE, targetParent.getFileId()));
+        assertNotNull(entryRepo.moveAcrossSpace(leaf, TARGET_SPACE, targetParent));
         List<FileDB> path = entryRepo.pathFiles(TARGET_SPACE, leaf.getFileId());
         assertEquals(FileEntryRepo.MAX_TREE_DEPTH + 1, path.size());
         assertEquals(leaf.getFileId(), path.get(path.size() - 1).getFileId());
@@ -371,7 +371,7 @@ public class FileEntryRepoTest {
         FileDB targetParent = addDirectory(TARGET_SPACE, "chunk-target", null, "chunk-target");
 
         setOperator(SOURCE_SPACE);
-        FileEntryDB moved = entryRepo.moveAcrossSpace(root.getFileId(), TARGET_SPACE, targetParent.getFileId());
+        FileEntryDB moved = entryRepo.moveAcrossSpace(root, TARGET_SPACE, targetParent);
         assertNotNull(moved);
         DSLContext sourceDsl = DSLContextHolder.get(FileRepo.getShardingKeyBySpaceCode(SOURCE_SPACE), dsl);
         assertEquals(0, sourceDsl.fetchCount(FILE_ENTRY, FILE_ENTRY.SPACE_CODE.eq(SOURCE_SPACE)));
@@ -406,7 +406,7 @@ public class FileEntryRepoTest {
         FileDB targetParent = addDirectory(siblingSpace, "shard-target", null, "shard-target");
 
         setOperator(SOURCE_SPACE);
-        FileEntryDB moved = entryRepo.moveAcrossSpace(root.getFileId(), siblingSpace, targetParent.getFileId());
+        FileEntryDB moved = entryRepo.moveAcrossSpace(root, siblingSpace, targetParent);
         assertNotNull(moved);
         assertNull(entryRepo.queryActiveByFileId(SOURCE_SPACE, root.getFileId()));
         assertNull(entryRepo.queryActiveByFileId(SOURCE_SPACE, child.getFileId()));
@@ -426,7 +426,7 @@ public class FileEntryRepoTest {
 
         setOperator(SOURCE_SPACE);
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
-                () -> entryRepo.moveAcrossSpace(movedDir.getFileId(), TARGET_SPACE, targetFile.getFileId()));
+                () -> entryRepo.moveAcrossSpace(movedDir, TARGET_SPACE, targetFile));
         assertTrue(error.getMessage().contains("not a directory"));
         assertNotNull(entryRepo.queryActiveByFileId(SOURCE_SPACE, movedDir.getFileId()));
     }
@@ -438,9 +438,9 @@ public class FileEntryRepoTest {
         FileDB sub = addDirectory(SOURCE_SPACE, "cycle-sub", root.getFileId(), "cycle-sub");
 
         assertThrows(IllegalArgumentException.class,
-                () -> entryRepo.moveAcrossSpace(root.getFileId(), SOURCE_SPACE, sub.getFileId()));
+                () -> entryRepo.moveAcrossSpace(root, SOURCE_SPACE, sub));
         assertThrows(IllegalArgumentException.class,
-                () -> entryRepo.moveAcrossSpace(root.getFileId(), SOURCE_SPACE, root.getFileId()));
+                () -> entryRepo.moveAcrossSpace(root, SOURCE_SPACE, root));
         assertNotNull(entryRepo.queryActiveByFileId(SOURCE_SPACE, sub.getFileId()));
     }
 
@@ -500,13 +500,13 @@ public class FileEntryRepoTest {
 
         // 防环校验由 entry 自己承担
         assertThrows(IllegalArgumentException.class,
-                () -> fileRepo.moveFile(root.getFileId(), child.getFileId()));
+                () -> fileRepo.moveFile(root, child));
 
         // entry 写是主写：重名冲突必须失败，不再降级
         assertThrows(IllegalStateException.class,
                 () -> addFile(SOURCE_SPACE, "eo-child", root.getFileId(), "eo-dup"));
 
-        fileRepo.moveFile(leaf.getFileId(), root.getFileId());
+        fileRepo.moveFile(leaf, root);
         assertEquals(root.getFileId(), fileRepo.getDirectAncestorId(leaf.getFileId()));
 
         fileRepo.updateFile(FileOps.builder().fileId(leaf.getFileId()).status(FileStatus.DELETED).build());
@@ -527,7 +527,7 @@ public class FileEntryRepoTest {
         assertEquals(0, shardDsl.fetchCount(FILE_ENTRY));
         assertEquals(root.getFileId(), fileRepo.getDirectAncestorId(leaf.getFileId()));
 
-        fileRepo.moveFile(leaf.getFileId(), null);
+        fileRepo.moveFile(leaf, null);
         assertNull(fileRepo.getDirectAncestorId(leaf.getFileId()));
         fileRepo.updateFile(FileOps.builder().fileId(leaf.getFileId()).filename("cm-renamed.txt").build());
         fileRepo.updateFile(FileOps.builder().fileId(leaf.getFileId()).status(FileStatus.DELETED).build());
@@ -535,7 +535,7 @@ public class FileEntryRepoTest {
 
         // 跨空间移动依赖 entry 记录，closure 模式下必须拒绝
         assertThrows(IllegalStateException.class,
-                () -> entryRepo.moveAcrossSpace(root.getFileId(), TARGET_SPACE, null));
+                () -> entryRepo.moveAcrossSpace(root, TARGET_SPACE, null));
     }
 
     @Test

@@ -94,7 +94,7 @@ public class FileEntryCrossSpaceMoveTransactionTest {
         setOperator(SOURCE_SPACE);
         IllegalStateException error = assertThrows(IllegalStateException.class,
                 () -> transactionTemplate.execute(status ->
-                        entryRepo.moveAcrossSpace(root.getFileId(), TARGET_SPACE, targetParent.getFileId())));
+                        entryRepo.moveAcrossSpace(root, TARGET_SPACE, targetParent)));
 
         assertTrue(error.getMessage().contains("update file space cache failed"));
         // 整体回滚：源子树 entry 完好，目标空间无残留，file.space_code 缓存未变

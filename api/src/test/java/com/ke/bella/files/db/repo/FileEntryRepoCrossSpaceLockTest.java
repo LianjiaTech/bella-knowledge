@@ -118,7 +118,7 @@ public class FileEntryRepoCrossSpaceLockTest {
             Future<?> move = executor.submit(() -> {
                 setOperator(SOURCE_SPACE);
                 try {
-                    entryRepo.moveAcrossSpace(movedDir.getFileId(), TARGET_SPACE, targetParent.getFileId());
+                    entryRepo.moveAcrossSpace(movedDir, TARGET_SPACE, targetParent);
                 } catch (Throwable t) {
                     moveError.set(t);
                 }
@@ -182,7 +182,7 @@ public class FileEntryRepoCrossSpaceLockTest {
             Future<?> move = executor.submit(() -> {
                 setOperator(SOURCE_SPACE);
                 try {
-                    entryRepo.moveAcrossSpace(movedDir.getFileId(), TARGET_SPACE, targetParent.getFileId());
+                    entryRepo.moveAcrossSpace(movedDir, TARGET_SPACE, targetParent);
                 } catch (Throwable t) {
                     moveError.set(t);
                 }
@@ -246,6 +246,7 @@ public class FileEntryRepoCrossSpaceLockTest {
         file.setFilename(filename);
         file.setIsDir(isDir);
         file.setNodeType(nodeType.getValue());
+        file.setSpaceCode(spaceCode);
         entryRepo.addEntry(spaceCode, file, ancestorId);
         return file;
     }
