@@ -91,7 +91,7 @@ public class FileEntryRepoTest {
         assertThrows(IllegalStateException.class,
                 () -> addFile(SOURCE_SPACE, "report.txt", firstParent.getFileId(), "duplicate"));
 
-        fileRepo.moveFileClosures(file.getFileId(), secondParent.getFileId());
+        fileRepo.moveFile(file.getFileId(), secondParent.getFileId());
         FileEntryDB moved = entryRepo.queryActiveByFileId(SOURCE_SPACE, file.getFileId());
         assertEquals(original.getEntryId(), moved.getEntryId());
         assertEquals(entryRepo.queryActiveByFileId(SOURCE_SPACE, secondParent.getFileId()).getEntryId(), moved.getParentEntryId());
@@ -146,7 +146,6 @@ public class FileEntryRepoTest {
         FileDB targetParent = addDirectory(TARGET_SPACE, "target", null, "target");
         String sourceEntryId = entryRepo.queryActiveByFileId(SOURCE_SPACE, source.getFileId()).getEntryId();
 
-        entryRepo.setCrossSpaceMoveEnabled(true);
         FileEntryDB target = entryRepo.moveAcrossSpace(source.getFileId(), TARGET_SPACE, targetParent.getFileId());
         entryRepo.moveAcrossSpace(movedDirectory.getFileId(), TARGET_SPACE, targetParent.getFileId());
         FileDB child = addFile(TARGET_SPACE, "child.txt", movedDirectory.getFileId(), "child");
@@ -191,7 +190,6 @@ public class FileEntryRepoTest {
     public void crossSpaceMoveMigratesNonEmptyDirectorySubtreeInEntryMode() {
         entryRepo.setFileEntryWriteMode("entry");
         fileRepo.setFileEntryReadMode("entry");
-        entryRepo.setCrossSpaceMoveEnabled(true);
 
         FileDB root = addDirectory(SOURCE_SPACE, "tree-root", null, "tree-root");
         FileDB fileA = addFile(SOURCE_SPACE, "tree-a.txt", root.getFileId(), "tree-a");
@@ -248,7 +246,6 @@ public class FileEntryRepoTest {
     @Test
     public void crossSpaceMoveOfNonEmptyDirectoryExceedingWarnThresholdStillSucceeds() {
         entryRepo.setFileEntryWriteMode("entry");
-        entryRepo.setCrossSpaceMoveEnabled(true);
         entryRepo.setCrossSpaceMoveWarnThreshold(1);
 
         FileDB root = addDirectory(SOURCE_SPACE, "warn-root", null, "warn-root");
@@ -263,7 +260,6 @@ public class FileEntryRepoTest {
 
     @Test
     public void crossSpaceMoveOfNonEmptyDirectoryRequiresEntryWriteMode() {
-        entryRepo.setCrossSpaceMoveEnabled(true);
         FileDB root = addDirectory(SOURCE_SPACE, "dual-root", null, "dual-root");
         addFile(SOURCE_SPACE, "dual-a.txt", root.getFileId(), "dual-a");
 
@@ -278,7 +274,6 @@ public class FileEntryRepoTest {
     @Test
     public void crossSpaceMoveRejectsTargetNameConflictBeforeAnyWrite() {
         entryRepo.setFileEntryWriteMode("entry");
-        entryRepo.setCrossSpaceMoveEnabled(true);
         FileDB root = addDirectory(SOURCE_SPACE, "conflict-dir", null, "conflict-src");
         FileDB child = addFile(SOURCE_SPACE, "conflict-a.txt", root.getFileId(), "conflict-a");
         setOperator(TARGET_SPACE);
@@ -296,7 +291,6 @@ public class FileEntryRepoTest {
     @Test
     public void crossSpaceMoveWithinSameSpaceDelegatesToPlainMove() {
         entryRepo.setFileEntryWriteMode("entry");
-        entryRepo.setCrossSpaceMoveEnabled(true);
         FileDB root = addDirectory(SOURCE_SPACE, "same-root", null, "same-root");
         FileDB child = addFile(SOURCE_SPACE, "same-a.txt", root.getFileId(), "same-a");
         FileDB sibling = addDirectory(SOURCE_SPACE, "same-target", null, "same-target");
@@ -313,7 +307,6 @@ public class FileEntryRepoTest {
     @Test
     public void crossSpaceMoveHandlesSubtreeAtMaxDepthAndRejectsBeyond() {
         entryRepo.setFileEntryWriteMode("entry");
-        entryRepo.setCrossSpaceMoveEnabled(true);
         FileDB root = addDirectory(SOURCE_SPACE, "depth-root", null, "depth-root");
         FileDB deepest = root;
         for (int level = 1; level <= FileEntryRepo.MAX_TREE_DEPTH; level++) {
@@ -338,7 +331,6 @@ public class FileEntryRepoTest {
     @Test
     public void crossSpaceMoveAccountsForTargetParentDepth() {
         entryRepo.setFileEntryWriteMode("entry");
-        entryRepo.setCrossSpaceMoveEnabled(true);
         FileDB targetDeepest = null;
         for (int level = 1; level <= FileEntryRepo.MAX_TREE_DEPTH; level++) {
             targetDeepest = addDirectory(TARGET_SPACE, "tp-" + level,
@@ -368,7 +360,6 @@ public class FileEntryRepoTest {
     @Test
     public void crossSpaceMoveChunksAllInListsAndStaysConsistent() {
         entryRepo.setFileEntryWriteMode("entry");
-        entryRepo.setCrossSpaceMoveEnabled(true);
         // 块大小压到 2，强制 BFS、insert-select、delete 和缓存刷新全部走分块路径
         entryRepo.setSqlInChunkSize(2);
         FileDB root = addDirectory(SOURCE_SPACE, "chunk-root", null, "chunk-root");
@@ -399,7 +390,6 @@ public class FileEntryRepoTest {
     @Test
     public void crossSpaceMoveWithinSamePhysicalShardKeepsBothSpacesIsolated() {
         entryRepo.setFileEntryWriteMode("entry");
-        entryRepo.setCrossSpaceMoveEnabled(true);
         // 找一个与源空间落在同一物理分片的不同空间：insert-select 源表与目标表为同一张表
         String sourceShard = FileRepo.getShardingKeyBySpaceCode(SOURCE_SPACE);
         String siblingSpace = null;
@@ -429,7 +419,6 @@ public class FileEntryRepoTest {
     @Test
     public void crossSpaceMoveRejectsNonDirectoryTargetParent() {
         entryRepo.setFileEntryWriteMode("entry");
-        entryRepo.setCrossSpaceMoveEnabled(true);
         FileDB movedDir = addDirectory(SOURCE_SPACE, "parent-check-src", null, "parent-check-src");
         addFile(SOURCE_SPACE, "parent-check-child.txt", movedDir.getFileId(), "parent-check-child");
         setOperator(TARGET_SPACE);
@@ -445,7 +434,6 @@ public class FileEntryRepoTest {
     @Test
     public void crossSpaceMoveRejectsMovingIntoOwnSubtree() {
         entryRepo.setFileEntryWriteMode("entry");
-        entryRepo.setCrossSpaceMoveEnabled(true);
         FileDB root = addDirectory(SOURCE_SPACE, "cycle-root", null, "cycle-root");
         FileDB sub = addDirectory(SOURCE_SPACE, "cycle-sub", root.getFileId(), "cycle-sub");
 
@@ -512,13 +500,13 @@ public class FileEntryRepoTest {
 
         // 防环校验由 entry 自己承担
         assertThrows(IllegalArgumentException.class,
-                () -> fileRepo.moveFileClosures(root.getFileId(), child.getFileId()));
+                () -> fileRepo.moveFile(root.getFileId(), child.getFileId()));
 
         // entry 写是主写：重名冲突必须失败，不再降级
         assertThrows(IllegalStateException.class,
                 () -> addFile(SOURCE_SPACE, "eo-child", root.getFileId(), "eo-dup"));
 
-        fileRepo.moveFileClosures(leaf.getFileId(), root.getFileId());
+        fileRepo.moveFile(leaf.getFileId(), root.getFileId());
         assertEquals(root.getFileId(), fileRepo.getDirectAncestorId(leaf.getFileId()));
 
         fileRepo.updateFile(FileOps.builder().fileId(leaf.getFileId()).status(FileStatus.DELETED).build());
@@ -539,14 +527,13 @@ public class FileEntryRepoTest {
         assertEquals(0, shardDsl.fetchCount(FILE_ENTRY));
         assertEquals(root.getFileId(), fileRepo.getDirectAncestorId(leaf.getFileId()));
 
-        fileRepo.moveFileClosures(leaf.getFileId(), null);
+        fileRepo.moveFile(leaf.getFileId(), null);
         assertNull(fileRepo.getDirectAncestorId(leaf.getFileId()));
         fileRepo.updateFile(FileOps.builder().fileId(leaf.getFileId()).filename("cm-renamed.txt").build());
         fileRepo.updateFile(FileOps.builder().fileId(leaf.getFileId()).status(FileStatus.DELETED).build());
         assertEquals(0, shardDsl.fetchCount(FILE_ENTRY));
 
         // 跨空间移动依赖 entry 记录，closure 模式下必须拒绝
-        entryRepo.setCrossSpaceMoveEnabled(true);
         assertThrows(IllegalStateException.class,
                 () -> entryRepo.moveAcrossSpace(root.getFileId(), TARGET_SPACE, null));
     }

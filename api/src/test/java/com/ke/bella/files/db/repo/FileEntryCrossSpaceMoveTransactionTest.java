@@ -71,7 +71,6 @@ public class FileEntryCrossSpaceMoveTransactionTest {
         entryRepo = new FileEntryRepo(dsl);
         fileRepo = new FileRepo(dsl, entryRepo);
         entryRepo.setFileEntryWriteMode("entry");
-        entryRepo.setCrossSpaceMoveEnabled(true);
         setOperator(SOURCE_SPACE);
     }
 

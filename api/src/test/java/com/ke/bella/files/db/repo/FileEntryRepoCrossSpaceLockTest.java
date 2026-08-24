@@ -73,7 +73,6 @@ public class FileEntryRepoCrossSpaceLockTest {
         // @Value 注入在 @Bean 方法之后执行，开关必须在 bean 初始化完成后设置到代理背后的目标对象
         FileEntryRepo target = AopTestUtils.getTargetObject(entryRepo);
         target.setFileEntryWriteMode("entry");
-        target.setCrossSpaceMoveEnabled(true);
         executor = Executors.newFixedThreadPool(2);
         setOperator(SOURCE_SPACE);
     }

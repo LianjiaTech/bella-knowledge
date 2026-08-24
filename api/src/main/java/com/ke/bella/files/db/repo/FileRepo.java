@@ -561,8 +561,11 @@ public class FileRepo implements BaseRepo {
                 .execute();
     }
 
+    /**
+     * 同空间移动：file_entry 是主记录，闭包表仅在 write-mode 仍写闭包（dual/closure）时同步维护。
+     */
     @Transactional(rollbackFor = Exception.class)
-    public void moveFileClosures(String fileId, String targetAncestorId) {
+    public void moveFile(String fileId, String targetAncestorId) {
         FileDB file = queryFile(fileId);
         if(file == null) {
             throw new FileNotFoundException(fileId);
@@ -577,6 +580,13 @@ public class FileRepo implements BaseRepo {
             updateSubtreeRootDepths(dsl, snapshot, fileId);
         }
         fileEntryRepo.move(file.getSpaceCode(), fileId, targetAncestorId);
+    }
+
+    /**
+     * 跨空间移动薄委托：事务由 moveAcrossSpace 自身声明，加入调用方已开启的事务。
+     */
+    public void moveFileAcrossSpace(String fileId, String targetSpaceCode, String targetAncestorId) {
+        fileEntryRepo.moveAcrossSpace(fileId, targetSpaceCode, targetAncestorId);
     }
 
     private ClosureMoveSnapshot loadClosureMoveSnapshot(DSLContext dsl, String fileId, String targetAncestorId) {

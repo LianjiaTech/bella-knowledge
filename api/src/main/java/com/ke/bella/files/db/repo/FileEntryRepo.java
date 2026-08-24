@@ -67,9 +67,6 @@ public class FileEntryRepo implements BaseRepo {
 
     private final DSLContext db;
 
-    @Value("${bella.file-api.file-entry.cross-space-move-enabled:false}")
-    private boolean crossSpaceMoveEnabled;
-
     /**
      * 跨空间迁移子树规模的告警阈值：超过只记 warning（含规模、源/目标空间、耗时），不拒绝迁移。
      * 告警数据用于评估是否需要异步分批迁移的 Phase 2。
@@ -91,10 +88,6 @@ public class FileEntryRepo implements BaseRepo {
 
     public FileEntryRepo(DSLContext db) {
         this.db = db;
-    }
-
-    void setCrossSpaceMoveEnabled(boolean enabled) {
-        this.crossSpaceMoveEnabled = enabled;
     }
 
     void setCrossSpaceMoveWarnThreshold(int threshold) {
@@ -662,9 +655,6 @@ public class FileEntryRepo implements BaseRepo {
 
     @Transactional(rollbackFor = Exception.class)
     public FileEntryDB moveAcrossSpace(String fileId, String targetSpaceCode, @Nullable String targetAncestorId) {
-        if(!crossSpaceMoveEnabled) {
-            throw new IllegalStateException("cross-space file entry move is disabled");
-        }
         if(!entryWriteEnabled()) {
             throw new IllegalStateException("cross-space move requires file_entry writes, current write-mode is closure");
         }
