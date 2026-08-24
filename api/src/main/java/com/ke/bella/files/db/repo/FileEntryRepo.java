@@ -27,6 +27,7 @@ import org.jooq.Record2;
 import org.jooq.Result;
 import org.jooq.SelectConditionStep;
 import org.jooq.SortField;
+import org.jooq.Table;
 import org.jooq.exception.DataAccessException;
 import org.jooq.exception.SQLStateClass;
 import org.jooq.impl.DSL;
@@ -663,6 +664,12 @@ public class FileEntryRepo implements BaseRepo {
         }
         String sourceSpaceCode = file.getSpaceCode();
         FileEntryDB source = ensureLegacyEntry(sourceSpaceCode, fileId);
+        if(sourceSpaceCode.equals(targetSpaceCode) && !closureWriteEnabled()) {
+            // 同空间调用退化为普通移动：只改根 entry 的 parent_entry_id，子树与 file 缓存都不用动。
+            // 闭包仍在写（dual）时不走此捷径，让原路径维护闭包一致性。
+            move(sourceSpaceCode, fileId, targetAncestorId);
+            return queryActiveByFileId(targetSpaceCode, fileId);
+        }
         List<FileEntryDB> descendants = TYPE_DIR.equals(source.getType())
                 ? collectSubtreeDescendants(sourceSpaceCode, source)
                 : Collections.emptyList();
@@ -726,29 +733,31 @@ public class FileEntryRepo implements BaseRepo {
         List<String> entryIds = subtree.stream().map(FileEntryDB::getEntryId).collect(Collectors.toList());
         List<String> fileIds = subtree.stream().map(FileEntryDB::getFileId).collect(Collectors.toList());
 
+        // 源/目标分片表同库，单条 insert-select 整体搬迁，行数据不经应用层；再整体删除源行
+        FileEntryRecord audit = FILE_ENTRY.newRecord();
+        fillUpdatorInfo(audit);
+        Table<?> sourceTable = DSL.table(DSL.name("file_entry_" + FileRepo.getShardingKeyBySpaceCode(sourceSpaceCode)));
+        Table<?> targetTable = DSL.table(DSL.name("file_entry_" + FileRepo.getShardingKeyBySpaceCode(targetSpaceCode)));
+        int inserted = db.execute("insert into {0} "
+                        + "(entry_id, space_code, parent_entry_id, file_id, filename, type, cuid, cu_name, ctime, muid, mu_name, mtime) "
+                        + "select entry_id, {1}, case when entry_id = {2} then {3} else parent_entry_id end, "
+                        + "file_id, filename, type, cuid, cu_name, ctime, {4}, {5}, {6} "
+                        + "from {7} where space_code = {8} and entry_id in ({9})",
+                targetTable, DSL.val(targetSpaceCode), DSL.val(source.getEntryId()), DSL.val(targetParentEntryId),
+                DSL.val(audit.getMuid() == null ? 0L : audit.getMuid()),
+                DSL.val(audit.getMuName() == null ? "" : audit.getMuName()), DSL.val(audit.getMtime()),
+                sourceTable, DSL.val(sourceSpaceCode),
+                DSL.list(entryIds.stream().map(DSL::val).collect(Collectors.toList())));
+        if(inserted != entryIds.size()) {
+            throw new IllegalStateException("insert target subtree file_entry failed, fileId: " + fileId
+                    + ", expected: " + entryIds.size() + ", inserted: " + inserted);
+        }
         int deleted = entryDb(sourceSpaceCode).deleteFrom(FILE_ENTRY)
                 .where(FILE_ENTRY.SPACE_CODE.eq(sourceSpaceCode))
                 .and(FILE_ENTRY.ENTRY_ID.in(entryIds))
                 .execute();
         if(deleted != entryIds.size()) {
             throw new IllegalStateException("delete source subtree file_entry failed, fileId: " + fileId);
-        }
-        DSLContext targetDsl = entryDb(targetSpaceCode);
-        for (FileEntryDB entry : subtree) {
-            FileEntryRecord record = FILE_ENTRY.newRecord();
-            record.setEntryId(entry.getEntryId());
-            record.setSpaceCode(targetSpaceCode);
-            record.setParentEntryId(entry == source ? targetParentEntryId : entry.getParentEntryId());
-            record.setFileId(entry.getFileId());
-            record.setFilename(entry.getFilename());
-            record.setType(entry.getType());
-            record.setCuid(entry.getCuid());
-            record.setCuName(entry.getCuName());
-            record.setCtime(entry.getCtime());
-            fillUpdatorInfo(record);
-            if(targetDsl.insertInto(FILE_ENTRY).set(record).execute() != 1) {
-                throw new IllegalStateException("insert target file_entry failed, entryId: " + entry.getEntryId());
-            }
         }
         updateFileSpaceCache(fileIds, targetSpaceCode);
         long elapsedMillis = System.currentTimeMillis() - startMillis;
@@ -770,7 +779,10 @@ public class FileEntryRepo implements BaseRepo {
             if(++depth > MAX_TREE_DEPTH) {
                 throw new IllegalStateException("file_entry subtree exceeds max depth, fileId: " + root.getFileId());
             }
-            List<FileEntryDB> children = entryDb(spaceCode).selectFrom(FILE_ENTRY)
+            // 只取迁移必需的三列，行数据本身由 insert-select 在库内搬迁，不经应用层
+            List<FileEntryDB> children = entryDb(spaceCode)
+                    .select(FILE_ENTRY.ENTRY_ID, FILE_ENTRY.FILE_ID, FILE_ENTRY.TYPE)
+                    .from(FILE_ENTRY)
                     .where(FILE_ENTRY.SPACE_CODE.eq(spaceCode))
                     .and(FILE_ENTRY.PARENT_ENTRY_ID.in(frontier))
                     .forUpdate()

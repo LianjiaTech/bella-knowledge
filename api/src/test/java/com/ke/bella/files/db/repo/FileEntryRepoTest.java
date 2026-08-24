@@ -299,6 +299,23 @@ public class FileEntryRepoTest {
     }
 
     @Test
+    public void crossSpaceMoveWithinSameSpaceDelegatesToPlainMove() {
+        entryRepo.setFileEntryWriteMode("entry");
+        entryRepo.setCrossSpaceMoveEnabled(true);
+        FileDB root = addDirectory(SOURCE_SPACE, "same-root", null, "same-root");
+        FileDB child = addFile(SOURCE_SPACE, "same-a.txt", root.getFileId(), "same-a");
+        FileDB sibling = addDirectory(SOURCE_SPACE, "same-target", null, "same-target");
+
+        // 目标空间与源空间相同：退化为只改根 parent_entry_id，子树不搬迁
+        FileEntryDB before = entryRepo.queryActiveByFileId(SOURCE_SPACE, root.getFileId());
+        FileEntryDB moved = entryRepo.moveAcrossSpace(root.getFileId(), SOURCE_SPACE, sibling.getFileId());
+        assertEquals(before.getEntryId(), moved.getEntryId());
+        assertEquals(entryRepo.queryActiveByFileId(SOURCE_SPACE, sibling.getFileId()).getEntryId(), moved.getParentEntryId());
+        FileEntryDB childEntry = entryRepo.queryActiveByFileId(SOURCE_SPACE, child.getFileId());
+        assertEquals(before.getEntryId(), childEntry.getParentEntryId());
+    }
+
+    @Test
     public void crossSpaceMoveRejectsMovingIntoOwnSubtree() {
         entryRepo.setFileEntryWriteMode("entry");
         entryRepo.setCrossSpaceMoveEnabled(true);
