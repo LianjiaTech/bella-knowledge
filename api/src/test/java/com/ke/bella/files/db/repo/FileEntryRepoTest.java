@@ -344,6 +344,53 @@ public class FileEntryRepoTest {
     }
 
     @Test
+    public void crossSpaceMoveChunksAllInListsAndStaysConsistent() {
+        entryRepo.setFileEntryWriteMode("entry");
+        entryRepo.setCrossSpaceMoveEnabled(true);
+        // 块大小压到 2，强制 BFS、insert-select、delete 和缓存刷新全部走分块路径
+        entryRepo.setSqlInChunkSize(2);
+        FileDB root = addDirectory(SOURCE_SPACE, "chunk-root", null, "chunk-root");
+        for (int index = 0; index < 3; index++) {
+            FileDB dir = addDirectory(SOURCE_SPACE, "chunk-dir-" + index, root.getFileId(), "chunk-dir-" + index);
+            addFile(SOURCE_SPACE, "chunk-file-" + index + ".txt", dir.getFileId(), "chunk-file-" + index);
+        }
+        setOperator(TARGET_SPACE);
+        FileDB targetParent = addDirectory(TARGET_SPACE, "chunk-target", null, "chunk-target");
+
+        setOperator(SOURCE_SPACE);
+        FileEntryDB moved = entryRepo.moveAcrossSpace(root.getFileId(), TARGET_SPACE, targetParent.getFileId());
+        assertNotNull(moved);
+        DSLContext sourceDsl = DSLContextHolder.get(FileRepo.getShardingKeyBySpaceCode(SOURCE_SPACE), dsl);
+        assertEquals(0, sourceDsl.fetchCount(FILE_ENTRY, FILE_ENTRY.SPACE_CODE.eq(SOURCE_SPACE)));
+        DSLContext targetDsl = DSLContextHolder.get(FileRepo.getShardingKeyBySpaceCode(TARGET_SPACE), dsl);
+        // 目标空间：target 父目录 + 根 + 3 目录 + 3 文件
+        assertEquals(8, targetDsl.fetchCount(FILE_ENTRY, FILE_ENTRY.SPACE_CODE.eq(TARGET_SPACE)));
+        for (int index = 0; index < 3; index++) {
+            FileDB movedFile = entryRepo.queryFile(TARGET_SPACE,
+                    entryRepo.queryFile(TARGET_SPACE, root.getFileId(), "chunk-dir-" + index).getFileId(),
+                    "chunk-file-" + index + ".txt");
+            assertNotNull(movedFile);
+            assertEquals(TARGET_SPACE, movedFile.getSpaceCode());
+        }
+    }
+
+    @Test
+    public void crossSpaceMoveRejectsNonDirectoryTargetParent() {
+        entryRepo.setFileEntryWriteMode("entry");
+        entryRepo.setCrossSpaceMoveEnabled(true);
+        FileDB movedDir = addDirectory(SOURCE_SPACE, "parent-check-src", null, "parent-check-src");
+        addFile(SOURCE_SPACE, "parent-check-child.txt", movedDir.getFileId(), "parent-check-child");
+        setOperator(TARGET_SPACE);
+        FileDB targetFile = addFile(TARGET_SPACE, "parent-check-target.txt", null, "parent-check-target");
+
+        setOperator(SOURCE_SPACE);
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+                () -> entryRepo.moveAcrossSpace(movedDir.getFileId(), TARGET_SPACE, targetFile.getFileId()));
+        assertTrue(error.getMessage().contains("not a directory"));
+        assertNotNull(entryRepo.queryActiveByFileId(SOURCE_SPACE, movedDir.getFileId()));
+    }
+
+    @Test
     public void crossSpaceMoveRejectsMovingIntoOwnSubtree() {
         entryRepo.setFileEntryWriteMode("entry");
         entryRepo.setCrossSpaceMoveEnabled(true);

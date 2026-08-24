@@ -60,6 +60,8 @@ public class FileEntryRepo implements BaseRepo {
     public static final String TYPE_RESOURCE = "resource";
     // 祖先链遍历的深度上限，超出视为数据成环等异常
     static final int MAX_TREE_DEPTH = 64;
+    // MySQL 预处理语句占位符上限为 65535，子树迁移只告警不限规模，所有不定长 IN 列表必须分块
+    private static final int SQL_IN_CHUNK_SIZE = 2000;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(FileEntryRepo.class);
 
@@ -74,6 +76,8 @@ public class FileEntryRepo implements BaseRepo {
      */
     @Value("${bella.file-api.file-entry.cross-space-move-warn-threshold:5000}")
     private int crossSpaceMoveWarnThreshold;
+
+    private int sqlInChunkSize = SQL_IN_CHUNK_SIZE;
 
     /**
      * dual（默认）：闭包表和 entry 双写，任一失败整体回滚，保证两边严格一致；
@@ -95,6 +99,10 @@ public class FileEntryRepo implements BaseRepo {
 
     void setCrossSpaceMoveWarnThreshold(int threshold) {
         this.crossSpaceMoveWarnThreshold = threshold;
+    }
+
+    void setSqlInChunkSize(int size) {
+        this.sqlInChunkSize = size;
     }
 
     void setFileEntryWriteMode(String writeMode) {
@@ -727,6 +735,18 @@ public class FileEntryRepo implements BaseRepo {
             throw new IllegalStateException(
                     "target parent file_entry not found in target space, entryId: " + targetParentEntryId);
         }
+        if(!TYPE_DIR.equals(locked.getType())) {
+            throw new IllegalArgumentException(
+                    "target parent file_entry is not a directory, entryId: " + targetParentEntryId);
+        }
+    }
+
+    private static <T> List<List<T>> partition(List<T> values, int size) {
+        List<List<T>> chunks = new ArrayList<>();
+        for (int from = 0; from < values.size(); from += size) {
+            chunks.add(values.subList(from, Math.min(from + size, values.size())));
+        }
+        return chunks;
     }
 
     private void moveLeafAcrossSpace(FileEntryDB source, String sourceSpaceCode, String targetSpaceCode,
@@ -780,24 +800,30 @@ public class FileEntryRepo implements BaseRepo {
         fillUpdatorInfo(audit);
         Table<?> sourceTable = DSL.table(DSL.name("file_entry_" + FileRepo.getShardingKeyBySpaceCode(sourceSpaceCode)));
         Table<?> targetTable = DSL.table(DSL.name("file_entry_" + FileRepo.getShardingKeyBySpaceCode(targetSpaceCode)));
-        int inserted = db.execute("insert into {0} "
-                        + "(entry_id, space_code, parent_entry_id, file_id, filename, type, cuid, cu_name, ctime, muid, mu_name, mtime) "
-                        + "select entry_id, {1}, case when entry_id = {2} then {3} else parent_entry_id end, "
-                        + "file_id, filename, type, cuid, cu_name, ctime, {4}, {5}, {6} "
-                        + "from {7} where space_code = {8} and entry_id in ({9})",
-                targetTable, DSL.val(targetSpaceCode), DSL.val(source.getEntryId()), DSL.val(targetParentEntryId),
-                DSL.val(audit.getMuid() == null ? 0L : audit.getMuid()),
-                DSL.val(audit.getMuName() == null ? "" : audit.getMuName()), DSL.val(audit.getMtime()),
-                sourceTable, DSL.val(sourceSpaceCode),
-                DSL.list(entryIds.stream().map(DSL::val).collect(Collectors.toList())));
+        int inserted = 0;
+        for (List<String> chunk : partition(entryIds, sqlInChunkSize)) {
+            inserted += db.execute("insert into {0} "
+                            + "(entry_id, space_code, parent_entry_id, file_id, filename, type, cuid, cu_name, ctime, muid, mu_name, mtime) "
+                            + "select entry_id, {1}, case when entry_id = {2} then {3} else parent_entry_id end, "
+                            + "file_id, filename, type, cuid, cu_name, ctime, {4}, {5}, {6} "
+                            + "from {7} where space_code = {8} and entry_id in ({9})",
+                    targetTable, DSL.val(targetSpaceCode), DSL.val(source.getEntryId()), DSL.val(targetParentEntryId),
+                    DSL.val(audit.getMuid() == null ? 0L : audit.getMuid()),
+                    DSL.val(audit.getMuName() == null ? "" : audit.getMuName()), DSL.val(audit.getMtime()),
+                    sourceTable, DSL.val(sourceSpaceCode),
+                    DSL.list(chunk.stream().map(DSL::val).collect(Collectors.toList())));
+        }
         if(inserted != entryIds.size()) {
             throw new IllegalStateException("insert target subtree file_entry failed, fileId: " + fileId
                     + ", expected: " + entryIds.size() + ", inserted: " + inserted);
         }
-        int deleted = entryDb(sourceSpaceCode).deleteFrom(FILE_ENTRY)
-                .where(FILE_ENTRY.SPACE_CODE.eq(sourceSpaceCode))
-                .and(FILE_ENTRY.ENTRY_ID.in(entryIds))
-                .execute();
+        int deleted = 0;
+        for (List<String> chunk : partition(entryIds, sqlInChunkSize)) {
+            deleted += entryDb(sourceSpaceCode).deleteFrom(FILE_ENTRY)
+                    .where(FILE_ENTRY.SPACE_CODE.eq(sourceSpaceCode))
+                    .and(FILE_ENTRY.ENTRY_ID.in(chunk))
+                    .execute();
+        }
         if(deleted != entryIds.size()) {
             throw new IllegalStateException("delete source subtree file_entry failed, fileId: " + fileId);
         }
@@ -819,13 +845,16 @@ public class FileEntryRepo implements BaseRepo {
         int depth = 0;
         while (!frontier.isEmpty()) {
             // 只取迁移必需的三列，行数据本身由 insert-select 在库内搬迁，不经应用层
-            List<FileEntryDB> children = entryDb(spaceCode)
-                    .select(FILE_ENTRY.ENTRY_ID, FILE_ENTRY.FILE_ID, FILE_ENTRY.TYPE)
-                    .from(FILE_ENTRY)
-                    .where(FILE_ENTRY.SPACE_CODE.eq(spaceCode))
-                    .and(FILE_ENTRY.PARENT_ENTRY_ID.in(frontier))
-                    .forUpdate()
-                    .fetchInto(FileEntryDB.class);
+            List<FileEntryDB> children = new ArrayList<>();
+            for (List<String> chunk : partition(frontier, sqlInChunkSize)) {
+                children.addAll(entryDb(spaceCode)
+                        .select(FILE_ENTRY.ENTRY_ID, FILE_ENTRY.FILE_ID, FILE_ENTRY.TYPE)
+                        .from(FILE_ENTRY)
+                        .where(FILE_ENTRY.SPACE_CODE.eq(spaceCode))
+                        .and(FILE_ENTRY.PARENT_ENTRY_ID.in(chunk))
+                        .forUpdate()
+                        .fetchInto(FileEntryDB.class));
+            }
             // 深度在查到非空下一层后才累加：最深层是空目录时的“确认无子节点”查询不计入，
             // 恰好 MAX_TREE_DEPTH 层的合法子树可以迁移
             if(!children.isEmpty() && ++depth > MAX_TREE_DEPTH) {
@@ -848,12 +877,12 @@ public class FileEntryRepo implements BaseRepo {
     private void updateFileSpaceCache(List<String> fileIds, String targetSpaceCode) {
         Map<String, List<String>> idsByShard = fileIds.stream()
                 .collect(Collectors.groupingBy(FileRepo::getShardingKeyByFileIdStatic));
-        List<Query> updates = idsByShard.entrySet().stream()
-                .map(shard -> db.query("update {0} set space_code = {1} where file_id in ({2}) and status = {3}",
-                        DSL.table(DSL.name("file_" + shard.getKey())), DSL.val(targetSpaceCode),
-                        DSL.list(shard.getValue().stream().map(DSL::val).collect(Collectors.toList())),
-                        DSL.val(FileStatus.NOT_DELETED.getValue())))
-                .collect(Collectors.toList());
+        List<Query> updates = new ArrayList<>();
+        idsByShard.forEach((shardKey, ids) -> partition(ids, sqlInChunkSize)
+                .forEach(chunk -> updates.add(db.query("update {0} set space_code = {1} where file_id in ({2}) and status = {3}",
+                        DSL.table(DSL.name("file_" + shardKey)), DSL.val(targetSpaceCode),
+                        DSL.list(chunk.stream().map(DSL::val).collect(Collectors.toList())),
+                        DSL.val(FileStatus.NOT_DELETED.getValue())))));
         int updated = Arrays.stream(db.batch(updates).execute()).sum();
         if(updated != fileIds.size()) {
             throw new IllegalStateException("update file space cache failed, expected: " + fileIds.size() + ", updated: " + updated);
