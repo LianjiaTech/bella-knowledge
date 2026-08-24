@@ -41,6 +41,7 @@ type Action = {
     ancestorId: string,
     currentAncestorId: string,
     spaceCode?: string,
+    targetSpaceCode?: string,
   ) => Promise<boolean>;
   reUploadFile: (fileId: string, file: File, ancestorId: string) => Promise<boolean>;
 };
@@ -209,8 +210,15 @@ export const store = create<State & Action>()((set, get) => ({
     ancestorId: string,
     currentAncestorId: string,
     spaceCode?: string,
+    targetSpaceCode?: string,
   ) => {
-    const res = await postMoveFile(file.id, ancestorId);
+    // 目标空间与当前空间相同视为同空间移动，不带 target_space_code
+    const crossSpace = targetSpaceCode && targetSpaceCode !== spaceCode;
+    const res = await postMoveFile(
+      file.id,
+      ancestorId,
+      crossSpace ? targetSpaceCode : undefined,
+    );
     if (!res) {
       return false;
     }

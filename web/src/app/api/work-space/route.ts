@@ -14,6 +14,11 @@ export async function GET(req: NextRequest) {
           spaceCode,
           spaceName: process.env.BELLA_DEV_SPACE_NAME || "Local Dev",
         },
+        {
+          roleCode: "owner",
+          spaceCode: "cross-space-test",
+          spaceName: "跨空间测试",
+        },
       ],
       message: "",
     });

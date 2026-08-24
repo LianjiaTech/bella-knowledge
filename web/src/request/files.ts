@@ -92,13 +92,18 @@ export async function postRenameFile(fileId: string, filename: string) {
   return null;
 }
 
-export async function postMoveFile(fileId: string, ancestorId: string) {
+export async function postMoveFile(
+  fileId: string,
+  ancestorId: string,
+  targetSpaceCode?: string,
+) {
   const res = await webRequest<KnowledgeFile>({
     path: "/api/files/move",
     method: "POST",
     body: {
       file_id: fileId,
       ancestor_id: ancestorId,
+      ...(targetSpaceCode ? { target_space_code: targetSpaceCode } : {}),
     },
   });
   if (res.code === 200) {

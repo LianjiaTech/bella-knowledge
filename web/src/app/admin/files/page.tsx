@@ -158,12 +158,13 @@ const Page = () => {
   }, []);
 
   const handleMoveConfirm = useCallback(
-    async (file: KnowledgeFile, ancestorId: string) => {
+    async (file: KnowledgeFile, ancestorId: string, targetSpaceCode?: string) => {
       const success = await moveFile(
         file,
         ancestorId,
         currentDir.id,
         currentWorkspace?.spaceCode,
+        targetSpaceCode,
       );
       if (success) {
         toast.success("移动成功");
