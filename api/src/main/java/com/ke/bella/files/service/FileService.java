@@ -4,6 +4,7 @@ import static com.ke.bella.files.db.IDGenerator.FILE_ID_GENERATOR;
 
 import java.io.File;
 import java.io.InputStream;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
@@ -560,11 +561,23 @@ public class FileService {
         FileType fileType = FileType.fromFileId(ops.getFileId());
         fileRepo.updateFile(ops, increaseVersion);
         FileDB fileDB = fileRepo.queryFile(ops.getFileId(), fileType);
+        return broadcastFileUpdated(fileDB, actionType);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public OpenAIFile updateCreatorInfo(String fileId, Long cuid, String cuName, LocalDateTime ctime) {
+        FileType fileType = FileType.fromFileId(fileId);
+        fileRepo.updateCreatorInfo(fileId, cuid, cuName, ctime);
+        FileDB fileDB = fileRepo.queryFile(fileId, fileType);
+        return broadcastFileUpdated(fileDB, Scope.CREATOR);
+    }
+
+    private OpenAIFile broadcastFileUpdated(FileDB fileDB, Scope scope) {
         OpenAIFile finalOpenAIFile = buildOpenAIFileWithSource(fileDB);
 
         FileBroadcasting<OpenAIFile> message = new FileBroadcasting<>();
         message.setEvent(EventType.FILE_UPDATED);
-        message.setScope(actionType.getValue());
+        message.setScope(scope.getValue());
         message.setData(finalOpenAIFile);
         message.setMetadata(fileDB.getMetaData());
         message.setUserId(BellaContextHelper.getOperatorUserId());

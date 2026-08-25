@@ -6,6 +6,8 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 
+import java.time.LocalDateTime;
+
 import javax.sql.DataSource;
 
 import org.h2.jdbcx.JdbcDataSource;
@@ -146,6 +148,74 @@ public class FileRepoUpdateTransactionTest {
                 .set(FILE_ENTRY.FILENAME, "duplicate-file.txt")
                 .set(FILE_ENTRY.TYPE, FileEntryRepo.TYPE_FILE)
                 .execute());
+    }
+
+    @Test
+    public void updateCreatorInfoOnlyChangesCreatorAuditFields() {
+        FileDB before = queryFile(SOURCE);
+        LocalDateTime originalCtime = LocalDateTime.of(2024, 1, 2, 3, 4, 5);
+
+        fileRepo.updateCreatorInfo(SOURCE, 42L, "original creator", originalCtime);
+
+        FileDB after = queryFile(SOURCE);
+        assertEquals(Long.valueOf(42L), after.getCuid());
+        assertEquals("original creator", after.getCuName());
+        assertEquals(originalCtime, after.getCtime());
+        assertEquals(before.getVersion(), after.getVersion());
+        assertEquals(before.getFilename(), after.getFilename());
+        assertEquals(before.getPurpose(), after.getPurpose());
+        assertEquals(before.getMetaData(), after.getMetaData());
+        assertEquals(before.getDescription(), after.getDescription());
+        assertEquals(before.getCities(), after.getCities());
+        assertEquals(before.getTags(), after.getTags());
+        assertEquals(before.getMuid(), after.getMuid());
+        assertEquals(before.getMuName(), after.getMuName());
+        assertEquals(before.getMtime(), after.getMtime());
+    }
+
+    @Test
+    public void updateCreatorInfoSupportsIndividualFields() {
+        FileDB original = queryFile(SOURCE);
+
+        fileRepo.updateCreatorInfo(SOURCE, 42L, null, null);
+        FileDB afterCuid = queryFile(SOURCE);
+        assertEquals(Long.valueOf(42L), afterCuid.getCuid());
+        assertEquals(original.getCuName(), afterCuid.getCuName());
+        assertEquals(original.getCtime(), afterCuid.getCtime());
+
+        fileRepo.updateCreatorInfo(SOURCE, null, "new creator", null);
+        FileDB afterName = queryFile(SOURCE);
+        assertEquals(Long.valueOf(42L), afterName.getCuid());
+        assertEquals("new creator", afterName.getCuName());
+        assertEquals(original.getCtime(), afterName.getCtime());
+
+        LocalDateTime updatedCtime = LocalDateTime.of(2024, 1, 2, 3, 4, 5);
+        fileRepo.updateCreatorInfo(SOURCE, null, null, updatedCtime);
+        FileDB afterCtime = queryFile(SOURCE);
+        assertEquals(Long.valueOf(42L), afterCtime.getCuid());
+        assertEquals("new creator", afterCtime.getCuName());
+        assertEquals(updatedCtime, afterCtime.getCtime());
+        assertEquals(original.getVersion(), afterCtime.getVersion());
+        assertEquals(original.getFilename(), afterCtime.getFilename());
+        assertEquals(original.getMetaData(), afterCtime.getMetaData());
+        assertEquals(original.getMtime(), afterCtime.getMtime());
+    }
+
+    @Test
+    public void updateCreatorInfoRejectsEmptyUpdate() {
+        FileDB before = queryFile(SOURCE);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> fileRepo.updateCreatorInfo(SOURCE, null, null, null));
+
+        FileDB after = queryFile(SOURCE);
+        assertEquals(before.getCuid(), after.getCuid());
+        assertEquals(before.getCuName(), after.getCuName());
+        assertEquals(before.getCtime(), after.getCtime());
+        assertEquals(before.getVersion(), after.getVersion());
+        assertEquals(before.getFilename(), after.getFilename());
+        assertEquals(before.getMetaData(), after.getMetaData());
+        assertEquals(before.getMtime(), after.getMtime());
     }
 
     private void addFile(String fileId, String filename) {
