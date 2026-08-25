@@ -14,6 +14,7 @@ public enum Scope {
     METADATA("metadata"),
     CITIES("cities"),
     TAGS("tags"),
+    CREATOR("creator"),
     LOCATION("location");
 
     private final String value;

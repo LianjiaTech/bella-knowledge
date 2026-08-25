@@ -147,6 +147,7 @@ public class FileServiceBroadcastTest {
     }
 
     @Test
+<<<<<<< HEAD
     public void metadataUpdateBroadcastsMetadataScope() {
         FileDB file = file("file-test-u", FilePurpose.ASSISTANTS);
         file.setMetaData("{\"team\":\"search\"}");
@@ -160,6 +161,24 @@ public class FileServiceBroadcastTest {
         assertEquals(EventType.FILE_UPDATED.getValue(), messageCaptor.getValue().getEvent());
         assertEquals(Scope.METADATA.getValue(), messageCaptor.getValue().getScope());
         assertEquals(file.getMetaData(), messageCaptor.getValue().getMetadata());
+=======
+    public void updateCreatorBroadcastsDedicatedScope() {
+        FileDB file = file("file-test-1", FilePurpose.ASSISTANTS);
+        LocalDateTime ctime = LocalDateTime.of(2024, 1, 2, 3, 4, 5);
+        file.setCuid(42L);
+        file.setCuName("original creator");
+        file.setCtime(ctime);
+        when(fileRepo.queryFile(file.getFileId(), FileType.USER)).thenReturn(file);
+
+        fileService.updateCreatorInfo(file.getFileId(), 42L, "original creator", ctime);
+
+        verify(fileRepo).updateCreatorInfo(file.getFileId(), 42L, "original creator", ctime);
+        ArgumentCaptor<FileBroadcasting> messageCaptor = ArgumentCaptor.forClass(FileBroadcasting.class);
+        verify(broadcastService).broadcast(messageCaptor.capture(), any(Runnable.class), any(Runnable.class));
+        assertEquals(EventType.FILE_UPDATED.getValue(), messageCaptor.getValue().getEvent());
+        assertEquals(Scope.CREATOR.getValue(), messageCaptor.getValue().getScope());
+        assertEquals(Long.valueOf(42L), ((com.ke.bella.files.protocol.OpenAIFile) messageCaptor.getValue().getData()).getCuid());
+>>>>>>> 6ccca07 (feat: support updating file creator info)
     }
 
     @Test

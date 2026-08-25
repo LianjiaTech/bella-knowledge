@@ -9,6 +9,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.time.DateTimeException;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
@@ -65,6 +69,7 @@ import com.ke.bella.files.protocol.PageFileOps;
 import com.ke.bella.files.protocol.Progress;
 import com.ke.bella.files.protocol.Scope;
 import com.ke.bella.files.protocol.UpdateCitiesOps;
+import com.ke.bella.files.protocol.UpdateCreatorOps;
 import com.ke.bella.files.protocol.UpdateDescriptionOps;
 import com.ke.bella.files.protocol.UpdateMetadataOps;
 import com.ke.bella.files.protocol.UpdateProgressRequestData;
@@ -98,6 +103,8 @@ public class FileController {
     private static final int MAX_CITIES_JSON_LENGTH = 512;
 
     private static final int MAX_TAGS_JSON_LENGTH = 512;
+
+    private static final int MAX_CREATOR_NAME_LENGTH = 32;
 
     private static final Pattern WINDOWS_INVALID_CHARS = Pattern.compile("[<>:\"|?*\\\\]|[\\x00-\\x1f]");
 
@@ -1380,6 +1387,38 @@ public class FileController {
                 .build();
 
         return fileService.updateFile(ops, true, Scope.TAGS);
+    }
+
+    @PutMapping("/{fileId}/creator")
+    public OpenAIFile updateCreator(
+            @PathVariable String fileId,
+            @RequestBody UpdateCreatorOps op) {
+        Assert.hasText(fileId, "file_id is required");
+        Assert.notNull(op, "invalid request body");
+        Assert.notNull(op.getCuid(), "cuid is required");
+        Assert.isTrue(op.getCuid() >= 0, "cuid must not be negative");
+        Assert.hasText(op.getCuName(), "cu_name is required");
+        Assert.isTrue(op.getCuName().length() <= MAX_CREATOR_NAME_LENGTH,
+                "cu_name cannot exceed 32 characters");
+        Assert.notNull(op.getCreatedAt(), "created_at is required");
+        Assert.isTrue(op.getCreatedAt() >= 0, "created_at must not be negative");
+
+        OpenAIFile existingFile = fileService.getFile(fileId);
+        if(existingFile == null) {
+            throw new FileNotFoundException(fileId);
+        }
+
+        return fileService.updateCreatorInfo(fileId, op.getCuid(), op.getCuName(), toLocalDateTime(op.getCreatedAt()));
+    }
+
+    private LocalDateTime toLocalDateTime(Long timestamp) {
+        try {
+            LocalDateTime dateTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(timestamp), ZoneId.systemDefault());
+            Assert.isTrue(dateTime.getYear() <= 9999, "created_at is out of range");
+            return dateTime;
+        } catch (DateTimeException e) {
+            throw new IllegalArgumentException("created_at is out of range", e);
+        }
     }
 
     @GetMapping("/exists")

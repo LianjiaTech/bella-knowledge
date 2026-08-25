@@ -344,6 +344,22 @@ public class FileRepo implements BaseRepo {
         updateFile(op, false);
     }
 
+    @Transactional(rollbackFor = Exception.class)
+    public void updateCreatorInfo(String fileId, Long cuid, String cuName, LocalDateTime ctime) {
+        fileId = queryNewFileId(fileId);
+        String shardingKey = getShardingKeyByFileId(fileId);
+        int updatedNum = db(shardingKey).update(FILE)
+                .set(FILE.CUID, cuid)
+                .set(FILE.CU_NAME, cuName)
+                .set(FILE.CTIME, ctime)
+                .where(FILE.FILE_ID.eq(fileId))
+                .execute();
+
+        if(updatedNum != 1) {
+            throw new IllegalStateException("update file creator failed, fileId: " + fileId);
+        }
+    }
+
     public List<FileDB> listFile(
             String purpose,
             Integer limit,

@@ -6,6 +6,8 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 
+import java.time.LocalDateTime;
+
 import javax.sql.DataSource;
 
 import org.h2.jdbcx.JdbcDataSource;
@@ -146,6 +148,29 @@ public class FileRepoUpdateTransactionTest {
                 .set(FILE_ENTRY.FILENAME, "duplicate-file.txt")
                 .set(FILE_ENTRY.TYPE, FileEntryRepo.TYPE_FILE)
                 .execute());
+    }
+
+    @Test
+    public void updateCreatorInfoOnlyChangesCreatorAuditFields() {
+        FileDB before = queryFile(SOURCE);
+        LocalDateTime originalCtime = LocalDateTime.of(2024, 1, 2, 3, 4, 5);
+
+        fileRepo.updateCreatorInfo(SOURCE, 42L, "original creator", originalCtime);
+
+        FileDB after = queryFile(SOURCE);
+        assertEquals(Long.valueOf(42L), after.getCuid());
+        assertEquals("original creator", after.getCuName());
+        assertEquals(originalCtime, after.getCtime());
+        assertEquals(before.getVersion(), after.getVersion());
+        assertEquals(before.getFilename(), after.getFilename());
+        assertEquals(before.getPurpose(), after.getPurpose());
+        assertEquals(before.getMetaData(), after.getMetaData());
+        assertEquals(before.getDescription(), after.getDescription());
+        assertEquals(before.getCities(), after.getCities());
+        assertEquals(before.getTags(), after.getTags());
+        assertEquals(before.getMuid(), after.getMuid());
+        assertEquals(before.getMuName(), after.getMuName());
+        assertEquals(before.getMtime(), after.getMtime());
     }
 
     private void addFile(String fileId, String filename) {
