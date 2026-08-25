@@ -103,6 +103,21 @@ public class FileRepoUpdateTransactionTest {
     }
 
     @Test
+    public void metadataUpdateLeavesOtherFileFieldsUntouched() {
+        FileDB before = queryFile(SOURCE);
+
+        fileRepo.updateFile(FileOps.builder().fileId(SOURCE).metadata("{\"team\":\"search\"}").build(), false);
+
+        FileDB after = queryFile(SOURCE);
+        assertEquals("{\"team\":\"search\"}", after.getMetaData());
+        assertEquals(before.getFilename(), after.getFilename());
+        assertEquals(before.getPurpose(), after.getPurpose());
+        assertEquals(before.getStatus(), after.getStatus());
+        assertEquals(before.getVersion(), after.getVersion());
+        assertEquals(queryEntryFilename(SOURCE), after.getFilename());
+    }
+
+    @Test
     public void deleteHardDeletesEntry() {
         fileRepo.updateFile(FileOps.builder().fileId(SOURCE).status(FileStatus.DELETED).build());
 

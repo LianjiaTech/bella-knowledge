@@ -66,6 +66,7 @@ import com.ke.bella.files.protocol.Progress;
 import com.ke.bella.files.protocol.Scope;
 import com.ke.bella.files.protocol.UpdateCitiesOps;
 import com.ke.bella.files.protocol.UpdateDescriptionOps;
+import com.ke.bella.files.protocol.UpdateMetadataOps;
 import com.ke.bella.files.protocol.UpdateProgressRequestData;
 import com.ke.bella.files.protocol.UpdateTagsOps;
 import com.ke.bella.files.service.FileService;
@@ -1286,6 +1287,27 @@ public class FileController {
                 .build();
 
         return fileService.updateFile(ops, false, Scope.DESCRIPTION);
+    }
+
+    @PutMapping("/{fileId}/metadata")
+    public OpenAIFile updateMetadata(
+            @PathVariable String fileId,
+            @RequestBody UpdateMetadataOps op) {
+        Assert.hasText(fileId, "file_id is required");
+        Assert.notNull(op, "invalid request body");
+        Assert.notNull(op.getMetadata(), "metadata is required");
+
+        OpenAIFile existingFile = fileService.getFile(fileId);
+        if(existingFile == null) {
+            throw new FileNotFoundException(fileId);
+        }
+
+        FileOps ops = FileOps.builder()
+                .fileId(fileId)
+                .metadata(op.getMetadata())
+                .build();
+
+        return fileService.updateFile(ops, false, Scope.METADATA);
     }
 
     /**

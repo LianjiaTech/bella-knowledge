@@ -147,6 +147,22 @@ public class FileServiceBroadcastTest {
     }
 
     @Test
+    public void metadataUpdateBroadcastsMetadataScope() {
+        FileDB file = file("file-test-u", FilePurpose.ASSISTANTS);
+        file.setMetaData("{\"team\":\"search\"}");
+        FileOps ops = FileOps.builder().fileId(file.getFileId()).metadata(file.getMetaData()).build();
+        when(fileRepo.queryFile(file.getFileId(), FileType.USER)).thenReturn(file);
+
+        fileService.updateFile(ops, false, Scope.METADATA);
+
+        ArgumentCaptor<FileBroadcasting> messageCaptor = ArgumentCaptor.forClass(FileBroadcasting.class);
+        verify(broadcastService).broadcast(messageCaptor.capture(), any(Runnable.class), any(Runnable.class));
+        assertEquals(EventType.FILE_UPDATED.getValue(), messageCaptor.getValue().getEvent());
+        assertEquals(Scope.METADATA.getValue(), messageCaptor.getValue().getScope());
+        assertEquals(file.getMetaData(), messageCaptor.getValue().getMetadata());
+    }
+
+    @Test
     public void deleteSkipsBroadcastForSystemFile() {
         FileDB file = systemFile(FilePurpose.DATASETS_EXPORT);
 
