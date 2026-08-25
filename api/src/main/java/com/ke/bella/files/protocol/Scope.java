@@ -11,6 +11,7 @@ public enum Scope {
     DOM_TREE("dom_tree"),
     PDF("pdf"),
     DESCRIPTION("description"),
+    METADATA("metadata"),
     CITIES("cities"),
     TAGS("tags"),
     LOCATION("location");
