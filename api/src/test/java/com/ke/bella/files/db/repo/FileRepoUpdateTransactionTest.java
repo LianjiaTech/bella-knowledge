@@ -173,6 +173,51 @@ public class FileRepoUpdateTransactionTest {
         assertEquals(before.getMtime(), after.getMtime());
     }
 
+    @Test
+    public void updateCreatorInfoSupportsIndividualFields() {
+        FileDB original = queryFile(SOURCE);
+
+        fileRepo.updateCreatorInfo(SOURCE, 42L, null, null);
+        FileDB afterCuid = queryFile(SOURCE);
+        assertEquals(Long.valueOf(42L), afterCuid.getCuid());
+        assertEquals(original.getCuName(), afterCuid.getCuName());
+        assertEquals(original.getCtime(), afterCuid.getCtime());
+
+        fileRepo.updateCreatorInfo(SOURCE, null, "new creator", null);
+        FileDB afterName = queryFile(SOURCE);
+        assertEquals(Long.valueOf(42L), afterName.getCuid());
+        assertEquals("new creator", afterName.getCuName());
+        assertEquals(original.getCtime(), afterName.getCtime());
+
+        LocalDateTime updatedCtime = LocalDateTime.of(2024, 1, 2, 3, 4, 5);
+        fileRepo.updateCreatorInfo(SOURCE, null, null, updatedCtime);
+        FileDB afterCtime = queryFile(SOURCE);
+        assertEquals(Long.valueOf(42L), afterCtime.getCuid());
+        assertEquals("new creator", afterCtime.getCuName());
+        assertEquals(updatedCtime, afterCtime.getCtime());
+        assertEquals(original.getVersion(), afterCtime.getVersion());
+        assertEquals(original.getFilename(), afterCtime.getFilename());
+        assertEquals(original.getMetaData(), afterCtime.getMetaData());
+        assertEquals(original.getMtime(), afterCtime.getMtime());
+    }
+
+    @Test
+    public void updateCreatorInfoRejectsEmptyUpdate() {
+        FileDB before = queryFile(SOURCE);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> fileRepo.updateCreatorInfo(SOURCE, null, null, null));
+
+        FileDB after = queryFile(SOURCE);
+        assertEquals(before.getCuid(), after.getCuid());
+        assertEquals(before.getCuName(), after.getCuName());
+        assertEquals(before.getCtime(), after.getCtime());
+        assertEquals(before.getVersion(), after.getVersion());
+        assertEquals(before.getFilename(), after.getFilename());
+        assertEquals(before.getMetaData(), after.getMetaData());
+        assertEquals(before.getMtime(), after.getMtime());
+    }
+
     private void addFile(String fileId, String filename) {
         FileDB file = new FileDB();
         file.setFileId(fileId);

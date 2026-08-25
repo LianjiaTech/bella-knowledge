@@ -1395,20 +1395,29 @@ public class FileController {
             @RequestBody UpdateCreatorOps op) {
         Assert.hasText(fileId, "file_id is required");
         Assert.notNull(op, "invalid request body");
-        Assert.notNull(op.getCuid(), "cuid is required");
-        Assert.isTrue(op.getCuid() >= 0, "cuid must not be negative");
-        Assert.hasText(op.getCuName(), "cu_name is required");
-        Assert.isTrue(op.getCuName().length() <= MAX_CREATOR_NAME_LENGTH,
-                "cu_name cannot exceed 32 characters");
-        Assert.notNull(op.getCreatedAt(), "created_at is required");
-        Assert.isTrue(op.getCreatedAt() >= 0, "created_at must not be negative");
+        Assert.isTrue(op.hasAnyField(), "at least one creator field is required");
+        if(op.isCuidSet()) {
+            Assert.notNull(op.getCuid(), "cuid must not be null");
+            Assert.isTrue(op.getCuid() >= 0, "cuid must not be negative");
+        }
+        if(op.isCuNameSet()) {
+            Assert.hasText(op.getCuName(), "cu_name must not be blank");
+            Assert.isTrue(op.getCuName().length() <= MAX_CREATOR_NAME_LENGTH,
+                    "cu_name cannot exceed 32 characters");
+        }
+        LocalDateTime ctime = null;
+        if(op.isCreatedAtSet()) {
+            Assert.notNull(op.getCreatedAt(), "created_at must not be null");
+            Assert.isTrue(op.getCreatedAt() >= 0, "created_at must not be negative");
+            ctime = toLocalDateTime(op.getCreatedAt());
+        }
 
         OpenAIFile existingFile = fileService.getFile(fileId);
         if(existingFile == null) {
             throw new FileNotFoundException(fileId);
         }
 
-        return fileService.updateCreatorInfo(fileId, op.getCuid(), op.getCuName(), toLocalDateTime(op.getCreatedAt()));
+        return fileService.updateCreatorInfo(fileId, op.getCuid(), op.getCuName(), ctime);
     }
 
     private LocalDateTime toLocalDateTime(Long timestamp) {

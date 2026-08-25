@@ -71,6 +71,62 @@ public class FileControllerUpdateCreatorTest {
     }
 
     @Test
+    public void updateCreatorSupportsUpdatingCuidOnly() throws Exception {
+        OpenAIFile existing = OpenAIFile.builder().id(FILE_ID).cuid(1L).cuName("creator").createdAt(CREATED_AT).build();
+        OpenAIFile updated = existing.toBuilder().cuid(42L).build();
+        when(fileService.getFile(FILE_ID)).thenReturn(existing);
+        when(fileService.updateCreatorInfo(FILE_ID, 42L, null, null)).thenReturn(updated);
+
+        mockMvc.perform(put("/v1/files/{fileId}/creator", FILE_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"cuid\":42}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.cuid").value(42L))
+                .andExpect(jsonPath("$.cu_name").value("creator"))
+                .andExpect(jsonPath("$.created_at").value(CREATED_AT));
+
+        verify(fileService).updateCreatorInfo(FILE_ID, 42L, null, null);
+    }
+
+    @Test
+    public void updateCreatorSupportsUpdatingNameOnly() throws Exception {
+        OpenAIFile existing = OpenAIFile.builder().id(FILE_ID).cuid(1L).cuName("old creator").createdAt(CREATED_AT).build();
+        OpenAIFile updated = existing.toBuilder().cuName("new creator").build();
+        when(fileService.getFile(FILE_ID)).thenReturn(existing);
+        when(fileService.updateCreatorInfo(FILE_ID, null, "new creator", null)).thenReturn(updated);
+
+        mockMvc.perform(put("/v1/files/{fileId}/creator", FILE_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"cu_name\":\"new creator\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.cuid").value(1L))
+                .andExpect(jsonPath("$.cu_name").value("new creator"))
+                .andExpect(jsonPath("$.created_at").value(CREATED_AT));
+
+        verify(fileService).updateCreatorInfo(FILE_ID, null, "new creator", null);
+    }
+
+    @Test
+    public void updateCreatorSupportsUpdatingCreatedAtOnly() throws Exception {
+        long updatedCreatedAt = CREATED_AT + 1000;
+        LocalDateTime ctime = LocalDateTime.ofInstant(Instant.ofEpochMilli(updatedCreatedAt), ZoneId.systemDefault());
+        OpenAIFile existing = OpenAIFile.builder().id(FILE_ID).cuid(1L).cuName("creator").createdAt(CREATED_AT).build();
+        OpenAIFile updated = existing.toBuilder().createdAt(updatedCreatedAt).build();
+        when(fileService.getFile(FILE_ID)).thenReturn(existing);
+        when(fileService.updateCreatorInfo(FILE_ID, null, null, ctime)).thenReturn(updated);
+
+        mockMvc.perform(put("/v1/files/{fileId}/creator", FILE_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"created_at\":" + updatedCreatedAt + "}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.cuid").value(1L))
+                .andExpect(jsonPath("$.cu_name").value("creator"))
+                .andExpect(jsonPath("$.created_at").value(updatedCreatedAt));
+
+        verify(fileService).updateCreatorInfo(FILE_ID, null, null, ctime);
+    }
+
+    @Test
     public void updateCreatorFileNotFound() throws Exception {
         when(fileService.getFile(FILE_ID)).thenReturn(null);
 
@@ -94,11 +150,13 @@ public class FileControllerUpdateCreatorTest {
     @Test
     public void updateCreatorRejectsInvalidFieldsWithoutPartialUpdate() throws Exception {
         String[] invalidBodies = {
-                "{\"cu_name\":\"creator\",\"created_at\":" + CREATED_AT + "}",
-                "{\"cuid\":-1,\"cu_name\":\"creator\",\"created_at\":" + CREATED_AT + "}",
-                "{\"cuid\":42,\"cu_name\":\" \",\"created_at\":" + CREATED_AT + "}",
-                "{\"cuid\":42,\"cu_name\":\"creator\"}",
-                "{\"cuid\":42,\"cu_name\":\"creator\",\"created_at\":-1}"
+                "{}",
+                "{\"cuid\":null}",
+                "{\"cuid\":-1}",
+                "{\"cu_name\":null}",
+                "{\"cu_name\":\" \"}",
+                "{\"created_at\":null}",
+                "{\"created_at\":-1}"
         };
 
         for (String body : invalidBodies) {
@@ -110,6 +168,6 @@ public class FileControllerUpdateCreatorTest {
 
         verify(fileService, never()).getFile(FILE_ID);
         verify(fileService, never()).updateCreatorInfo(
-                Mockito.anyString(), Mockito.anyLong(), Mockito.anyString(), Mockito.any(LocalDateTime.class));
+                Mockito.anyString(), Mockito.any(), Mockito.any(), Mockito.any());
     }
 }
