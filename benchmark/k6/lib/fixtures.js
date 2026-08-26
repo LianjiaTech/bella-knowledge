@@ -13,6 +13,29 @@ export function seedDirectories(count, ancestorId, prefix) {
   return ids;
 }
 
+export function seedDirectoryTree(count, rootId, prefix, branchingFactor = 10) {
+  const ids = [rootId];
+  const parents = [rootId];
+  let parentIndex = 0;
+
+  while (ids.length < count) {
+    const parentId = parents[parentIndex];
+    parentIndex += 1;
+    const children = Math.min(branchingFactor, count - ids.length);
+    for (let child = 0; child < children; child += 1) {
+      const index = ids.length;
+      const directory = mustSucceed(
+        createDirectory(`${prefix}-${String(index).padStart(6, '0')}`, parentId),
+        'seed directory tree',
+        (value) => Boolean(value && value.id),
+      );
+      ids.push(directory.id);
+      parents.push(directory.id);
+    }
+  }
+  return ids;
+}
+
 export function seedQaDataset(count, prefix) {
   const dataset = mustSucceed(
     createDataset(unique(`${prefix}-dataset`)),

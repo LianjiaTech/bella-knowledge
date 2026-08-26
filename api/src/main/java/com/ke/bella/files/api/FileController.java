@@ -17,6 +17,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
 import javax.imageio.ImageIO;
@@ -58,8 +59,8 @@ import com.ke.bella.files.protocol.FileExists;
 import com.ke.bella.files.protocol.FileMoveOps;
 import com.ke.bella.files.protocol.FileNodeCount;
 import com.ke.bella.files.protocol.FileOps;
-import com.ke.bella.files.protocol.FileSystemOps.MkdirOp;
 import com.ke.bella.files.protocol.FileSystemOps.CreateResourceOp;
+import com.ke.bella.files.protocol.FileSystemOps.MkdirOp;
 import com.ke.bella.files.protocol.FileUrl;
 import com.ke.bella.files.protocol.ImportOps.ImportObjectOp;
 import com.ke.bella.files.protocol.ListFileOps;
@@ -147,7 +148,6 @@ public class FileController {
             purpose = FilePurpose.TEMP.getValue();
         }
 
-        TmpFileInfo tmpFileInfo = null;
         final String spaceCode = BellaContextHelper.getOperateSpaceCode();
         final String filename = file.getOriginalFilename();
         validateAncestorDirectory(spaceCode, ancestorId);
@@ -338,27 +338,6 @@ public class FileController {
         }
         String tagsJson = JsonUtils.toJson(tags);
         Assert.isTrue(tagsJson.length() <= MAX_TAGS_JSON_LENGTH, "tags total length cannot exceed 512 characters");
-    }
-
-    private TmpFileInfo createTempFile(MultipartFile file) throws IOException {
-        MediaType mimeTypeSource = Optional.ofNullable(file.getContentType()).map(MediaType::parse).orElse(null);
-        String type = "";
-        String mimeType = "";
-        String charset = "";
-        if(mimeTypeSource != null) {
-            type = FileUtils.getType(mimeTypeSource);
-            mimeType = FileUtils.extraPureMediaType(mimeTypeSource);
-            charset = Optional.ofNullable(mimeTypeSource.charset()).map(Charset::name).orElse(null);
-        }
-
-        String extension = FileUtils.getFileExtension(file.getOriginalFilename());
-        String suffix = StringUtils.isEmpty(extension) ? "" : "." + extension;
-
-        File tmpDir = new File(tmpFileDir);
-        File tmpFile = File.createTempFile("tmp", suffix, tmpDir);
-        file.transferTo(tmpFile);
-
-        return new TmpFileInfo(tmpFile, type, mimeType, extension, charset);
     }
 
     private TmpFileInfo createTempFileFromObject(Object content, String extension) throws IOException {
@@ -1448,44 +1427,65 @@ public class FileController {
 
         String fileId = op.getFileId();
         String targetAncestorId = StringUtils.trimToNull(op.getAncestorId());
-        String spaceCode = BellaContextHelper.getOperateSpaceCode();
 
         Assert.hasText(fileId, "file_id is required and cannot be empty");
 
-        if(targetAncestorId != null) {
-            FileDB ancestor = fileService.getFile0(targetAncestorId);
-            if(ancestor == null) {
-                throw new FileNotFoundException(targetAncestorId);
-            }
-            Assert.isTrue(NodeType.from(ancestor) == NodeType.DIRECTORY, "ancestor_id must refer to a directory");
-            Assert.isTrue(StringUtils.equals(spaceCode, ancestor.getSpaceCode()),
-                    "space_code mismatch between context and ancestor_id");
-        }
-
+        // 源空间以文件自身为准，不使用上下文空间
         FileDB file = fileService.getFile0(fileId);
         if(file == null) {
             throw new FileNotFoundException(fileId);
         }
-        Assert.isTrue(StringUtils.equals(spaceCode, file.getSpaceCode()), "space mismatch between context and file_id");
+        String sourceSpaceCode = file.getSpaceCode();
+
+        FileDB ancestor = null;
+        if(targetAncestorId != null) {
+            ancestor = fileService.getFile0(targetAncestorId);
+            if(ancestor == null) {
+                throw new FileNotFoundException(targetAncestorId);
+            }
+            Assert.isTrue(NodeType.from(ancestor) == NodeType.DIRECTORY, "ancestor_id must refer to a directory");
+        }
+        // 目标空间：显式参数 > 目标目录所在空间 > 源空间；显式参数与目标目录空间不一致时拒绝
+        String targetSpaceCode = StringUtils.defaultString(StringUtils.trimToNull(op.getTargetSpaceCode()),
+                ancestor != null ? ancestor.getSpaceCode() : sourceSpaceCode);
+        if(ancestor != null) {
+            Assert.isTrue(StringUtils.equals(targetSpaceCode, ancestor.getSpaceCode()),
+                    "space_code mismatch between target space and ancestor_id");
+        }
+        boolean crossSpace = !StringUtils.equals(sourceSpaceCode, targetSpaceCode);
+        FileDB targetAncestor = ancestor;
 
         try {
             boolean directory = NodeType.from(file) == NodeType.DIRECTORY;
-            return fl.executeWithMoveLock(spaceCode, directory, FILE_LOCK_TIMEOUT_MS,
-                    () -> fl.executeWithLock(spaceCode, targetAncestorId, file.getFilename(), FILE_LOCK_TIMEOUT_MS,
-                            () -> {
-                                String currentAncestorId = fileService.getDirectAncestorId(fileId);
-                                Assert.isTrue(!StringUtils.equals(currentAncestorId, targetAncestorId),
-                                        "file already in target directory");
+            // 名称唯一锁与重名检查落在目标空间坐标；
+            // "file already in target directory" 仅对同空间移动有意义（跨空间 root→root 迁移合法）
+            Supplier<OpenAIFile> moveAction = () -> fl.executeWithLock(targetSpaceCode, targetAncestorId,
+                    file.getFilename(), FILE_LOCK_TIMEOUT_MS,
+                    () -> {
+                        if(!crossSpace) {
+                            String currentAncestorId = fileService.getDirectAncestorId(fileId);
+                            Assert.isTrue(!StringUtils.equals(currentAncestorId, targetAncestorId),
+                                    "file already in target directory");
+                        }
+                        boolean exists = fileService.exists(targetSpaceCode, targetAncestorId, file.getFilename());
+                        Assert.isTrue(!exists, "filename already exists");
 
-                                boolean exists = fileService.exists(spaceCode, targetAncestorId, file.getFilename());
-                                Assert.isTrue(!exists, "filename already exists");
-
-                                return fileService.moveFile(fileId, targetAncestorId);
-                            }));
+                        return fileService.moveFile(file, crossSpace ? targetSpaceCode : null, targetAncestor);
+                    });
+            if(!crossSpace) {
+                return fl.executeWithMoveLock(sourceSpaceCode, directory, FILE_LOCK_TIMEOUT_MS, moveAction);
+            }
+            // 跨空间需同时持有源/目标两个空间的 move 锁，按 spaceCode 字典序嵌套获取，
+            // 消除并发 A→B 与 B→A 移动在锁层的环形等待
+            String firstLockSpace = sourceSpaceCode.compareTo(targetSpaceCode) <= 0 ? sourceSpaceCode : targetSpaceCode;
+            String secondLockSpace = firstLockSpace.equals(sourceSpaceCode) ? targetSpaceCode : sourceSpaceCode;
+            return fl.executeWithMoveLock(firstLockSpace, directory, FILE_LOCK_TIMEOUT_MS,
+                    () -> fl.executeWithMoveLock(secondLockSpace, directory, FILE_LOCK_TIMEOUT_MS, moveAction));
         } catch (IllegalArgumentException e) {
             throw e;
         } catch (Exception e) {
-            LOGGER.error("move file failed, file_id: {}, ancestor_id: {}, error: {}", fileId, targetAncestorId, e.getMessage(), e);
+            LOGGER.error("move file failed, file_id: {}, ancestor_id: {}, target_space_code: {}, error: {}",
+                    fileId, targetAncestorId, targetSpaceCode, e.getMessage(), e);
             throw new IllegalStateException("move file failed", e);
         }
     }

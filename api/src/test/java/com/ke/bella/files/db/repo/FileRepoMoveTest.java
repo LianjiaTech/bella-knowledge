@@ -62,6 +62,7 @@ public class FileRepoMoveTest {
         BellaContext.setOperator(Operator.builder().userId(1L).userName("tester").spaceCode("sp-0").build());
         insertTree();
         insertFiles();
+        insertEntries();
     }
 
     @AfterClass
@@ -71,7 +72,7 @@ public class FileRepoMoveTest {
 
     @Test
     public void moveDirectoryPreservesSubtreeAndReplacesExternalAncestors() {
-        fileRepo.moveFileClosures(SOURCE, TARGET);
+        fileRepo.moveFile(file(SOURCE), file(TARGET));
 
         assertFalse(hasClosure(OLD_ROOT, SOURCE));
         assertFalse(hasClosure(OLD_ROOT, CHILD));
@@ -97,7 +98,7 @@ public class FileRepoMoveTest {
     public void moveDirectoryAllowsMissingExternalClosureRows() {
         dsl.execute("delete from file_closure_0 where ancestor_id = ? and descendant_id = ?", OLD_ROOT, LEAF);
 
-        fileRepo.moveFileClosures(SOURCE, TARGET);
+        fileRepo.moveFile(file(SOURCE), file(TARGET));
 
         assertFalse(hasClosure(OLD_ROOT, SOURCE));
         assertFalse(hasClosure(OLD_ROOT, CHILD));
@@ -108,7 +109,7 @@ public class FileRepoMoveTest {
 
     @Test
     public void movedSubtreeIsVisibleThroughHierarchyQueries() {
-        fileRepo.moveFileClosures(SOURCE, TARGET);
+        fileRepo.moveFile(file(SOURCE), file(TARGET));
 
         List<String> pathIds = fileRepo.getPathFiles(LEAF).stream()
                 .map(FileDB::getFileId)
@@ -157,6 +158,8 @@ public class FileRepoMoveTest {
 
     @Test
     public void entryReadFallsBackWhenDirectoryEntryIsMissing() {
+        // 读回退场景需要 entry 缺失：清空夹具预置的 entry，模拟极端数据洞
+        dsl.execute("delete from file_entry_0");
         fileRepo.setFileEntryReadMode("entry");
 
         List<String> children = fileRepo.findFiles("sp-0", SOURCE).stream()
@@ -185,6 +188,8 @@ public class FileRepoMoveTest {
 
     @Test
     public void entryReadFallsBackForExistsAndQueryFileWhenDirectoryEntryIsMissing() {
+        // 读回退场景需要 entry 缺失：清空夹具预置的 entry，模拟极端数据洞
+        dsl.execute("delete from file_entry_0");
         fileRepo.setFileEntryReadMode("entry");
 
         assertTrue(fileRepo.exists("sp-0", SOURCE, "child"));
@@ -215,7 +220,7 @@ public class FileRepoMoveTest {
 
     @Test
     public void moveLeafUsesSameSubtreeAlgorithm() {
-        fileRepo.moveFileClosures(LEAF, TARGET);
+        fileRepo.moveFile(file(LEAF), file(TARGET));
 
         assertFalse(hasClosure(OLD_ROOT, LEAF));
         assertFalse(hasClosure(SOURCE, LEAF));
@@ -227,7 +232,7 @@ public class FileRepoMoveTest {
 
     @Test
     public void moveDirectoryToRootRemovesExternalAncestorsAndResetsRootDepths() {
-        fileRepo.moveFileClosures(SOURCE, null);
+        fileRepo.moveFile(file(SOURCE), null);
 
         assertFalse(hasClosure(OLD_ROOT, SOURCE));
         assertFalse(hasClosure(OLD_ROOT, CHILD));
@@ -243,7 +248,7 @@ public class FileRepoMoveTest {
 
     @Test
     public void moveLeafToRootResetsRootDepth() {
-        fileRepo.moveFileClosures(LEAF, "");
+        fileRepo.moveFile(file(LEAF), null);
 
         assertFalse(hasClosure(OLD_ROOT, LEAF));
         assertFalse(hasClosure(SOURCE, LEAF));
@@ -253,7 +258,7 @@ public class FileRepoMoveTest {
 
     @Test
     public void movedSubtreeToRootIsVisibleThroughHierarchyQueries() {
-        fileRepo.moveFileClosures(SOURCE, null);
+        fileRepo.moveFile(file(SOURCE), null);
 
         List<String> pathIds = fileRepo.getPathFiles(LEAF).stream()
                 .map(FileDB::getFileId)
@@ -282,15 +287,22 @@ public class FileRepoMoveTest {
         Map<String, String> before = snapshot();
 
         IllegalArgumentException selfError = assertThrows(IllegalArgumentException.class,
-                () -> fileRepo.moveFileClosures(SOURCE, SOURCE));
+                () -> fileRepo.moveFile(file(SOURCE), file(SOURCE)));
         assertTrue(selfError.getMessage().contains("cannot move a directory"));
         assertEquals(before, snapshot());
 
-        assertThrows(IllegalArgumentException.class, () -> fileRepo.moveFileClosures(SOURCE, CHILD));
+        assertThrows(IllegalArgumentException.class, () -> fileRepo.moveFile(file(SOURCE), file(CHILD)));
         assertEquals(before, snapshot());
 
-        assertThrows(IllegalArgumentException.class, () -> fileRepo.moveFileClosures(SOURCE, LEAF));
+        assertThrows(IllegalArgumentException.class, () -> fileRepo.moveFile(file(SOURCE), file(LEAF)));
         assertEquals(before, snapshot());
+    }
+
+    private static FileDB file(String fileId) {
+        FileDB file = new FileDB();
+        file.setFileId(fileId);
+        file.setSpaceCode("sp-0");
+        return file;
     }
 
     private void insertTree() {
@@ -316,6 +328,26 @@ public class FileRepoMoveTest {
         insertFile(LEAF, "leaf.txt", false);
         insertFile(NEW_ROOT, "new-root", true);
         insertFile(TARGET, "target", true);
+    }
+
+    /**
+     * 存量数据已全部回填：活跃文件必须有 entry，夹具与生产状态一致（镜像闭包树的父子关系）。
+     */
+    private void insertEntries() {
+        insertEntry(OLD_ROOT, null, "old-root", true);
+        insertEntry(SOURCE, OLD_ROOT, "source", true);
+        insertEntry(CHILD, SOURCE, "child", true);
+        insertEntry(LEAF, CHILD, "leaf.txt", false);
+        insertEntry(NEW_ROOT, null, "new-root", true);
+        insertEntry(TARGET, NEW_ROOT, "target", true);
+    }
+
+    private void insertEntry(String fileId, String parentFileId, String filename, boolean directory) {
+        dsl.execute("insert into file_entry_0 (entry_id, space_code, parent_entry_id, file_id, filename, type, "
+                        + "cuid, cu_name, ctime, muid, mu_name, mtime) values (?, ?, ?, ?, ?, ?, 1, 'tester', "
+                        + "timestamp '2026-01-01 00:00:00', 1, 'tester', timestamp '2026-01-01 00:00:00')",
+                "e-" + fileId, "sp-0", parentFileId == null ? "" : "e-" + parentFileId, fileId, filename,
+                directory ? FileEntryRepo.TYPE_DIR : FileEntryRepo.TYPE_FILE);
     }
 
     private void insertFile(String fileId, String filename, boolean directory) {

@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import javax.annotation.Nullable;
 import javax.annotation.PostConstruct;
 
 import org.apache.commons.lang3.StringUtils;
@@ -872,9 +873,27 @@ public class FileService {
         private String charset;
     }
 
+    /**
+     * 移动文件/目录，支持同空间与跨空间。目标空间解析：targetSpaceCode 显式传入优先；
+     * 缺省时取 targetAncestor 所在空间（移入哪个目录就去哪个空间）；均缺省则为文件当前空间。
+     * targetAncestor 为 null 表示移动到目标空间根目录——跨空间移动到根只能通过 targetSpaceCode 表达。
+     * 传入对象是调用方锁外读取的快照，最新状态由仓储层事务内加锁重读兜底。
+     */
     @Transactional(rollbackFor = Exception.class)
-    public OpenAIFile moveFile(String fileId, String targetAncestorId) {
-        fileRepo.moveFileClosures(fileId, targetAncestorId);
+    public OpenAIFile moveFile(FileDB file, @Nullable String targetSpaceCode, @Nullable FileDB targetAncestor) {
+        String fileId = file.getFileId();
+        String targetSpace = StringUtils.defaultString(StringUtils.trimToNull(targetSpaceCode),
+                targetAncestor != null ? targetAncestor.getSpaceCode() : file.getSpaceCode());
+        if(targetAncestor != null && !StringUtils.equals(targetSpace, targetAncestor.getSpaceCode())) {
+            throw new IllegalArgumentException("space_code mismatch between target space and ancestor_id");
+        }
+        if(StringUtils.equals(targetSpace, file.getSpaceCode())) {
+            fileRepo.moveFile(file, targetAncestor);
+        } else {
+            LOGGER.info("cross-space move, fileId: {}, source space: {}, target space: {}",
+                    fileId, file.getSpaceCode(), targetSpace);
+            fileRepo.moveFileAcrossSpace(file, targetSpace, targetAncestor);
+        }
 
         FileOps ops = FileOps.builder()
                 .fileId(fileId)

@@ -2,9 +2,13 @@ package com.ke.bella.files.service;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import java.util.LinkedHashMap;
@@ -28,24 +32,37 @@ import org.jooq.impl.DefaultDSLContext;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.TransactionAwareDataSourceProxy;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringRunner;
+import org.springframework.test.util.AopTestUtils;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import com.ke.bella.files.FileShardingCountUpdator;
 import com.ke.bella.files.configuration.BucketConfig;
+import com.ke.bella.files.db.IDGenerator;
 import com.ke.bella.files.db.repo.FileEntryRepo;
 import com.ke.bella.files.db.repo.FileRepo;
 import com.ke.bella.files.db.repo.FileRepoTestFixture;
+import com.ke.bella.files.db.tables.pojos.FileDB;
+import com.ke.bella.files.db.tables.pojos.FileEntryDB;
+import com.ke.bella.files.enums.FileType;
+import com.ke.bella.files.enums.NodeType;
+import com.ke.bella.files.protocol.FileBroadcasting;
 import com.ke.bella.files.protocol.FileOps;
+import com.ke.bella.files.protocol.FileStatus;
+import com.ke.bella.files.protocol.OpenAIFile;
 import com.ke.bella.files.service.broadcast.BroadcastService;
 import com.ke.bella.files.service.storage.StorageService;
+import com.ke.bella.files.utils.CustomStringUtils;
 import com.ke.bella.openapi.BellaContext;
 import com.ke.bella.openapi.Operator;
 
@@ -57,6 +74,8 @@ public class FileServiceMoveTransactionTest {
     private static final String CHILD = "file-child-1-d";
     private static final String TARGET = "file-target-1-d";
     private static final String CREATED_FILE = "file-created-1-d";
+    private static final String SOURCE_SPACE = "sp-a";
+    private static final String TARGET_SPACE = "sp-b";
 
     @javax.annotation.Resource
     private DSLContext dsl;
@@ -67,6 +86,8 @@ public class FileServiceMoveTransactionTest {
     @javax.annotation.Resource
     private FileRepo fileRepo;
     @javax.annotation.Resource
+    private FileEntryRepo fileEntryRepo;
+    @javax.annotation.Resource
     private PlatformTransactionManager transactionManager;
 
     @Before
@@ -74,7 +95,9 @@ public class FileServiceMoveTransactionTest {
         FileRepoTestFixture.recreateUserFileTables(dsl, "1");
         insertTree();
         insertFile();
-        setOperator();
+        insertEntries();
+        setOperator(SOURCE_SPACE);
+        Mockito.reset(broadcastService);
     }
 
     @Test
@@ -82,12 +105,87 @@ public class FileServiceMoveTransactionTest {
         Map<String, String> closuresBefore = snapshotClosures();
         String fileBefore = snapshotFile();
 
-        RuntimeException error = assertThrows(RuntimeException.class, () -> fileService.moveFile(SOURCE, TARGET));
+        RuntimeException error = assertThrows(RuntimeException.class,
+                () -> fileService.moveFile(buildFileDB(SOURCE, SOURCE_SPACE), null, buildFileDB(TARGET, SOURCE_SPACE)));
 
         assertTrue(error.getMessage().contains("simulated location update failure"));
         assertEquals(closuresBefore, snapshotClosures());
         assertEquals(fileBefore, snapshotFile());
         verifyNoInteractions(broadcastService);
+    }
+
+    @Test
+    public void crossSpaceUpdateFailureRollsBackEntryAndSpaceCache() {
+        FileEntryRepo entryRepoTarget = AopTestUtils.getTargetObject(fileEntryRepo);
+        recreateCrossSpaceShards();
+        ReflectionTestUtils.setField(entryRepoTarget, "writeMode", "entry");
+        try {
+            FileDB leaf = addLeaf(SOURCE_SPACE, "cross-rollback.txt", "cross-rollback");
+
+            RuntimeException error = assertThrows(RuntimeException.class,
+                    () -> fileService.moveFile(leaf, TARGET_SPACE, null));
+
+            // service 事务包住 moveAcrossSpace：entry 迁移与 space_code 缓存一并回滚，无广播
+            assertTrue(error.getMessage().contains("simulated location update failure"));
+            assertNotNull(fileEntryRepo.queryActiveByFileId(SOURCE_SPACE, leaf.getFileId()));
+            assertNull(fileEntryRepo.queryActiveByFileId(TARGET_SPACE, leaf.getFileId()));
+            assertEquals(SOURCE_SPACE, fileRepo.queryFile(leaf.getFileId()).getSpaceCode());
+            verifyNoInteractions(broadcastService);
+        } finally {
+            ReflectionTestUtils.setField(entryRepoTarget, "writeMode", "dual");
+        }
+    }
+
+    @Test
+    public void crossSpaceMoveBroadcastsTargetSpaceAndMigratesEntry() {
+        FileEntryRepo entryRepoTarget = AopTestUtils.getTargetObject(fileEntryRepo);
+        FailingFileRepo failingRepo = AopTestUtils.getTargetObject(fileRepo);
+        recreateCrossSpaceShards();
+        ReflectionTestUtils.setField(entryRepoTarget, "writeMode", "entry");
+        failingRepo.failOnUpdate = false;
+        try {
+            FileDB leaf = addLeaf(SOURCE_SPACE, "cross-broadcast.txt", "cross-broadcast");
+            setOperator(SOURCE_SPACE);
+
+            OpenAIFile moved = fileService.moveFile(leaf, TARGET_SPACE, null);
+
+            assertEquals(TARGET_SPACE, moved.getSpaceCode());
+            assertNull(fileEntryRepo.queryActiveByFileId(SOURCE_SPACE, leaf.getFileId()));
+            assertNotNull(fileEntryRepo.queryActiveByFileId(TARGET_SPACE, leaf.getFileId()));
+            // 一条 location 事件，payload 的 space_code 为目标空间（源空间分区无事件）
+            ArgumentCaptor<FileBroadcasting<?>> captor = ArgumentCaptor.forClass(FileBroadcasting.class);
+            verify(broadcastService).broadcast(captor.capture(), any(Runnable.class), any(Runnable.class));
+            assertEquals(TARGET_SPACE, ((OpenAIFile) captor.getValue().getData()).getSpaceCode());
+        } finally {
+            failingRepo.failOnUpdate = true;
+            ReflectionTestUtils.setField(entryRepoTarget, "writeMode", "dual");
+        }
+    }
+
+    @Test
+    public void crossSpaceMoveInfersTargetSpaceFromAncestor() {
+        FileEntryRepo entryRepoTarget = AopTestUtils.getTargetObject(fileEntryRepo);
+        FailingFileRepo failingRepo = AopTestUtils.getTargetObject(fileRepo);
+        recreateCrossSpaceShards();
+        ReflectionTestUtils.setField(entryRepoTarget, "writeMode", "entry");
+        failingRepo.failOnUpdate = false;
+        try {
+            FileDB leaf = addLeaf(SOURCE_SPACE, "cross-infer.txt", "cross-infer");
+            FileDB targetDir = addDirectory(TARGET_SPACE, "cross-infer-dir", "cross-infer-dir");
+            setOperator(SOURCE_SPACE);
+
+            // 未显式传目标空间：由目标目录所在空间推断
+            OpenAIFile moved = fileService.moveFile(leaf, null, targetDir);
+
+            assertEquals(TARGET_SPACE, moved.getSpaceCode());
+            FileEntryDB movedEntry = fileEntryRepo.queryActiveByFileId(TARGET_SPACE, leaf.getFileId());
+            assertNotNull(movedEntry);
+            assertEquals(fileEntryRepo.queryActiveByFileId(TARGET_SPACE, targetDir.getFileId()).getEntryId(),
+                    movedEntry.getParentEntryId());
+        } finally {
+            failingRepo.failOnUpdate = true;
+            ReflectionTestUtils.setField(entryRepoTarget, "writeMode", "dual");
+        }
     }
 
     @Test
@@ -101,15 +199,15 @@ public class FileServiceMoveTransactionTest {
 
         try {
             Future<?> move = executor.submit(() -> transactionTemplate.executeWithoutResult(status -> {
-                setOperator();
-                fileRepo.moveFileClosures(SOURCE, TARGET);
+                setOperator(SOURCE_SPACE);
+                fileRepo.moveFile(buildFileDB(SOURCE, SOURCE_SPACE), buildFileDB(TARGET, SOURCE_SPACE));
                 moveCompleted.countDown();
                 await(allowMoveCommit);
             }));
             assertTrue(moveCompleted.await(5, TimeUnit.SECONDS));
 
             Future<?> create = executor.submit(() -> {
-                setOperator();
+                setOperator(SOURCE_SPACE);
                 createStarted.countDown();
                 fileRepo.addFileClosures("sp-a", CREATED_FILE, CHILD);
                 createCompleted.countDown();
@@ -143,8 +241,49 @@ public class FileServiceMoveTransactionTest {
         }
     }
 
-    private static void setOperator() {
-        BellaContext.setOperator(Operator.builder().userId(1L).userName("tester").spaceCode("sp-a").build());
+    private static void setOperator(String spaceCode) {
+        BellaContext.setOperator(Operator.builder().userId(1L).userName("tester").spaceCode(spaceCode).build());
+    }
+
+    private static FileDB buildFileDB(String fileId, String spaceCode) {
+        FileDB file = new FileDB();
+        file.setFileId(fileId);
+        file.setSpaceCode(spaceCode);
+        return file;
+    }
+
+    private void recreateCrossSpaceShards() {
+        FileRepoTestFixture.recreateUserFileTables(dsl, FileRepo.getShardingKeyBySpaceCode(SOURCE_SPACE));
+        FileRepoTestFixture.recreateUserFileTables(dsl, FileRepo.getShardingKeyBySpaceCode(TARGET_SPACE));
+        IDGenerator.setInstanceId(1L);
+    }
+
+    private FileDB addLeaf(String spaceCode, String filename, String seed) {
+        return add(spaceCode, filename, seed, FileType.USER, 0, NodeType.FILE);
+    }
+
+    private FileDB addDirectory(String spaceCode, String filename, String seed) {
+        return add(spaceCode, filename, seed, FileType.DIRECTORY, 1, NodeType.DIRECTORY);
+    }
+
+    private FileDB add(String spaceCode, String filename, String seed, FileType type, int isDir, NodeType nodeType) {
+        setOperator(spaceCode);
+        String hash = String.valueOf(Math.abs(CustomStringUtils.hashCode(spaceCode)));
+        String fileId = "file-260824000000" + String.format("%06d", Math.abs(seed.hashCode()) % 1000000) + "-" + hash + type.getSuffix();
+        FileDB file = new FileDB();
+        file.setFileId(fileId);
+        file.setFilename(filename);
+        file.setIsDir(isDir);
+        file.setNodeType(nodeType.getValue());
+        file.setResourceId("");
+        file.setSpaceCode(spaceCode);
+        file.setPurpose("assistants");
+        file.setStatus(FileStatus.NOT_DELETED.getValue());
+        file.setBucket("bucket");
+        file.setPath("path/" + seed);
+        file.setMetaData("{}");
+        fileRepo.addFile(file, null, type);
+        return fileRepo.queryFile(fileId, type);
     }
 
     private void insertTree() {
@@ -170,6 +309,23 @@ public class FileServiceMoveTransactionTest {
         dsl.execute("insert into file_1 (file_id, filename, is_dir, space_code, meta_data, mtime) "
                         + "values (?, ?, ?, ?, ?, timestamp '2026-01-01 00:00:00')",
                 TARGET, "target", 1, "sp-a", "{}");
+    }
+
+    /**
+     * 存量数据已全部回填：活跃文件必须有 entry，夹具与生产状态一致（镜像闭包树的父子关系）。
+     */
+    private void insertEntries() {
+        insertEntry(OLD_ROOT, null, "old-root");
+        insertEntry(SOURCE, OLD_ROOT, "source");
+        insertEntry(CHILD, SOURCE, "child");
+        insertEntry(TARGET, null, "target");
+    }
+
+    private void insertEntry(String fileId, String parentFileId, String filename) {
+        dsl.execute("insert into file_entry_1 (entry_id, space_code, parent_entry_id, file_id, filename, type, "
+                        + "cuid, cu_name, ctime, muid, mu_name, mtime) values (?, ?, ?, ?, ?, ?, 1, 'tester', "
+                        + "timestamp '2026-01-01 00:00:00', 1, 'tester', timestamp '2026-01-01 00:00:00')",
+                "e-" + fileId, "sp-a", parentFileId == null ? "" : "e-" + parentFileId, fileId, filename, "dir");
     }
 
     private void insertClosure(String ancestorId, String descendantId, long depth, long rootDepth) {
@@ -268,6 +424,9 @@ public class FileServiceMoveTransactionTest {
     }
 
     private static class FailingFileRepo extends FileRepo {
+        // 默认在 LOCATION 更新后抛错以验证回滚；成功路径用例临时关闭
+        volatile boolean failOnUpdate = true;
+
         FailingFileRepo(DSLContext dslContext, FileEntryRepo fileEntryRepo) {
             super(dslContext, fileEntryRepo);
         }
@@ -275,7 +434,9 @@ public class FileServiceMoveTransactionTest {
         @Override
         public void updateFile(FileOps op, boolean increaseVersion) {
             super.updateFile(op, increaseVersion);
-            throw new IllegalStateException("simulated location update failure");
+            if(failOnUpdate) {
+                throw new IllegalStateException("simulated location update failure");
+            }
         }
     }
 

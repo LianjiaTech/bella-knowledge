@@ -12,7 +12,6 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -20,6 +19,7 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 
 import javax.annotation.Nullable;
+
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jooq.Condition;
@@ -39,8 +39,8 @@ import org.jooq.UpdateSetMoreStep;
 import org.jooq.impl.DSL;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Component;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
@@ -586,12 +586,14 @@ public class FileRepo implements BaseRepo {
                 .execute();
     }
 
+    /**
+     * 同空间移动：file_entry 是主记录，闭包表仅在 write-mode 仍写闭包（dual/closure）时同步维护。
+     * file 与 targetAncestor 是调用方已查出的快照，不再回表。
+     */
     @Transactional(rollbackFor = Exception.class)
-    public void moveFileClosures(String fileId, String targetAncestorId) {
-        FileDB file = queryFile(fileId);
-        if(file == null) {
-            throw new FileNotFoundException(fileId);
-        }
+    public void moveFile(FileDB file, @Nullable FileDB targetAncestor) {
+        String fileId = file.getFileId();
+        String targetAncestorId = targetAncestor == null ? null : targetAncestor.getFileId();
         if(fileEntryRepo.closureWriteEnabled()) {
             String shardingKey = getShardingKeyByFileId(fileId);
             DSLContext dsl = db(shardingKey);
@@ -602,6 +604,13 @@ public class FileRepo implements BaseRepo {
             updateSubtreeRootDepths(dsl, snapshot, fileId);
         }
         fileEntryRepo.move(file.getSpaceCode(), fileId, targetAncestorId);
+    }
+
+    /**
+     * 跨空间移动薄委托：事务由 moveAcrossSpace 自身声明，加入调用方已开启的事务。
+     */
+    public void moveFileAcrossSpace(FileDB file, String targetSpaceCode, @Nullable FileDB targetAncestor) {
+        fileEntryRepo.moveAcrossSpace(file, targetSpaceCode, targetAncestor);
     }
 
     private ClosureMoveSnapshot loadClosureMoveSnapshot(DSLContext dsl, String fileId, String targetAncestorId) {

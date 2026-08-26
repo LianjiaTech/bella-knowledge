@@ -9,9 +9,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { KnowledgeFile } from "@/lib/types/file";
 import { findFiles } from "@/request/files";
+import { useUserStore } from "@/store/user";
 import { ChevronRight, Folder, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -26,7 +34,11 @@ type MoveFolderDialogProps = {
   currentAncestorId: string;
   spaceCode?: string;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (file: KnowledgeFile, ancestorId: string) => Promise<boolean>;
+  onConfirm: (
+    file: KnowledgeFile,
+    ancestorId: string,
+    targetSpaceCode?: string,
+  ) => Promise<boolean>;
 };
 
 const ROOT_DIRECTORY: Directory = {
@@ -42,6 +54,8 @@ export function MoveFolderDialog({
   onOpenChange,
   onConfirm,
 }: MoveFolderDialogProps) {
+  const { workspaceList } = useUserStore();
+  const [targetSpaceCode, setTargetSpaceCode] = useState(spaceCode);
   const [directoryStack, setDirectoryStack] = useState<Directory[]>([
     ROOT_DIRECTORY,
   ]);
@@ -49,29 +63,45 @@ export function MoveFolderDialog({
   const [loading, setLoading] = useState(false);
   const [moving, setMoving] = useState(false);
   const currentDirectory = directoryStack[directoryStack.length - 1];
-  const isCurrentParent = currentDirectory.id === currentAncestorId;
+  const isSameSpace = !targetSpaceCode || targetSpaceCode === spaceCode;
+  // 跨空间移动到任何位置（含目标空间根目录）都合法，仅同空间校验"已在该目录"
+  const isCurrentParent = isSameSpace && currentDirectory.id === currentAncestorId;
+
+  const rootDirectoryOf = useCallback(
+    (targetCode?: string): Directory => {
+      if (!targetCode || targetCode === spaceCode) {
+        return ROOT_DIRECTORY;
+      }
+      const workspace = workspaceList.find(
+        (item) => item.spaceCode === targetCode,
+      );
+      return { id: "", name: workspace?.spaceName ?? targetCode };
+    },
+    [spaceCode, workspaceList],
+  );
 
   const loadDirectories = useCallback(
-    async (ancestorId: string) => {
+    async (ancestorId: string, targetCode?: string) => {
       setLoading(true);
       const res = await findFiles({
         ancestor_id: ancestorId,
-        space_code: spaceCode,
+        space_code: targetCode,
       });
       setDirectories(res.data.filter((item) => item.node_type === "directory"));
       setLoading(false);
     },
-    [spaceCode],
+    [],
   );
 
   useEffect(() => {
     if (!open) {
       return;
     }
+    setTargetSpaceCode(spaceCode);
     setDirectoryStack([ROOT_DIRECTORY]);
     setMoving(false);
-    loadDirectories(ROOT_DIRECTORY.id);
-  }, [loadDirectories, open]);
+    loadDirectories(ROOT_DIRECTORY.id, spaceCode);
+  }, [loadDirectories, open, spaceCode]);
 
   const invalidMessage = useMemo(() => {
     if (isCurrentParent) {
@@ -79,6 +109,12 @@ export function MoveFolderDialog({
     }
     return null;
   }, [isCurrentParent]);
+
+  const changeTargetSpace = async (nextSpaceCode: string) => {
+    setTargetSpaceCode(nextSpaceCode);
+    setDirectoryStack([rootDirectoryOf(nextSpaceCode)]);
+    await loadDirectories("", nextSpaceCode);
+  };
 
   const enterDirectory = async (directory: KnowledgeFile) => {
     if (directory.id === file?.id) {
@@ -88,13 +124,13 @@ export function MoveFolderDialog({
       ...stack,
       { id: directory.id, name: directory.filename },
     ]);
-    await loadDirectories(directory.id);
+    await loadDirectories(directory.id, targetSpaceCode);
   };
 
   const jumpDirectory = async (index: number) => {
     const directory = directoryStack[index];
     setDirectoryStack((stack) => stack.slice(0, index + 1));
-    await loadDirectories(directory.id);
+    await loadDirectories(directory.id, targetSpaceCode);
   };
 
   const handleConfirm = async () => {
@@ -102,7 +138,11 @@ export function MoveFolderDialog({
       return;
     }
     setMoving(true);
-    const success = await onConfirm(file, currentDirectory.id);
+    const success = await onConfirm(
+      file,
+      currentDirectory.id,
+      isSameSpace ? undefined : targetSpaceCode,
+    );
     setMoving(false);
     if (success) {
       onOpenChange(false);
@@ -121,6 +161,33 @@ export function MoveFolderDialog({
             为 &ldquo;{file?.filename}&rdquo; 选择新的上级目录。
           </DialogDescription>
         </DialogHeader>
+
+        {workspaceList.length > 1 && (
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-muted-foreground shrink-0">目标空间：</span>
+            <Select
+              value={targetSpaceCode}
+              disabled={loading || moving}
+              onValueChange={changeTargetSpace}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="选择空间" />
+              </SelectTrigger>
+              <SelectContent>
+                {workspaceList.map((space) => (
+                  <SelectItem key={space.spaceCode} value={space.spaceCode}>
+                    {space.spaceName}
+                    {space.spaceCode === spaceCode && (
+                      <span className="text-muted-foreground ml-1 text-xs">
+                        （当前空间）
+                      </span>
+                    )}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         <div className="flex flex-wrap items-center gap-1 text-sm">
           {directoryStack.map((directory, index) => (

@@ -42,7 +42,8 @@ bella:
     file-entry:
       read-mode: ${BELLA_FILE_ENTRY_READ_MODE:closure}
       write-mode: ${BELLA_FILE_ENTRY_WRITE_MODE:dual}
-      cross-space-move-enabled: ${BELLA_FILE_ENTRY_CROSS_SPACE_MOVE_ENABLED:false}
+      # 非空目录跨空间迁移的子树规模告警阈值：超过只记 warning，不拒绝
+      cross-space-move-warn-threshold: ${BELLA_FILE_ENTRY_CROSS_SPACE_MOVE_WARN_THRESHOLD:5000}
     file:
       tmp-file-dir: ${BELLA_TMP_FILE_DIR:.}
     bucket-name:

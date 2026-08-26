@@ -37,6 +37,9 @@ bella:
     space-code: ${BELLA_DEV_AUTH_SPACE_CODE:local-dev}
     manager-ak: ${BELLA_DEV_AUTH_MANAGER_AK:local-dev-ak}
   file-api:
+    file-entry:
+      read-mode: entry
+      write-mode: entry
     file:
       tmp-file-dir: ${BELLA_TMP_FILE_DIR:.local-cache}
     bucket-name:
