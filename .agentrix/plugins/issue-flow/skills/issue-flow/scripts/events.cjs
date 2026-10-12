@@ -162,7 +162,7 @@ function buildGitlabBridgeNotePayload(env = process.env, project = buildGitlabBr
       url: gitlabBridgeValue(env, 'COMMENT_URL') || '',
     },
     user: {
-      username: env.GITLAB_USER_LOGIN || env.GITLAB_USER_NAME || '',
+      username: gitlabBridgeValue(env, 'COMMENT_AUTHOR'),
       bot: false,
     },
   };

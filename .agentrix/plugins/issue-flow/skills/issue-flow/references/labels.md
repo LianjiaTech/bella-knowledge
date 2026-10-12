@@ -124,9 +124,9 @@ PR/MR 级自动 review 暂停开关。**只用于 PR/MR，不用于 issue。**
 
 | Label | 语义 |
 |-------|------|
-| `review::off` | 暂停新的自动 review 和 review-comment task resume；移除后恢复仓库默认行为 |
+| `review::off` | 暂停新的自动 review；移除后恢复仓库默认行为 |
 
-`review::off` 不会取消已经运行的 Agentrix task，也不会补放暂停期间错过的事件。仓库级 `ISSUE_FLOW_REVIEW_ENABLED` 关闭时始终全局禁用；仓库级开启时，该标签可以对单个 PR/MR 施加更严格的暂停。使用 `labels sync` 或安装升级提供标签，使用 `labels check` 诊断缺失或 metadata 漂移。
+`review::off` 不会取消已经运行的 reviewer task，也不会补跑暂停期间错过的 review 事件。仓库级 `ISSUE_FLOW_REVIEW_ENABLED` 关闭时始终禁用自动 review；仓库级开启时，该标签可以对单个 PR/MR 施加更严格的暂停。该开关不影响 review comment 唤醒原 Plan/Build task。使用 `labels sync` 或安装升级提供标签，使用 `labels check` 诊断缺失或 metadata 漂移。
 
 ## 互斥规则
 

@@ -6,3 +6,7 @@
 - 运行仓库已有的文档检查，并补充与改动相称的人工检查；不要把 Markdown 格式检查当作完成验证。
 - 提交前按运行时提供的仓库上下文创建或切换到工作分支，不要直接在基准分支提交。
 - 按仓库规则修改、验证、提交，然后使用统一 CLI 提交 build PR/MR。
+
+PR body 写清 Summary（改了哪些文档、帮助谁解决什么问题）和 Validation（执行的文档检查，以及人工核对过的链接、示例、命令和关键事实）；Source issue 由 CLI 生成。
+
+PR body 写入仓库外临时文件（例如 `mktemp`），通过 `issue-flow pr submit ... --body-file` 提交，不要加入 git。

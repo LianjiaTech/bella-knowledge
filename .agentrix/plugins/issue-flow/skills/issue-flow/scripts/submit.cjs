@@ -65,6 +65,7 @@ function usage() {
     '  --label <mr-by::...>    PR/MR label override. Defaults by kind.',
     '  --draft                Create the PR as draft.',
     '  --no-push              Do not push the current branch before creating the PR.',
+    '  --force-with-lease     Allow a non-fast-forward push only when remote updates are integrated locally.',
     '  --dry-run              Print intended behavior without changing remote state.',
     '  --help',
   ].join('\n');
@@ -102,6 +103,10 @@ function parseArgs(argv) {
     }
     if (arg === '--no-push') {
       options.noPush = true;
+      continue;
+    }
+    if (arg === '--force-with-lease') {
+      options.forceWithLease = true;
       continue;
     }
     if (!arg.startsWith('--')) {
@@ -534,13 +539,16 @@ function buildPrBodyWithMarkers(body, issueNumber, taskId = '') {
   return marked.trimEnd();
 }
 
-function buildPrBodyWithSourceMarker(body, issueNumber) {
-  return buildPrBodyWithMarkers(body, issueNumber);
+function buildPrBodyReferences(body, issueNumber, planFile = '') {
+  const content = String(body || '').trim();
+  const references = [];
+  if (!/^\W*Source issue\W*[:：]/im.test(content)) references.push(`Source issue: #${issueNumber}`);
+  if (planFile && !/^\W*Plan file\W*[:：]/im.test(content)) references.push(`Plan file: \`${planFile}\``);
+  return [references.join('\n'), content].filter(Boolean).join('\n\n');
 }
 
-function writePrBodyWithMarkers(bodyFile, issueNumber, taskId = '') {
-  const body = fs.readFileSync(bodyFile, 'utf8');
-  return writePrBodyTextWithMarkers(body, issueNumber, taskId);
+function buildPrBodyWithSourceMarker(body, issueNumber) {
+  return buildPrBodyWithMarkers(body, issueNumber);
 }
 
 function writePrBodyTextWithMarkers(body, issueNumber, taskId = '') {
@@ -551,10 +559,6 @@ function writePrBodyTextWithMarkers(body, issueNumber, taskId = '') {
     path: markedBodyFile,
     cleanup: () => fs.rmSync(tempDir, { recursive: true, force: true }),
   };
-}
-
-function writePrBodyWithSourceMarker(bodyFile, issueNumber) {
-  return writePrBodyWithMarkers(bodyFile, issueNumber);
 }
 
 function validateLabel(label) {
@@ -650,6 +654,15 @@ function createGitAskpassEnv(providerName, baseEnv = process.env) {
 }
 
 
+function buildPushArgs(headBranch, options = {}) {
+  const args = ['push'];
+  if (options.forceWithLease) {
+    args.push('--force-with-lease', '--force-if-includes');
+  }
+  args.push('-u', 'origin', `HEAD:${headBranch}`);
+  return args;
+}
+
 function pushCurrentBranch(headBranch, options) {
   if (options.noPush) {
     return;
@@ -657,7 +670,7 @@ function pushCurrentBranch(headBranch, options) {
 
   const askpass = createGitAskpassEnv(options.provider);
   try {
-    runChecked('git', ['push', '-u', 'origin', `HEAD:${headBranch}`], {
+    runChecked('git', buildPushArgs(headBranch, options), {
       dryRun: options.dryRun,
       inherit: true,
       env: askpass.env,
@@ -741,7 +754,7 @@ async function publishPlanMergeRequest({ provider, repo, issueNumber, headBranch
   const commit = runOutput('git', ['rev-parse', 'HEAD']);
   const artifactInput = { artifact, format, issueNumber, branch: headBranch, commit, artifactPath, ...reviewContext };
   const artifactBody = visual ? buildVisualArtifactComment(artifactInput) : buildVisualArtifactMarker(artifactInput);
-  const suppliedBody = visual ? '' : fs.readFileSync(options.bodyFile, 'utf8').trim();
+  const suppliedBody = visual ? '' : buildPrBodyReferences(fs.readFileSync(options.bodyFile, 'utf8'), issueNumber, artifactPath);
   const markedBody = writePrBodyTextWithMarkers(
     [artifactBody, suppliedBody].filter(Boolean).join('\n\n'),
     issueNumber,
@@ -896,7 +909,11 @@ async function main(argv = process.argv.slice(2)) {
   await ensureMergeRequestLabel(provider, repo, label, options);
   pushCurrentBranch(headBranch, options);
 
-  const markedBody = writePrBodyWithMarkers(options.bodyFile, issueNumber, resolveAgentrixTaskId(options));
+  const markedBody = writePrBodyTextWithMarkers(
+    buildPrBodyReferences(fs.readFileSync(options.bodyFile, 'utf8'), issueNumber),
+    issueNumber,
+    resolveAgentrixTaskId(options),
+  );
   try {
     const prUrl = await createOrUpdatePullRequest({
       provider,
@@ -922,6 +939,8 @@ module.exports = {
   assertDecisionArtifactsRemoved,
   assertVisualArtifactData,
   assertVisualBriefNotInIssueArtifacts,
+  buildPushArgs,
+  buildPrBodyReferences,
   buildPrBodyWithMarkers,
   buildPrBodyWithSourceMarker,
   buildSourceIssueMarker,

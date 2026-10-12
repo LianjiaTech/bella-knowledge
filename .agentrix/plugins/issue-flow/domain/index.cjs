@@ -363,6 +363,7 @@ function validateVisualArtifactData(data, artifact, options = {}) {
 }
 
 module.exports = {
+  ...require('./action-execution.cjs'),
   ...labels,
   ...provenance,
   allOptimizationProposalsTerminal,

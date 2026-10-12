@@ -34,6 +34,8 @@ jobs:
       - name: Apply source issue transition
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          AGENTRIX_GIT_SERVER_ID: ${{ vars.AGENTRIX_GIT_SERVER_ID }}
+          ISSUE_FLOW_BASE_URL: ${{ vars.ISSUE_FLOW_BASE_URL }}
           AGENTRIX_BASE_URL: ${{ vars.AGENTRIX_BASE_URL }}
           AGENTRIX_API_KEY: ${{ secrets.AGENTRIX_API_KEY }}
           AGENTRIX_RUNNER_ID: ${{ vars.AGENTRIX_RUNNER_ID }}

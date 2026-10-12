@@ -9,6 +9,7 @@ const {
   shouldRunAutoForEvent,
 } = require('./resolve.cjs');
 const { parseSourceMarker } = require('./provenance.cjs');
+const { commentAuthorSkipReason } = require('./comment-policy.cjs');
 const prMerged = require('./pr-merged.cjs');
 const pipelineFailed = require('./pipeline-failed.cjs');
 const { completeOptimizationForChildIssue } = require('./optimization-completion.cjs');
@@ -35,6 +36,9 @@ const VALUE_OPTIONS = new Set([
   '--gitlab-project',
   '--gitlab-token',
   '--log-file',
+  '--agent',
+  '--model',
+  '--reasoning-effort',
 ]);
 
 function logIssueFlow(message, details = {}) {
@@ -76,6 +80,9 @@ function usage() {
     '  --prompts-dir <path>    Agentrix prompt override directory.',
     '  --templates-dir <path>  Agentrix template override directory.',
     '  --plan-root-dir <path>  Agentrix plan root directory.',
+    '  --agent <id>            Override the action agent.',
+    '  --model <model>         Override the action model.',
+    '  --reasoning-effort <v>  Override reasoning effort: low, medium, high, xhigh, or max.',
     '  --dry-run              Print intended behavior without calling external APIs.',
     '  --help',
   ].join('\n');
@@ -590,6 +597,8 @@ async function startPullRequestReview(pr, options = {}, data = {}) {
   const taskData = {
     ...data,
     pullRequest: currentPr,
+    checkoutRef: currentPr.headRef,
+    checkoutSha: currentPr.headSha,
     sourceIssueNumber: options.issueNumber || runtime.extractSourceIssueNumberFromPullRequest(currentPr),
   };
   const existingReviewTask = findActionTaskComment(await listPullRequestComments(currentPr, options), action, runtime, taskData);
@@ -773,7 +782,7 @@ function listResumableIssueTasks(comments, runtime) {
     .filter(Boolean);
 }
 
-function shouldSkipPullRequestReview(pr) {
+function shouldSkipPullRequest(pr) {
   if (!pr || !pr.number) {
     return 'not_pull_request';
   }
@@ -785,6 +794,14 @@ function shouldSkipPullRequestReview(pr) {
   }
   if (pr.state && pr.state !== 'open' && pr.state !== 'opened') {
     return 'pull_request_not_open';
+  }
+  return '';
+}
+
+function shouldSkipPullRequestReview(pr) {
+  const reason = shouldSkipPullRequest(pr);
+  if (reason) {
+    return reason;
   }
   if (normalizeLabels(pr.labels).includes('review::off')) {
     return 'pull_request_review_disabled';
@@ -919,6 +936,11 @@ async function runComment(options = {}, provided = {}) {
     };
   }
   const comment = getCommentContext(payload, options);
+  const authorSkipReason = commentAuthorSkipReason(comment.author);
+  if (authorSkipReason) {
+    logIssueFlow('Issue comment skipped', { reason: authorSkipReason, author: comment.author });
+    return { action: 'skipped', reason: authorSkipReason, comment: comment.id };
+  }
   if (isBotComment(payload, options)) {
     logIssueFlow('Bot comment ignored');
     return {
@@ -1145,15 +1167,12 @@ async function runReviewComment(options = {}, provided = {}) {
     };
   }
 
-  if (!resolveReviewEnabled(options)) {
-    logIssueFlow('PR/MR review comment skipped', { reason: 'review_disabled' });
-    return {
-      action: 'skipped',
-      reason: 'review_disabled',
-    };
-  }
-
   const reviewComment = provided.reviewComment || getReviewCommentContext(payload, options);
+  const authorSkipReason = commentAuthorSkipReason(reviewComment.author);
+  if (authorSkipReason) {
+    logIssueFlow('PR/MR review comment skipped', { reason: authorSkipReason, author: reviewComment.author });
+    return { action: 'skipped', reason: authorSkipReason, reviewComment: reviewComment.id };
+  }
   const source = parseSourceMarker(reviewComment.body);
   if (source.source_task_id || source.source_agent) {
     logIssueFlow('PR/MR review comment skipped', {
@@ -1171,7 +1190,7 @@ async function runReviewComment(options = {}, provided = {}) {
     };
   }
   const currentPr = await fetchCurrentPullRequest(pr, options);
-  const skipReason = shouldSkipPullRequestReview(currentPr);
+  const skipReason = shouldSkipPullRequest(currentPr);
   if (skipReason) {
     logIssueFlow('PR/MR review comment skipped', {
       pr: currentPr.number ? `#${currentPr.number}` : '',

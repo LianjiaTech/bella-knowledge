@@ -43,9 +43,11 @@ jobs:
       - name: Route PR/MR review comment
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          AGENTRIX_GIT_SERVER_ID: ${{ vars.AGENTRIX_GIT_SERVER_ID }}
+          ISSUE_FLOW_BASE_URL: ${{ vars.ISSUE_FLOW_BASE_URL }}
           AGENTRIX_BASE_URL: ${{ vars.AGENTRIX_BASE_URL }}
           AGENTRIX_API_KEY: ${{ secrets.AGENTRIX_API_KEY }}
           AGENTRIX_ISSUE_FLOW_AGENT: ${{ vars.AGENTRIX_ISSUE_FLOW_AGENT }}
-          ISSUE_FLOW_REVIEW_ENABLED: ${{ vars.ISSUE_FLOW_REVIEW_ENABLED }}
+          ISSUE_FLOW_COMMENT_AUTHOR_BLACKLIST: ${{ vars.ISSUE_FLOW_COMMENT_AUTHOR_BLACKLIST }}
         run: |
           node .agentrix/plugins/issue-flow/skills/issue-flow/cli.cjs dispatch review-comment --event "$GITHUB_EVENT_PATH"

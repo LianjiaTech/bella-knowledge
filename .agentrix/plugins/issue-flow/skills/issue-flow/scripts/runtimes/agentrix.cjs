@@ -11,6 +11,7 @@ const path = require('node:path');
 const { sourceIssueNumber } = require('../../../../domain/index.cjs');
 const { spawnSync } = require('node:child_process');
 const { buildSourceMarker, parseSourceMarker } = require('../provenance.cjs');
+const { resolveActionExecution, validateActionExecutionConfig } = require('../action-execution.cjs');
 
 const DEFAULT_AGENT = 'codex';
 const DEFAULT_RESPONSE_MODE = 'async';
@@ -112,6 +113,11 @@ function agentrixAssetsDir() {
   return path.join(skillRootDir(), 'assets', 'agentrix', 'runtime');
 }
 
+function defaultProjectInstructions() {
+  const filePath = path.join(skillRootDir(), 'assets', 'agentrix', 'bootstrap', 'issue-flow', 'instructions.md');
+  return fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf8').trim() : '';
+}
+
 function readJsonFile(filePath, required = false) {
   if (!fs.existsSync(filePath)) {
     if (required) {
@@ -155,6 +161,7 @@ function resolveAgentrixConfig(options = {}) {
     planRootDirDisplay: normalizeRepoPath(planRootDir),
     defaultPromptsDir: path.join(agentrixAssetsDir(), 'prompts'),
     defaultTemplatesDir: path.join(agentrixAssetsDir(), 'templates'),
+    executionConfig: projectConfig,
   };
 }
 
@@ -390,7 +397,7 @@ function formatProjectInstructions(options = {}) {
     return '';
   }
   const body = fs.readFileSync(projectInstructionsPath, 'utf8').trim();
-  if (!body) {
+  if (!body || body === defaultProjectInstructions()) {
     return '';
   }
   return formatContextBlock('project_instructions', [
@@ -539,11 +546,7 @@ function extractAgentrixTaskIdFromPullRequest(pr = {}) {
 }
 
 function buildReviewCommentResumeInstruction() {
-  return [
-    'PR/MR 有新的 review comment，请查看并处理。',
-    '',
-    '处理完成后，请使用 issue-flow CLI 在 PR/MR 下回复一条普通总结 comment；不要创建新的 inline review comment。',
-  ].join('\n');
+  return 'PR/MR 有新的 review comment，请查看并处理。';
 }
 
 function buildIssueCommentResumeInstruction() {
@@ -611,7 +614,7 @@ function truncate(value, maxLength) {
 }
 
 function resolveAgent(options = {}) {
-  return options.agent || process.env.AGENTRIX_ISSUE_FLOW_AGENT || process.env.AGENTRIX_AGENT || DEFAULT_AGENT;
+  return options.agent || process.env.AGENTRIX_ISSUE_FLOW_AGENT || DEFAULT_AGENT;
 }
 
 function resolveResponseMode(options = {}) {
@@ -757,6 +760,8 @@ function buildRepoArg(issue = {}, options = {}) {
 }
 
 function buildRunArgs(action, issue, options = {}, data = {}, prompt = '', resultFile = '') {
+  const config = resolveAgentrixConfig(options);
+  const execution = resolveActionExecution(action, options, config.executionConfig, config.projectConfigPath);
   const metadataSubject = action === 'review'
     ? ['--metadata', `issue_flow_pr=${issue.repoFullName}#${issue.number}`]
     : ['--issue-number', String(issue.number), '--metadata', `issue_flow_issue=${issue.repoFullName}#${issue.number}`];
@@ -765,7 +770,7 @@ function buildRunArgs(action, issue, options = {}, data = {}, prompt = '', resul
     '--yes',
     resolveAgentrixRunPackage(),
     '--agent',
-    resolveAgent(options),
+    execution.values.agent,
     '--title',
     buildRunTitle(action, issue),
     '--prompt',
@@ -791,7 +796,10 @@ function buildRunArgs(action, issue, options = {}, data = {}, prompt = '', resul
   appendOptionalArg(args, '--repo', buildRepoArg(issue, options));
   appendOptionalArg(args, '--base-ref', resolvePromptBaseBranch(data, options));
   appendOptionalArg(args, '--checkout-ref', data.checkoutRef);
+  appendOptionalArg(args, '--checkout-sha', data.checkoutSha);
   appendOptionalArg(args, '--runner-id', options.runnerId || process.env.AGENTRIX_RUNNER_ID);
+  appendOptionalArg(args, '--model', execution.values.model);
+  appendOptionalArg(args, '--reasoning-effort', execution.values.reasoningEffort);
   return args;
 }
 
@@ -853,13 +861,15 @@ function sanitizeAgentrixRunEnv(env = process.env, data = {}) {
 function run(action, issue, options = {}, data = {}) {
   const prompt = composeActionPrompt(action, issue, data, options);
   if (options.dryRun) {
+    const config = resolveAgentrixConfig(options);
+    const execution = resolveActionExecution(action, options, config.executionConfig, config.projectConfigPath);
     const result = {
       runId: 'dry-run',
       status: 'dry-run',
       detailUrl: '',
       result: '',
     };
-    console.log(JSON.stringify({ dryRun: true, runtime: 'agentrix', action, subject: issue.number, prompt }, null, 2));
+    console.log(JSON.stringify({ dryRun: true, runtime: 'agentrix', action, subject: issue.number, execution, prompt }, null, 2));
     return result;
   }
 
@@ -1099,6 +1109,8 @@ module.exports = {
   listPlanInputFiles,
   normalizeRepoPath,
   resolveAgentrixConfig,
+  resolveActionExecution,
+  validateActionExecutionConfig,
   resolvePlanTemplate,
   visualPlanFeatureMode,
   resolvePromptBaseBranch,
