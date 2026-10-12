@@ -7,7 +7,11 @@
     "templatesDir": ".issue-flow/templates",
     "planRootDir": ".issue-flow/issues",
     "actions": {
-      "defaults": {},
+      "defaults": {
+        "agent": "codex",
+        "model": "gpt-6.1-sol",
+        "reasoningEffort": "medium"
+      },
       "triage": {},
       "plan": {},
       "build": {},
