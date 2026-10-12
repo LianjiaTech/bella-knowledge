@@ -101,6 +101,7 @@ function prSubmitHelp() {
     '  --head <branch>',
     '  --draft',
     '  --no-push',
+    '  --force-with-lease',
     '  --dry-run',
   ].join('\n');
 }
@@ -216,6 +217,10 @@ function mapAliasArgs(argv) {
     mapped.push(arg);
   }
   return mapped;
+}
+
+function buildPrSubmitArgs(argv) {
+  return [argv[1], ...mapAliasArgs(argv.slice(2))];
 }
 
 function parseJsonOutput(stdout) {
@@ -390,7 +395,7 @@ async function handlePr(argv) {
     if (argv[1] === '--help' || !argv[1]) {
       return prSubmitHelp();
     }
-    return runScript('submit.cjs', [argv[1], ...mapAliasArgs(argv.slice(2))], { action: 'submitted', resource: 'pr', command: `submit ${argv[1]}` });
+    return runScript('submit.cjs', buildPrSubmitArgs(argv), { action: 'submitted', resource: 'pr', command: `submit ${argv[1]}` });
   }
   if (action === 'comments') {
     return handlePrComments(argv.slice(1));
@@ -534,6 +539,7 @@ async function main(argv = process.argv.slice(2)) {
 }
 
 module.exports = {
+  buildPrSubmitArgs,
   main,
   parseOptions,
   run,

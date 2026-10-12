@@ -1,6 +1,6 @@
 ---
 name: issue-flow
-version: 0.9.3
+version: 0.12.0
 description: "标签驱动的 issue 状态机与 provider 操作工具。通过统一 issue-flow CLI 操作 GitHub/GitLab 的 issue、label、comment、PR/MR 与 review。在含 `.issue-flow/` 目录或使用 issue-flow managed label（type::/status::/flow:: 等）的仓库中处理 issue/PR、提交 Plan/Build PR/MR 或进行 review 时使用。"
 metadata:
   requires:
@@ -44,7 +44,7 @@ issue-flow <resource> <action> [options]
 | `priority::` | Issue | 处理优先级 | `p0`, `p1`, `p2`, `p3` |
 | `size::` | Issue | 工作量规模与 Weighted Throughput 权重 | `XS`, `S`, `M`, `L`, `XL` |
 | `mr-by::` | PR/MR | 标记 Decision、Visual/Markdown Plan 或 Build PR/MR 的来源动作 | `plan`, `build` |
-| `review::` | PR/MR | 暂停自动 review 与 review-comment task resume | `off` |
+| `review::` | PR/MR | 暂停自动 review | `off` |
 
 详情请参考：`references/labels.md`。
 
@@ -71,7 +71,7 @@ node .issue-flow/cli.cjs issue acknowledge --issue 123
 - `issue apply` 只移除指定 prefix 的旧 label，不动其他 prefix。
 - 规范化正文：按 issue 的 `type::` 对应 `.issue-flow/templates/type-*.md` 整理正文；模板是必须具备的最小结构，不是内容白名单。原文中无法归入模板但仍有价值的信息应融合进合适章节或新增章节，不得直接删除。正文写到 repo 外临时文件，用 `--normalized-body-file` 随标签一起应用。
 - 设置 `flow::clarify` 时不会更新 issue body（会忽略 `--normalized-body-file`）。
-- 用户明确要求创建 issue，或开放讨论已经形成清晰需求时，创建规范化 issue；目标、边界、用户故事或关键事实仍不清楚时先询问，不创建模糊 issue。
+- 用户明确要求创建 issue，或开放讨论已经形成清晰需求时，创建规范化 issue；目标、边界、验收标准或关键事实仍不清楚时先询问，不创建模糊 issue。
 - 创建 issue 时，body 先按 `.issue-flow/templates/type-*.md` 整理，写到 repo 外临时文件（如 `mktemp`）；不要把 body 文件提交到 git。
 - 创建 issue 前先运行 `milestone list`：返回 `enabled: true` 时必须显式传 `--milestone <title|none>`；用户未指定且有候选项时先询问，没有候选项时传 `none`，返回 `enabled: false` 时省略该参数。
 - 创建 issue 时只设置已经能判断的 managed labels：实现路径明确可用 `flow::build`，需要先规划用 `flow::plan`，仍需自动分类用 `flow::triage`，只记录且不自动推进用 `automation::off`。
@@ -98,6 +98,8 @@ node .issue-flow/cli.cjs pr merged --event <event-json-file>
 ```
 
 `pr submit plan` 会读取 source issue 的类型与特性开关。`type::optimization` 固定发布 Automation Optimizer Skill 定义的 Optimization JSON；其他 Issue 默认提交 Markdown Plan，`feature:visual-plan:on` 发布 Decision 或 Visual Plan。Markdown Plan 和 Build 的 `--body-file` 必须放在 repo 外临时文件。
+
+`pr submit plan|build` 默认使用普通 push。rebase 等操作改写提交历史后，可显式传入 `--force-with-lease`；内部同时使用 `--force-if-includes`，仅在远端更新已整合到本地时允许改写远端分支，不会退化为无保护的 `--force`。若已自行 push，可继续使用 `--no-push`。
 
 ### Milestone、Labels
 

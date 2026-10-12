@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "agentrix": {
+      "type": "object",
+      "properties": {
+        "actions": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/action"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "action": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "agent": { "type": ["string", "null"], "minLength": 1 },
+        "model": { "type": ["string", "null"], "minLength": 1 },
+        "reasoningEffort": {
+          "type": ["string", "null"],
+          "enum": ["low", "medium", "high", "xhigh", "max", null]
+        }
+      }
+    }
+  }
+}

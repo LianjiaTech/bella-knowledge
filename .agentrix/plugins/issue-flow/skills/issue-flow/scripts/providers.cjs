@@ -2102,6 +2102,7 @@ async function createOrUpdateGitlabMergeRequest({ repo, title, bodyFile, label, 
       title: mrTitle,
       description,
       labels: label,
+      remove_source_branch: true,
     },
     options
   );

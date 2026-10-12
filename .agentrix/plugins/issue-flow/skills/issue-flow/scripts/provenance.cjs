@@ -20,7 +20,6 @@ function resolveSourceAgent(options = {}, env = process.env) {
     options.sourceAgent ||
     options.agent ||
     env.AGENTRIX_ISSUE_FLOW_AGENT ||
-    env.AGENTRIX_AGENT ||
     env.AGENTRIX_AGENT_NAME ||
     ''
   );
