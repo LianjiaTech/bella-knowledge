@@ -147,6 +147,7 @@ public class FileController {
             LOGGER.info("Invalid purpose '{}', force to '{}'", purpose, FilePurpose.TEMP.getValue());
             purpose = FilePurpose.TEMP.getValue();
         }
+
         final String spaceCode = BellaContextHelper.getOperateSpaceCode();
         final String filename = file.getOriginalFilename();
         validateAncestorDirectory(spaceCode, ancestorId);
@@ -253,6 +254,7 @@ public class FileController {
             LOGGER.info("Invalid purpose '{}', force to '{}'", purpose, FilePurpose.TEMP.getValue());
             purpose = FilePurpose.TEMP.getValue();
         }
+
         final String spaceCode = StringUtils.defaultIfBlank(op.getSpaceCode(), BellaContextHelper.getOperateSpaceCode());
         validateAncestorDirectory(spaceCode, ancestorId);
         final String bucket = externalBucket ? sourceBucket : fileService.bucketForPurpose(purpose);

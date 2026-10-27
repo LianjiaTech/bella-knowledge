@@ -275,7 +275,41 @@ public class FileService {
         return openaiFile;
     }
 
-    /** 基于File的上传，S3上传在事务外执行。 */
+    @Transactional
+    public OpenAIFile upload(
+            File file,
+            String filename,
+            String purpose,
+            String metadata,
+            String mimeType,
+            String type,
+            String extension,
+            String charset) {
+        return upload(file, filename, purpose, metadata, mimeType, type, extension, charset,
+                null, null, null, null, null);
+    }
+
+    /**
+     * 基于File的上传 - 临时文件方式
+     * 优化：将S3上传移出事务，减少数据库连接占用时间
+     */
+    public OpenAIFile upload(
+            File file,
+            String filename,
+            String purpose,
+            String metadata,
+            String mimeType,
+            String type,
+            String extension,
+            String charset,
+            String ancestorId,
+            String description,
+            List<String> cities,
+            List<String> tags) {
+        return upload(file, filename, purpose, metadata, mimeType, type, extension, charset,
+                ancestorId, description, cities, tags, null);
+    }
+
     @Transactional
     public OpenAIFile upload(
             File file,
@@ -322,7 +356,43 @@ public class FileService {
         return self.finalizeFileUpload(context.getFileDB(), metadata, sourceFileId);
     }
 
-    /** 基于InputStream的流式上传，S3上传在事务外执行。 */
+    public OpenAIFile uploadFromStream(
+            InputStream inputStream,
+            long contentLength,
+            String filename,
+            String purpose,
+            String metadata,
+            String mimeType,
+            String type,
+            String extension,
+            String charset,
+            String ancestorId) {
+        return uploadFromStream(inputStream, contentLength, filename, purpose, metadata, mimeType, type, extension,
+                charset, ancestorId, null, null, null, null);
+    }
+
+    /**
+     * 基于InputStream的流式上传 - 避免创建临时文件
+     * 优化：将S3上传移出事务，减少数据库连接占用时间
+     */
+    public OpenAIFile uploadFromStream(
+            InputStream inputStream,
+            long contentLength,
+            String filename,
+            String purpose,
+            String metadata,
+            String mimeType,
+            String type,
+            String extension,
+            String charset,
+            String ancestorId,
+            String description,
+            List<String> cities,
+            List<String> tags) {
+        return uploadFromStream(inputStream, contentLength, filename, purpose, metadata, mimeType, type, extension,
+                charset, ancestorId, description, cities, tags, null);
+    }
+
     public OpenAIFile uploadFromStream(
             InputStream inputStream,
             long contentLength,
@@ -384,6 +454,23 @@ public class FileService {
             String ancestorId,
             String description,
             List<String> cities,
+            List<String> tags) {
+        return createFile(filename, contentLength, purpose, metadata, mimeType, type, extension,
+                ancestorId, description, cities, tags, null);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public FileUploadContext createFile(
+            String filename,
+            long contentLength,
+            String purpose,
+            String metadata,
+            String mimeType,
+            String type,
+            String extension,
+            String ancestorId,
+            String description,
+            List<String> cities,
             List<String> tags,
             String akCode) {
         String spaceCode = BellaContextHelper.getOperateSpaceCode();
@@ -396,6 +483,27 @@ public class FileService {
         }
         return createFileWithId(spaceCode, fileId, bucketName, keyName, filename, contentLength, purpose, metadata,
                 mimeType, type, extension, ancestorId, description, cities, tags, akCode);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public FileUploadContext createFileWithId(
+            String spaceCode,
+            String fileId,
+            String bucketName,
+            String keyName,
+            String filename,
+            long contentLength,
+            String purpose,
+            String metadata,
+            String mimeType,
+            String type,
+            String extension,
+            String ancestorId,
+            String description,
+            List<String> cities,
+            List<String> tags) {
+        return createFileWithId(spaceCode, fileId, bucketName, keyName, filename, contentLength, purpose, metadata,
+                mimeType, type, extension, ancestorId, description, cities, tags, null);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -461,6 +569,11 @@ public class FileService {
     /**
      * 完成上传并广播
      */
+    @Transactional
+    public OpenAIFile finalizeFileUpload(FileDB fileDB, String metadata) {
+        return finalizeFileUpload(fileDB, metadata, null);
+    }
+
     @Transactional
     public OpenAIFile finalizeFileUpload(FileDB fileDB, String metadata, String sourceFileId) {
         FileDB sourceFileDB = resolveSourceFile(fileDB, sourceFileId);
