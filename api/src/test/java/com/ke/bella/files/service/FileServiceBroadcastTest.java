@@ -108,7 +108,7 @@ public class FileServiceBroadcastTest {
 
         fileService.finalizeFileUpload(file, "{}");
 
-        verify(fileRepo).queryFileByDomTreeFileId(file.getFileId());
+        verify(fileRepo, times(2)).queryFileByDomTreeFileId(file.getFileId());
         assertBroadcastEvent(EventType.FILE_CREATED);
     }
 
@@ -160,7 +160,7 @@ public class FileServiceBroadcastTest {
 
         verify(fileRepo).updateFile(ops, false);
         verify(fileRepo).queryFile(file.getFileId(), FileType.SYSTEM);
-        verify(fileRepo).queryFileByDomTreeFileId(file.getFileId());
+        verify(fileRepo, times(2)).queryFileByDomTreeFileId(file.getFileId());
         assertBroadcastEvent(EventType.FILE_UPDATED);
     }
 
@@ -242,7 +242,7 @@ public class FileServiceBroadcastTest {
         ArgumentCaptor<FileOps> opsCaptor = ArgumentCaptor.forClass(FileOps.class);
         verify(fileRepo).updateFile(opsCaptor.capture(), eq(false));
         assertEquals(FileStatus.DELETED, opsCaptor.getValue().getStatus());
-        verify(fileRepo).queryFileByDomTreeFileId(file.getFileId());
+        verify(fileRepo, times(2)).queryFileByDomTreeFileId(file.getFileId());
         ArgumentCaptor<FileBroadcasting> messageCaptor = ArgumentCaptor.forClass(FileBroadcasting.class);
         verify(broadcastService).broadcast(messageCaptor.capture(), any(Runnable.class), any(Runnable.class));
         assertEquals(EventType.FILE_DELETED.getValue(), messageCaptor.getValue().getEvent());
