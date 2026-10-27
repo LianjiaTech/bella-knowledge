@@ -309,7 +309,12 @@ public class DatasetController {
                     "text/plain",
                     "text",
                     "jsonl",
-                    StandardCharsets.UTF_8.name());
+                    StandardCharsets.UTF_8.name(),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
 
             DatasetOps.DatasetOp op = DatasetOps.DatasetOp.builder()
                     .datasetId(datasetId)

@@ -119,8 +119,8 @@ public class FileService {
         FileType fileType = FilePurposeClassifier.classify(purpose);
         String fileId = FILE_ID_GENERATOR.generateWithType(fileType, spaceCode);
         FileUploadContext context = self.createFileWithId(spaceCode, fileId, bucket, path, filename, contentLength,
-                purpose, metadata, mimeType, type, extension, ancestorId, description, cities, tags);
-        return self.finalizeFileUpload(context.getFileDB(), metadata);
+                purpose, metadata, mimeType, type, extension, ancestorId, description, cities, tags, null);
+        return self.finalizeFileUpload(context.getFileDB(), metadata, null);
     }
 
     public FileDB queryFile(String spaceCode, String ancestorId, String filename) {
@@ -149,42 +149,52 @@ public class FileService {
         }
     }
 
-    private void broadcast(FileDB fileDB, FileBroadcasting<?> message) {
-        broadcast(fileDB, message, null);
-    }
-
-    private void broadcast(FileDB fileDB, FileBroadcasting<?> message, String sourceFileId) {
+    private void broadcast(FileDB fileDB, FileBroadcasting<?> message, FileDB sourceFileDB) {
         FileType fileType = FileType.fromFileId(fileDB.getFileId());
         if((fileType == FileType.SYSTEM && !FilePurpose.DOM_TREE.getValue().equals(fileDB.getPurpose()))
                 || (fileType == FileType.TEMP && !FilePurpose.ASSISTANTS_CHAT.getValue().equals(fileDB.getPurpose()))) {
             return;
         }
-        message.setSourceAkCode(resolveSourceAkCode(fileDB, sourceFileId));
+        message.setSourceAkCode(resolveSourceAkCode(fileDB, sourceFileDB));
         broadcastService.broadcast(message,
                 () -> updateBroadcastStatus(fileDB.getFileId(), BroadcastStatus.SUCCESS),
                 () -> updateBroadcastStatus(fileDB.getFileId(), BroadcastStatus.FAILED));
     }
 
-    private String resolveSourceAkCode(FileDB fileDB, String sourceFileId) {
-        String purpose = fileDB.getPurpose();
-        if(!"dom_tree".equals(purpose) && !"pdf".equals(purpose)) {
+    private String resolveSourceAkCode(FileDB fileDB, FileDB sourceFileDB) {
+        if(!isDerivedFile(fileDB)) {
             return fileDB.getAkCode();
         }
+        return sourceFileDB == null ? null : sourceFileDB.getAkCode();
+    }
 
-        try {
-            FileDB sourceFileDB;
-            if(StringUtils.isNotEmpty(sourceFileId)) {
-                sourceFileDB = fileRepo.queryFile(sourceFileId, FileType.fromFileId(sourceFileId));
-            } else if("dom_tree".equals(purpose)) {
-                sourceFileDB = fileRepo.queryFileByDomTreeFileId(fileDB.getFileId());
-            } else {
-                sourceFileDB = fileRepo.queryFileByPdfFileId(fileDB.getFileId());
-            }
-            return sourceFileDB == null ? null : sourceFileDB.getAkCode();
-        } catch (Exception e) {
-            LOGGER.warn("failed to query source AK for {} file: {}, error: {}", purpose, fileDB.getFileId(), e.getMessage());
+    private FileDB resolveSourceFile(FileDB fileDB, String sourceFileId) {
+        if(!isDerivedFile(fileDB)) {
             return null;
         }
+
+        String purpose = fileDB.getPurpose();
+        try {
+            if(StringUtils.isNotEmpty(sourceFileId)) {
+                FileType sourceFileType = FileType.fromFileId(sourceFileId);
+                if(!sourceFileType.isUsersType()) {
+                    LOGGER.warn("source file must be a user file, sourceFileId: {}", sourceFileId);
+                    return null;
+                }
+                return fileRepo.queryFile(sourceFileId, sourceFileType);
+            }
+            return FilePurpose.DOM_TREE.getValue().equals(purpose)
+                    ? fileRepo.queryFileByDomTreeFileId(fileDB.getFileId())
+                    : fileRepo.queryFileByPdfFileId(fileDB.getFileId());
+        } catch (Exception e) {
+            LOGGER.warn("failed to query source file for {} file: {}, error: {}", purpose, fileDB.getFileId(), e.getMessage());
+            return null;
+        }
+    }
+
+    private boolean isDerivedFile(FileDB fileDB) {
+        return FilePurpose.DOM_TREE.getValue().equals(fileDB.getPurpose())
+                || FilePurpose.PDF.getValue().equals(fileDB.getPurpose());
     }
 
     private OpenAIFile transferToOpenAIFile(FileDB fileDB) {
@@ -223,25 +233,11 @@ public class FileService {
                 .build();
     }
 
-    private OpenAIFile buildOpenAIFileWithSource(FileDB fileDB) {
+    private OpenAIFile buildOpenAIFileWithSource(FileDB fileDB, FileDB sourceFileDB) {
         OpenAIFile openAIFile = transferToOpenAIFile(fileDB);
-        String purpose = fileDB.getPurpose();
-
-        FileDB sourceFileDB = null;
-        try {
-            if("dom_tree".equals(purpose)) {
-                sourceFileDB = fileRepo.queryFileByDomTreeFileId(fileDB.getFileId());
-            } else if("pdf".equals(purpose)) {
-                sourceFileDB = fileRepo.queryFileByPdfFileId(fileDB.getFileId());
-            }
-
-            if(sourceFileDB != null) {
-                return openAIFile.toBuilder().sourceFile(transferToOpenAIFile(sourceFileDB)).build();
-            }
-        } catch (Exception e) {
-            LOGGER.warn("failed to query source file for {} file: {}, error: {}", purpose, fileDB.getFileId(), e.getMessage());
+        if(sourceFileDB != null) {
+            return openAIFile.toBuilder().sourceFile(transferToOpenAIFile(sourceFileDB)).build();
         }
-
         return openAIFile;
     }
 
@@ -270,7 +266,7 @@ public class FileService {
     public OpenAIFile uploadWithUrl(File file, String type, String mimeType, String extension, String charset, String purpose, String metadata,
             boolean getUrl, long expires, String ancestorId, String filename, String description, List<String> cities, List<String> tags) {
         OpenAIFile openaiFile = upload(file, filename, purpose, metadata,
-                mimeType, type, extension, charset, ancestorId, description, cities, tags);
+                mimeType, type, extension, charset, ancestorId, description, cities, tags, null);
 
         if(getUrl) {
             String url = getUrl(openaiFile.getId(), expires);
@@ -279,40 +275,8 @@ public class FileService {
         return openaiFile;
     }
 
+    /** 基于File的上传，S3上传在事务外执行。 */
     @Transactional
-    public OpenAIFile upload(
-            File file,
-            String filename,
-            String purpose,
-            String metadata,
-            String mimeType,
-            String type,
-            String extension,
-            String charset) {
-        return upload(file, filename, purpose, metadata, mimeType, type, extension, charset, null, null, null, null, null);
-    }
-
-    /**
-     * 基于File的上传 - 临时文件方式
-     * 优化：将S3上传移出事务，减少数据库连接占用时间
-     */
-    public OpenAIFile upload(
-            File file,
-            String filename,
-            String purpose,
-            String metadata,
-            String mimeType,
-            String type,
-            String extension,
-            String charset,
-            String ancestorId,
-            String description,
-            List<String> cities,
-            List<String> tags) {
-        return upload(file, filename, purpose, metadata, mimeType, type, extension, charset, ancestorId,
-                description, cities, tags, null);
-    }
-
     public OpenAIFile upload(
             File file,
             String filename,
@@ -330,7 +294,7 @@ public class FileService {
         // 步骤1：创建数据库记录（在事务内，快速完成）
         FileUploadContext context = self.createFile(
                 filename, file.length(), purpose, metadata,
-                mimeType, type, extension, ancestorId, description, cities, tags);
+                mimeType, type, extension, ancestorId, description, cities, tags, null);
 
         // 步骤2：上传到S3（在事务外，不占用数据库连接）
         try {
@@ -358,43 +322,7 @@ public class FileService {
         return self.finalizeFileUpload(context.getFileDB(), metadata, sourceFileId);
     }
 
-    public OpenAIFile uploadFromStream(
-            InputStream inputStream,
-            long contentLength,
-            String filename,
-            String purpose,
-            String metadata,
-            String mimeType,
-            String type,
-            String extension,
-            String charset,
-            String ancestorId) {
-        return uploadFromStream(inputStream, contentLength, filename, purpose, metadata, mimeType, type, extension, charset, ancestorId, null, null,
-                null, null);
-    }
-
-    /**
-     * 基于InputStream的流式上传 - 避免创建临时文件
-     * 优化：将S3上传移出事务，减少数据库连接占用时间
-     */
-    public OpenAIFile uploadFromStream(
-            InputStream inputStream,
-            long contentLength,
-            String filename,
-            String purpose,
-            String metadata,
-            String mimeType,
-            String type,
-            String extension,
-            String charset,
-            String ancestorId,
-            String description,
-            List<String> cities,
-            List<String> tags) {
-        return uploadFromStream(inputStream, contentLength, filename, purpose, metadata, mimeType, type, extension, charset,
-                ancestorId, description, cities, tags, null);
-    }
-
+    /** 基于InputStream的流式上传，S3上传在事务外执行。 */
     public OpenAIFile uploadFromStream(
             InputStream inputStream,
             long contentLength,
@@ -415,7 +343,7 @@ public class FileService {
         FileUploadContext context = self.createFile(
                 filename, contentLength, purpose, metadata,
                 mimeType, type, extension, ancestorId,
-                description, cities, tags);
+                description, cities, tags, null);
 
         // 步骤2：上传到S3（在事务外，不占用数据库连接）
         try {
@@ -456,7 +384,8 @@ public class FileService {
             String ancestorId,
             String description,
             List<String> cities,
-            List<String> tags) {
+            List<String> tags,
+            String akCode) {
         String spaceCode = BellaContextHelper.getOperateSpaceCode();
         FileType fileType = FilePurposeClassifier.classify(purpose);
         String fileId = FILE_ID_GENERATOR.generateWithType(fileType);
@@ -466,7 +395,7 @@ public class FileService {
             keyName += "." + extension;
         }
         return createFileWithId(spaceCode, fileId, bucketName, keyName, filename, contentLength, purpose, metadata,
-                mimeType, type, extension, ancestorId, description, cities, tags);
+                mimeType, type, extension, ancestorId, description, cities, tags, akCode);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -485,9 +414,10 @@ public class FileService {
             String ancestorId,
             String description,
             List<String> cities,
-            List<String> tags) {
+            List<String> tags,
+            String akCode) {
         FileType fileType = FilePurposeClassifier.classify(purpose);
-        String akCode = BellaContextHelper.getOperatorAkCode();
+        String fileAkCode = StringUtils.defaultIfBlank(akCode, BellaContextHelper.getOperatorAkCode());
 
         String citiesJson = cities == null ? "" : JsonUtils.toJson(cities);
         String tagsJson = tags == null ? "" : JsonUtils.toJson(tags);
@@ -505,7 +435,7 @@ public class FileService {
         fileDB.setSpaceCode(spaceCode);
         fileDB.setPurpose(purpose);
         fileDB.setMetaData(metadata);
-        fileDB.setAkCode(akCode);
+        fileDB.setAkCode(fileAkCode);
         fileDB.setDescription(StringUtils.isNotEmpty(description) ? description : "");
         fileDB.setCities(citiesJson);
         fileDB.setTags(tagsJson);
@@ -532,14 +462,9 @@ public class FileService {
      * 完成上传并广播
      */
     @Transactional
-    public OpenAIFile finalizeFileUpload(FileDB fileDB, String metadata) {
-        return finalizeFileUpload(fileDB, metadata, null);
-    }
-
-    @Transactional
     public OpenAIFile finalizeFileUpload(FileDB fileDB, String metadata, String sourceFileId) {
-
-        OpenAIFile openAIFile = buildOpenAIFileWithSource(fileDB);
+        FileDB sourceFileDB = resolveSourceFile(fileDB, sourceFileId);
+        OpenAIFile openAIFile = buildOpenAIFileWithSource(fileDB, sourceFileDB);
 
         // 文件创建后的广播机制
         FileBroadcasting<OpenAIFile> message = new FileBroadcasting<>();
@@ -549,7 +474,7 @@ public class FileService {
         message.setUserId(BellaContextHelper.getOperatorUserId());
         message.setUserName(BellaContextHelper.getOperatorUserName());
         message.setAkCode(BellaContextHelper.getOperatorAkCode());
-        broadcast(fileDB, message, sourceFileId);
+        broadcast(fileDB, message, sourceFileDB);
 
         return openAIFile;
     }
@@ -643,7 +568,8 @@ public class FileService {
     }
 
     private OpenAIFile broadcastFileUpdated(FileDB fileDB, Scope scope) {
-        OpenAIFile finalOpenAIFile = buildOpenAIFileWithSource(fileDB);
+        FileDB sourceFileDB = resolveSourceFile(fileDB, null);
+        OpenAIFile finalOpenAIFile = buildOpenAIFileWithSource(fileDB, sourceFileDB);
 
         FileBroadcasting<OpenAIFile> message = new FileBroadcasting<>();
         message.setEvent(EventType.FILE_UPDATED);
@@ -653,7 +579,7 @@ public class FileService {
         message.setUserId(BellaContextHelper.getOperatorUserId());
         message.setUserName(BellaContextHelper.getOperatorUserName());
         message.setAkCode(BellaContextHelper.getOperatorAkCode());
-        broadcast(fileDB, message);
+        broadcast(fileDB, message, sourceFileDB);
 
         return finalOpenAIFile;
     }
@@ -671,7 +597,8 @@ public class FileService {
         String fileId = fileDB.getFileId();
         FileType fileType = FileType.fromFileId(fileId);
 
-        OpenAIFile fileToDelete = buildOpenAIFileWithSource(fileDB);
+        FileDB sourceFileDB = resolveSourceFile(fileDB, null);
+        OpenAIFile fileToDelete = buildOpenAIFileWithSource(fileDB, sourceFileDB);
 
         // 只标记status字段，不删除文件，不删除数据库记录
         FileOps op = new FileOps();
@@ -691,7 +618,7 @@ public class FileService {
             message.setUserId(BellaContextHelper.getOperatorUserId());
             message.setUserName(BellaContextHelper.getOperatorUserName());
             message.setAkCode(BellaContextHelper.getOperatorAkCode());
-            broadcast(fileDB, message);
+            broadcast(fileDB, message, sourceFileDB);
         } catch (Exception e) {
             throw new IllegalStateException("Failed to update file status (indicating deletion), fileId: "
                     + fileId + ", status: " + FileStatus.DELETED, e);
@@ -841,7 +768,7 @@ public class FileService {
         message.setUserId(BellaContextHelper.getOperatorUserId());
         message.setUserName(BellaContextHelper.getOperatorUserName());
         message.setAkCode(BellaContextHelper.getOperatorAkCode());
-        broadcast(res, message);
+        broadcast(res, message, null);
         return openAIFile;
     }
 
@@ -884,7 +811,7 @@ public class FileService {
         message.setUserId(BellaContextHelper.getOperatorUserId());
         message.setUserName(BellaContextHelper.getOperatorUserName());
         message.setAkCode(BellaContextHelper.getOperatorAkCode());
-        broadcast(created, message);
+        broadcast(created, message, null);
         return resource;
     }
 

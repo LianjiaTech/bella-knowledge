@@ -53,7 +53,7 @@ public class FileServiceBroadcastTest {
                 FilePurpose.FINE_TUNE,
                 FilePurpose.EVALS,
                 FilePurpose.VISION }) {
-            fileService.finalizeFileUpload(tempFile(purpose), "{}");
+            fileService.finalizeFileUpload(tempFile(purpose), "{}", null);
         }
 
         verifyNoInteractions(broadcastService);
@@ -65,7 +65,7 @@ public class FileServiceBroadcastTest {
         FileDB file = tempFile(FilePurpose.ASSISTANTS_CHAT);
         file.setAkCode("ak-source");
 
-        fileService.finalizeFileUpload(file, "{}");
+        fileService.finalizeFileUpload(file, "{}", null);
 
         ArgumentCaptor<FileBroadcasting> messageCaptor = ArgumentCaptor.forClass(FileBroadcasting.class);
         verify(broadcastService).broadcast(messageCaptor.capture(), any(Runnable.class), any(Runnable.class));
@@ -87,6 +87,7 @@ public class FileServiceBroadcastTest {
         verify(broadcastService).broadcast(messageCaptor.capture(), any(Runnable.class), any(Runnable.class));
         assertEquals("ak-source", messageCaptor.getValue().getSourceAkCode());
         assertEquals(null, messageCaptor.getValue().getAkCode());
+        assertEquals("file-source", ((com.ke.bella.files.protocol.OpenAIFile) messageCaptor.getValue().getData()).getSourceFile().getId());
     }
 
     @Test
@@ -94,7 +95,7 @@ public class FileServiceBroadcastTest {
         FileDB file = systemFile(FilePurpose.DOM_TREE);
         file.setAkCode("ak-parser");
 
-        fileService.finalizeFileUpload(file, "{}");
+        fileService.finalizeFileUpload(file, "{}", null);
 
         ArgumentCaptor<FileBroadcasting> messageCaptor = ArgumentCaptor.forClass(FileBroadcasting.class);
         verify(broadcastService).broadcast(messageCaptor.capture(), any(Runnable.class), any(Runnable.class));
@@ -106,7 +107,7 @@ public class FileServiceBroadcastTest {
         for (FilePurpose purpose : new FilePurpose[] {
                 FilePurpose.PDF,
                 FilePurpose.DATASETS_EXPORT }) {
-            fileService.finalizeFileUpload(systemFile(purpose), "{}");
+            fileService.finalizeFileUpload(systemFile(purpose), "{}", null);
         }
 
         verify(fileRepo).queryFileByPdfFileId("file-test-s");
@@ -118,9 +119,9 @@ public class FileServiceBroadcastTest {
     public void finalizeUploadBroadcastsDomTreeSystemFile() {
         FileDB file = systemFile(FilePurpose.DOM_TREE);
 
-        fileService.finalizeFileUpload(file, "{}");
+        fileService.finalizeFileUpload(file, "{}", null);
 
-        verify(fileRepo, times(2)).queryFileByDomTreeFileId(file.getFileId());
+        verify(fileRepo).queryFileByDomTreeFileId(file.getFileId());
         assertBroadcastEvent(EventType.FILE_CREATED);
     }
 
@@ -172,7 +173,7 @@ public class FileServiceBroadcastTest {
 
         verify(fileRepo).updateFile(ops, false);
         verify(fileRepo).queryFile(file.getFileId(), FileType.SYSTEM);
-        verify(fileRepo, times(2)).queryFileByDomTreeFileId(file.getFileId());
+        verify(fileRepo).queryFileByDomTreeFileId(file.getFileId());
         assertBroadcastEvent(EventType.FILE_UPDATED);
     }
 
@@ -254,7 +255,7 @@ public class FileServiceBroadcastTest {
         ArgumentCaptor<FileOps> opsCaptor = ArgumentCaptor.forClass(FileOps.class);
         verify(fileRepo).updateFile(opsCaptor.capture(), eq(false));
         assertEquals(FileStatus.DELETED, opsCaptor.getValue().getStatus());
-        verify(fileRepo, times(2)).queryFileByDomTreeFileId(file.getFileId());
+        verify(fileRepo).queryFileByDomTreeFileId(file.getFileId());
         ArgumentCaptor<FileBroadcasting> messageCaptor = ArgumentCaptor.forClass(FileBroadcasting.class);
         verify(broadcastService).broadcast(messageCaptor.capture(), any(Runnable.class), any(Runnable.class));
         assertEquals(EventType.FILE_DELETED.getValue(), messageCaptor.getValue().getEvent());

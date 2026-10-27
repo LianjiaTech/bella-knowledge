@@ -161,7 +161,7 @@ public class UploadService {
             }
             FileDB existingById = getFileIfPresent(current.getFileId());
             if(existingById != null) {
-                OpenAIFile file = fileService.finalizeFileUpload(existingById, current.getMetadata());
+                OpenAIFile file = fileService.finalizeFileUpload(existingById, current.getMetadata(), null);
                 fileUploadRepo.bindFileId(uploadId, current.getFileId());
                 current.setStatus("COMPLETED");
                 return toUpload(current, file);
@@ -194,8 +194,8 @@ public class UploadService {
             FileService.FileUploadContext fileContext = fileService.createFileWithId(current.getSpaceCode(), current.getFileId(), current.getBucket(),
                     current.getPath(), current.getFilename(), finalBytes, current.getPurpose(), current.getMetadata(), current.getMimeType(),
                     current.getType(), current.getExtension(), emptyToNull(current.getAncestorId()), current.getDescription(),
-                    jsonList(current.getCities()), jsonList(current.getTags()));
-            OpenAIFile file = fileService.finalizeFileUpload(fileContext.getFileDB(), current.getMetadata());
+                    jsonList(current.getCities()), jsonList(current.getTags()), current.getAkCode());
+            OpenAIFile file = fileService.finalizeFileUpload(fileContext.getFileDB(), current.getMetadata(), null);
             fileUploadRepo.bindFileId(uploadId, current.getFileId());
             current.setStatus("COMPLETED");
             return toUpload(current, file);
