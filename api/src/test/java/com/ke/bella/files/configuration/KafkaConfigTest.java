@@ -12,6 +12,9 @@ import org.springframework.kafka.support.SendResult;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.util.concurrent.SettableListenableFuture;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.PropertyNamingStrategy;
+
 import com.ke.bella.files.protocol.FileBroadcasting;
 import com.ke.bella.files.protocol.OpenAIFile;
 import com.ke.bella.files.service.broadcast.BroadcastService;
@@ -60,6 +63,19 @@ public class KafkaConfigTest {
         verify(kafkaTemplate).send(TOPIC, "file-2", message);
         verify(successCallback, never()).run();
         verify(failCallback).run();
+    }
+
+    @Test
+    public void serializesSourceAkCodeAsSnakeCase() throws Exception {
+        FileBroadcasting<OpenAIFile> message = message("file-3", "space-a");
+        message.setSourceAkCode("ak-source");
+
+        ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.setPropertyNamingStrategy(PropertyNamingStrategy.SNAKE_CASE);
+
+        String json = objectMapper.writeValueAsString(message);
+
+        org.junit.Assert.assertTrue(json.contains("\"source_ak_code\":\"ak-source\""));
     }
 
     private FileBroadcasting<OpenAIFile> message(String fileId, String spaceCode) {

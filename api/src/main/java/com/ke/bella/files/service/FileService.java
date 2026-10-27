@@ -155,9 +155,27 @@ public class FileService {
                 || (fileType == FileType.TEMP && !FilePurpose.ASSISTANTS_CHAT.getValue().equals(fileDB.getPurpose()))) {
             return;
         }
+        message.setSourceAkCode(resolveSourceAkCode(fileDB));
         broadcastService.broadcast(message,
                 () -> updateBroadcastStatus(fileDB.getFileId(), BroadcastStatus.SUCCESS),
                 () -> updateBroadcastStatus(fileDB.getFileId(), BroadcastStatus.FAILED));
+    }
+
+    private String resolveSourceAkCode(FileDB fileDB) {
+        String purpose = fileDB.getPurpose();
+        if(!"dom_tree".equals(purpose) && !"pdf".equals(purpose)) {
+            return fileDB.getAkCode();
+        }
+
+        try {
+            FileDB sourceFileDB = "dom_tree".equals(purpose)
+                    ? fileRepo.queryFileByDomTreeFileId(fileDB.getFileId())
+                    : fileRepo.queryFileByPdfFileId(fileDB.getFileId());
+            return sourceFileDB == null ? fileDB.getAkCode() : sourceFileDB.getAkCode();
+        } catch (Exception e) {
+            LOGGER.warn("failed to query source AK for {} file: {}, error: {}", purpose, fileDB.getFileId(), e.getMessage());
+            return fileDB.getAkCode();
+        }
     }
 
     private OpenAIFile transferToOpenAIFile(FileDB fileDB) {

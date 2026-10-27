@@ -63,12 +63,30 @@ public class FileServiceBroadcastTest {
     @Test
     public void finalizeUploadBroadcastsAssistantChatTempFile() {
         FileDB file = tempFile(FilePurpose.ASSISTANTS_CHAT);
+        file.setAkCode("ak-source");
 
         fileService.finalizeFileUpload(file, "{}");
 
         ArgumentCaptor<FileBroadcasting> messageCaptor = ArgumentCaptor.forClass(FileBroadcasting.class);
         verify(broadcastService).broadcast(messageCaptor.capture(), any(Runnable.class), any(Runnable.class));
         assertEquals(EventType.FILE_CREATED.getValue(), messageCaptor.getValue().getEvent());
+        assertEquals("ak-source", messageCaptor.getValue().getSourceAkCode());
+    }
+
+    @Test
+    public void finalizeUploadUsesSourceAkForDomTreeAndKeepsOperatorAk() {
+        FileDB file = systemFile(FilePurpose.DOM_TREE);
+        file.setAkCode("ak-parser");
+        FileDB sourceFile = file("file-source", FilePurpose.ASSISTANTS);
+        sourceFile.setAkCode("ak-source");
+        when(fileRepo.queryFileByDomTreeFileId(file.getFileId())).thenReturn(sourceFile);
+
+        fileService.finalizeFileUpload(file, "{}");
+
+        ArgumentCaptor<FileBroadcasting> messageCaptor = ArgumentCaptor.forClass(FileBroadcasting.class);
+        verify(broadcastService).broadcast(messageCaptor.capture(), any(Runnable.class), any(Runnable.class));
+        assertEquals("ak-source", messageCaptor.getValue().getSourceAkCode());
+        assertEquals(null, messageCaptor.getValue().getAkCode());
     }
 
     @Test
@@ -149,6 +167,7 @@ public class FileServiceBroadcastTest {
     @Test
     public void metadataUpdateBroadcastsMetadataScope() {
         FileDB file = file("file-test-u", FilePurpose.ASSISTANTS);
+        file.setAkCode("ak-source");
         file.setMetaData("{\"team\":\"search\"}");
         FileOps ops = FileOps.builder().fileId(file.getFileId()).metadata(file.getMetaData()).build();
         when(fileRepo.queryFile(file.getFileId(), FileType.USER)).thenReturn(file);
@@ -160,6 +179,7 @@ public class FileServiceBroadcastTest {
         assertEquals(EventType.FILE_UPDATED.getValue(), messageCaptor.getValue().getEvent());
         assertEquals(Scope.METADATA.getValue(), messageCaptor.getValue().getScope());
         assertEquals(file.getMetaData(), messageCaptor.getValue().getMetadata());
+        assertEquals("ak-source", messageCaptor.getValue().getSourceAkCode());
     }
 
     @Test
@@ -212,6 +232,10 @@ public class FileServiceBroadcastTest {
     @Test
     public void deleteBroadcastsDomTreeSystemFile() {
         FileDB file = systemFile(FilePurpose.DOM_TREE);
+        file.setAkCode("ak-parser");
+        FileDB sourceFile = file("file-source", FilePurpose.ASSISTANTS);
+        sourceFile.setAkCode("ak-source");
+        when(fileRepo.queryFileByDomTreeFileId(file.getFileId())).thenReturn(sourceFile);
 
         fileService.delete(file);
 
@@ -219,7 +243,10 @@ public class FileServiceBroadcastTest {
         verify(fileRepo).updateFile(opsCaptor.capture(), eq(false));
         assertEquals(FileStatus.DELETED, opsCaptor.getValue().getStatus());
         verify(fileRepo).queryFileByDomTreeFileId(file.getFileId());
-        assertBroadcastEvent(EventType.FILE_DELETED);
+        ArgumentCaptor<FileBroadcasting> messageCaptor = ArgumentCaptor.forClass(FileBroadcasting.class);
+        verify(broadcastService).broadcast(messageCaptor.capture(), any(Runnable.class), any(Runnable.class));
+        assertEquals(EventType.FILE_DELETED.getValue(), messageCaptor.getValue().getEvent());
+        assertEquals("ak-source", messageCaptor.getValue().getSourceAkCode());
     }
 
     private void assertBroadcastEvent(EventType eventType) {
