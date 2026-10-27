@@ -365,7 +365,7 @@ public class FileController {
         } else {
             OpenAIFile uploaded = fileService.upload(tmpFileInfo.getTmpFile(), filename, "dom_tree", null,
                     tmpFileInfo.getMimeType(), tmpFileInfo.getType(), tmpFileInfo.getExtension(),
-                    tmpFileInfo.getCharset());
+                    tmpFileInfo.getCharset(), null, null, null, null, sourceFileId);
 
             FileOps bindOp = FileOps.builder()
                     .fileId(sourceFileId)
@@ -397,7 +397,7 @@ public class FileController {
                     type,
                     "json",
                     charset,
-                    null);
+                    null, null, null, null, sourceFileId);
 
             FileOps bindOp = FileOps.builder()
                     .fileId(sourceFileId)

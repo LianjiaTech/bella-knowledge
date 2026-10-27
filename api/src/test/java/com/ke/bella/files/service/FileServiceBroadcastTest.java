@@ -74,19 +74,31 @@ public class FileServiceBroadcastTest {
     }
 
     @Test
-    public void finalizeUploadUsesSourceAkForDomTreeAndKeepsOperatorAk() {
+    public void finalizeUploadUsesExplicitSourceAkForDomTreeCreate() {
         FileDB file = systemFile(FilePurpose.DOM_TREE);
         file.setAkCode("ak-parser");
         FileDB sourceFile = file("file-source", FilePurpose.ASSISTANTS);
         sourceFile.setAkCode("ak-source");
-        when(fileRepo.queryFileByDomTreeFileId(file.getFileId())).thenReturn(sourceFile);
+        when(fileRepo.queryFile(sourceFile.getFileId(), FileType.USER)).thenReturn(sourceFile);
 
-        fileService.finalizeFileUpload(file, "{}");
+        fileService.finalizeFileUpload(file, "{}", sourceFile.getFileId());
 
         ArgumentCaptor<FileBroadcasting> messageCaptor = ArgumentCaptor.forClass(FileBroadcasting.class);
         verify(broadcastService).broadcast(messageCaptor.capture(), any(Runnable.class), any(Runnable.class));
         assertEquals("ak-source", messageCaptor.getValue().getSourceAkCode());
         assertEquals(null, messageCaptor.getValue().getAkCode());
+    }
+
+    @Test
+    public void finalizeUploadLeavesSourceAkNullWhenDerivedSourceIsMissing() {
+        FileDB file = systemFile(FilePurpose.DOM_TREE);
+        file.setAkCode("ak-parser");
+
+        fileService.finalizeFileUpload(file, "{}");
+
+        ArgumentCaptor<FileBroadcasting> messageCaptor = ArgumentCaptor.forClass(FileBroadcasting.class);
+        verify(broadcastService).broadcast(messageCaptor.capture(), any(Runnable.class), any(Runnable.class));
+        assertEquals(null, messageCaptor.getValue().getSourceAkCode());
     }
 
     @Test

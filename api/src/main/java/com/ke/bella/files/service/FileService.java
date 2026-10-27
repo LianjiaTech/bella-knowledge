@@ -150,31 +150,40 @@ public class FileService {
     }
 
     private void broadcast(FileDB fileDB, FileBroadcasting<?> message) {
+        broadcast(fileDB, message, null);
+    }
+
+    private void broadcast(FileDB fileDB, FileBroadcasting<?> message, String sourceFileId) {
         FileType fileType = FileType.fromFileId(fileDB.getFileId());
         if((fileType == FileType.SYSTEM && !FilePurpose.DOM_TREE.getValue().equals(fileDB.getPurpose()))
                 || (fileType == FileType.TEMP && !FilePurpose.ASSISTANTS_CHAT.getValue().equals(fileDB.getPurpose()))) {
             return;
         }
-        message.setSourceAkCode(resolveSourceAkCode(fileDB));
+        message.setSourceAkCode(resolveSourceAkCode(fileDB, sourceFileId));
         broadcastService.broadcast(message,
                 () -> updateBroadcastStatus(fileDB.getFileId(), BroadcastStatus.SUCCESS),
                 () -> updateBroadcastStatus(fileDB.getFileId(), BroadcastStatus.FAILED));
     }
 
-    private String resolveSourceAkCode(FileDB fileDB) {
+    private String resolveSourceAkCode(FileDB fileDB, String sourceFileId) {
         String purpose = fileDB.getPurpose();
         if(!"dom_tree".equals(purpose) && !"pdf".equals(purpose)) {
             return fileDB.getAkCode();
         }
 
         try {
-            FileDB sourceFileDB = "dom_tree".equals(purpose)
-                    ? fileRepo.queryFileByDomTreeFileId(fileDB.getFileId())
-                    : fileRepo.queryFileByPdfFileId(fileDB.getFileId());
-            return sourceFileDB == null ? fileDB.getAkCode() : sourceFileDB.getAkCode();
+            FileDB sourceFileDB;
+            if(StringUtils.isNotEmpty(sourceFileId)) {
+                sourceFileDB = fileRepo.queryFile(sourceFileId, FileType.fromFileId(sourceFileId));
+            } else if("dom_tree".equals(purpose)) {
+                sourceFileDB = fileRepo.queryFileByDomTreeFileId(fileDB.getFileId());
+            } else {
+                sourceFileDB = fileRepo.queryFileByPdfFileId(fileDB.getFileId());
+            }
+            return sourceFileDB == null ? null : sourceFileDB.getAkCode();
         } catch (Exception e) {
             LOGGER.warn("failed to query source AK for {} file: {}, error: {}", purpose, fileDB.getFileId(), e.getMessage());
-            return fileDB.getAkCode();
+            return null;
         }
     }
 
@@ -280,7 +289,7 @@ public class FileService {
             String type,
             String extension,
             String charset) {
-        return upload(file, filename, purpose, metadata, mimeType, type, extension, charset, null, null, null, null);
+        return upload(file, filename, purpose, metadata, mimeType, type, extension, charset, null, null, null, null, null);
     }
 
     /**
@@ -300,6 +309,24 @@ public class FileService {
             String description,
             List<String> cities,
             List<String> tags) {
+        return upload(file, filename, purpose, metadata, mimeType, type, extension, charset, ancestorId,
+                description, cities, tags, null);
+    }
+
+    public OpenAIFile upload(
+            File file,
+            String filename,
+            String purpose,
+            String metadata,
+            String mimeType,
+            String type,
+            String extension,
+            String charset,
+            String ancestorId,
+            String description,
+            List<String> cities,
+            List<String> tags,
+            String sourceFileId) {
         // 步骤1：创建数据库记录（在事务内，快速完成）
         FileUploadContext context = self.createFile(
                 filename, file.length(), purpose, metadata,
@@ -328,7 +355,7 @@ public class FileService {
         }
 
         // 步骤3：查询并广播
-        return self.finalizeFileUpload(context.getFileDB(), metadata);
+        return self.finalizeFileUpload(context.getFileDB(), metadata, sourceFileId);
     }
 
     public OpenAIFile uploadFromStream(
@@ -343,7 +370,7 @@ public class FileService {
             String charset,
             String ancestorId) {
         return uploadFromStream(inputStream, contentLength, filename, purpose, metadata, mimeType, type, extension, charset, ancestorId, null, null,
-                null);
+                null, null);
     }
 
     /**
@@ -364,6 +391,25 @@ public class FileService {
             String description,
             List<String> cities,
             List<String> tags) {
+        return uploadFromStream(inputStream, contentLength, filename, purpose, metadata, mimeType, type, extension, charset,
+                ancestorId, description, cities, tags, null);
+    }
+
+    public OpenAIFile uploadFromStream(
+            InputStream inputStream,
+            long contentLength,
+            String filename,
+            String purpose,
+            String metadata,
+            String mimeType,
+            String type,
+            String extension,
+            String charset,
+            String ancestorId,
+            String description,
+            List<String> cities,
+            List<String> tags,
+            String sourceFileId) {
 
         // 步骤1：创建数据库记录（在事务内，快速完成）
         FileUploadContext context = self.createFile(
@@ -395,7 +441,7 @@ public class FileService {
         }
 
         // 步骤3：查询并广播
-        return self.finalizeFileUpload(context.getFileDB(), metadata);
+        return self.finalizeFileUpload(context.getFileDB(), metadata, sourceFileId);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -487,6 +533,11 @@ public class FileService {
      */
     @Transactional
     public OpenAIFile finalizeFileUpload(FileDB fileDB, String metadata) {
+        return finalizeFileUpload(fileDB, metadata, null);
+    }
+
+    @Transactional
+    public OpenAIFile finalizeFileUpload(FileDB fileDB, String metadata, String sourceFileId) {
 
         OpenAIFile openAIFile = buildOpenAIFileWithSource(fileDB);
 
@@ -498,7 +549,7 @@ public class FileService {
         message.setUserId(BellaContextHelper.getOperatorUserId());
         message.setUserName(BellaContextHelper.getOperatorUserName());
         message.setAkCode(BellaContextHelper.getOperatorAkCode());
-        broadcast(fileDB, message);
+        broadcast(fileDB, message, sourceFileId);
 
         return openAIFile;
     }
