@@ -3,6 +3,10 @@ package com.ke.bella.files.api.interceptor;
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
 
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -17,6 +21,11 @@ import com.ke.bella.openapi.BellaContext;
 import com.ke.bella.openapi.Operator;
 import com.ke.bella.openapi.apikey.ApikeyInfo;
 import com.ke.bella.openapi.client.OpenapiClient;
+import com.ke.bella.openapi.auth.AuthResult;
+import com.ke.bella.openapi.auth.CredentialType;
+import com.ke.bella.openapi.request.BellaInterceptor;
+
+import okhttp3.Request;
 
 public class RequestInterceptorTest {
     private RequestInterceptor interceptor;
@@ -68,7 +77,63 @@ public class RequestInterceptorTest {
         assertEquals(Long.valueOf(7L), BellaContext.getOperator().getUserId());
         assertEquals("user", BellaContext.getOperator().getUserName());
         assertNull(BellaContext.getOperator().getManagerAk());
+        AuthResult result = BellaContext.getAuthResultIgnoreNull();
+        assertNotNull(result);
+        assertEquals(CredentialType.SERVICE_CLIENT, result.getCredentialType());
+        assertEquals("parser", result.getServiceClientCode());
+        assertSame(BellaContext.getApikey(), result.getApikeyInfo());
         verifyNoInteractions(OpenapiUtils.openapiClient);
+    }
+
+    @Test
+    public void serviceClientAuthResultSurvivesAsyncSnapshotAndSdkForwarding() throws Exception {
+        ApikeyInfo effective = identity("user-ak");
+        when(service.authenticate("Bearer sc-secret", "parser", "user-ak")).thenReturn(effective);
+        assertTrue(interceptor.preHandle(request("Bearer sc-secret", "parser", "user-ak"),
+                new MockHttpServletResponse(), new Object()));
+        Map<String, Object> snapshot = BellaContext.snapshot();
+        Map<String, Object> restored = CompletableFuture.supplyAsync(() -> {
+            try {
+                BellaContext.replace(snapshot);
+                return BellaContext.snapshot();
+            } finally {
+                BellaContext.clearAll();
+            }
+        }).get(5, TimeUnit.SECONDS);
+        AuthResult result = (AuthResult) restored.get("authResult");
+        assertNotNull(result);
+        assertEquals(CredentialType.SERVICE_CLIENT, result.getCredentialType());
+        assertEquals("parser", result.getServiceClientCode());
+        assertSame(effective, result.getApikeyInfo());
+        assertSame(effective, restored.get("ak"));
+
+        String previousCode = (String) ReflectionTestUtils.getField(BellaInterceptor.class, "configuredServiceClientCode");
+        String previousToken = (String) ReflectionTestUtils.getField(BellaInterceptor.class, "configuredServiceClientToken");
+        try {
+            BellaInterceptor.configureServiceClient("file-api", "sc-outbound");
+            Request.Builder outgoing = new Request.Builder().url("http://openapi.test/v1/files");
+            BellaInterceptor.addServiceClientHeaders(outgoing, restored);
+            Request forwarded = outgoing.build();
+            assertEquals("Bearer sc-outbound", forwarded.header("Authorization"));
+            assertEquals("file-api", forwarded.header(BellaContext.SERVICE_CLIENT_HEADER));
+            assertEquals("user-ak", forwarded.header(BellaContext.EFFECTIVE_API_KEY_CODE_HEADER));
+        } finally {
+            BellaInterceptor.configureServiceClient(previousCode, previousToken);
+        }
+    }
+
+    @Test
+    public void failedServiceClientClearsPreviousAuthResult() throws Exception {
+        BellaContext.setAuthResult(AuthResult.builder()
+                .credentialType(CredentialType.SERVICE_CLIENT)
+                .apikeyInfo(identity("system-ak"))
+                .serviceClientCode("previous-client")
+                .build());
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        assertFalse(interceptor.preHandle(request("Bearer sc-secret", "parser", "user-ak"), response, new Object()));
+        assertEquals(401, response.getStatus());
+        assertNull(BellaContext.getAuthResultIgnoreNull());
+        assertNull(BellaContext.getApikeyIgnoreNull());
     }
 
     @Test

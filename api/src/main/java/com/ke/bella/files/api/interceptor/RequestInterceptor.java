@@ -23,7 +23,9 @@ import com.ke.bella.files.utils.JsonUtils;
 import com.ke.bella.openapi.BellaContext;
 import com.ke.bella.openapi.Operator;
 import com.ke.bella.openapi.apikey.ApikeyInfo;
+import com.ke.bella.openapi.auth.AuthResult;
 import com.ke.bella.openapi.auth.CredentialExtractor;
+import com.ke.bella.openapi.auth.CredentialType;
 import com.theokanning.openai.OpenAiError.OpenAiErrorDetails;
 
 import lombok.extern.slf4j.Slf4j;
@@ -108,7 +110,7 @@ public class RequestInterceptor extends HandlerInterceptorAdapter {
     }
 
     private boolean authenticateServiceClient(HttpServletRequest request, HttpServletResponse response) throws Exception {
-        BellaContext.setApikey(null);
+        BellaContext.setAuthResult(null);
         String authorization = singleHeader(request, HttpHeaders.AUTHORIZATION);
         String clientCode = singleHeader(request, BellaContext.SERVICE_CLIENT_HEADER);
         String effectiveCode = singleHeader(request, BellaContext.EFFECTIVE_API_KEY_CODE_HEADER);
@@ -124,7 +126,11 @@ public class RequestInterceptor extends HandlerInterceptorAdapter {
                 writeAuthorizationError(response, "Invalid ServiceClient identity");
                 return false;
             }
-            BellaContext.setApikey(effective);
+            BellaContext.setAuthResult(AuthResult.builder()
+                    .credentialType(CredentialType.SERVICE_CLIENT)
+                    .apikeyInfo(effective)
+                    .serviceClientCode(clientCode)
+                    .build());
             BellaContext.setOperator(Operator.builder().userId(effective.getUserId()).userName(effective.getOwnerName()).build());
             return true;
         } catch (Exception exception) {
