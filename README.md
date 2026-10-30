@@ -99,6 +99,26 @@ docker-compose up -d
 - 前端应用: http://localhost:3000
 - 后端API: http://localhost:8080
 
+## ServiceClient 鉴权与文件 AK
+
+普通请求继续使用 `Authorization: Bearer <api-key>`。ServiceClient 代用户调用必须同时提供：
+
+```text
+Authorization: Bearer <service-client-credential>
+X-Service-Client: <service-client-code>
+X-Effective-Api-Key-Code: <user-ak-code>
+```
+
+`BELLA_OPENAPI_URL` 指向的 Bella OpenAPI 必须支持三头 ServiceClient 鉴权：file-api 将三头原样发送到
+`/v1/apikey/whoami`，由上游校验调用凭证、系统编码绑定，并通过 `verifyAuthByCode` 校验用户 AK 及父 AK。
+file-api 仅接受与请求 effective AK code 一致、包含用户 ID 的结果；缺失、重复、非法请求头及鉴权失败均返回 401，
+不回退到调用系统身份，也不与 `X-BELLA-USER-AK-CODE` 混用。调用系统凭证只配置在上游，不在 file-api 复制密钥校验。
+
+新文件、目录、资源节点和上传会话保存有效用户 AK，上传完成及重试使用会话创建时保存的 AK。
+Kafka 事件的 `ak_code` 优先使用 dom-tree/pdf 原始源文件 AK，其次使用文件记录 AK；历史空 AK 仅在同步请求中
+回退已验证的有效用户 AK。异步/上传恢复不读取当前调用方 AK，归属仍未知时保持空值并告警，不回填历史记录。
+现有 topic、事件筛选规则及 JSON 字段名不变。
+
 ## 📖 文档
 
 ### 📚 快速导航

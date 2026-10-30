@@ -80,7 +80,7 @@ import com.ke.bella.files.service.lock.FileUniquenessLock;
 import com.ke.bella.files.utils.BellaContextHelper;
 import com.ke.bella.files.utils.FilePurposeClassifier;
 import com.ke.bella.files.utils.JsonUtils;
-import com.ke.bella.openapi.utils.FileUtils;
+import com.ke.bella.files.utils.FileUtils;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
