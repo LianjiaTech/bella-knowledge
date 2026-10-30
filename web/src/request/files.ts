@@ -131,6 +131,26 @@ export async function getFileProgress(fileId: string) {
   return null;
 }
 
+export type FileProgress = {
+  id?: number;
+  fileId?: string;
+  name?: string | null;
+  status?: string | null;
+  message?: string | null;
+  percent?: number | null;
+};
+
+export async function getFileProgresses(fileId: string) {
+  const res = await webRequest<FileProgress[]>({
+    path: `/api/files/${fileId}/progresses`,
+    method: "GET",
+  });
+  return {
+    data: res.code === 200 ? res.data : [],
+    error: res.code === 200 ? null : res.message || "查询进度失败",
+  };
+}
+
 export async function postCropImage(
   fileId: string,
   bbox: [number, number, number, number],

@@ -686,6 +686,12 @@ public class FileService {
         return fileProgressDB == null ? null : transferToProgress(fileProgressDB);
     }
 
+    public List<Progress> getProgresses(FileDB file) {
+        return fileRepo.queryProgresses(file.getFileId()).stream()
+                .map(this::transferToProgress)
+                .collect(Collectors.toList());
+    }
+
     /**
      * 支持通过fileIds批量查询，默认所有file在同一个space下
      *

@@ -940,6 +940,20 @@ public class FileController {
         return res;
     }
 
+    @GetMapping("/{file_id}/progresses")
+    public List<Progress> getProgresses(@PathVariable("file_id") String fileId) {
+        FileDB file = fileService.requireContentFile(fileId);
+        String purpose = file.getPurpose();
+        if(!FilePurposeClassifier.allowedProgressTrackablePurposes().contains(purpose)) {
+            throw new IllegalArgumentException(String.format(
+                    "Progress tracking is not supported for files with purpose '%s'. Supported purposes are: %s. file_id: %s",
+                    purpose,
+                    String.join(", ", FilePurposeClassifier.allowedProgressTrackablePurposes()),
+                    fileId));
+        }
+        return fileService.getProgresses(file);
+    }
+
     @PostMapping("/list")
     public List<OpenAIFile> getFiles(@RequestBody ListFileOps ops) {
         if(ops == null) {

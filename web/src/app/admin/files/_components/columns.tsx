@@ -17,6 +17,7 @@ import {
   Move,
   Trash2,
   Upload,
+  Activity,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -52,6 +53,7 @@ type GetColumnsOptions = {
   onDelete: (file: KnowledgeFile) => Promise<boolean>;
   onMove: (file: KnowledgeFile) => void;
   onReUpload: (file: KnowledgeFile, newFile: File) => Promise<boolean>;
+  onProgress: (file: KnowledgeFile) => void;
   siblingFiles?: KnowledgeFile[];
 };
 
@@ -62,6 +64,7 @@ const FilenameCell = ({
   onDelete,
   onMove,
   onReUpload,
+  onProgress,
   siblingFiles,
 }: {
   file: KnowledgeFile;
@@ -70,6 +73,7 @@ const FilenameCell = ({
   onDelete: (file: KnowledgeFile) => Promise<boolean>;
   onMove: (file: KnowledgeFile) => void;
   onReUpload: (file: KnowledgeFile, newFile: File) => Promise<boolean>;
+  onProgress: (file: KnowledgeFile) => void;
   siblingFiles?: KnowledgeFile[];
 }) => {
   const isDir = file.node_type === "directory";
@@ -299,6 +303,17 @@ const FilenameCell = ({
                   {isUploading ? "上传中..." : "重新上传"}
                 </DropdownMenuItem>
               )}
+              {file.node_type === "file" && (
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onProgress(file);
+                  }}
+                >
+                  <Activity className="mr-2 h-4 w-4" />
+                  解析进度
+                </DropdownMenuItem>
+              )}
               {isResource && (
                 <DropdownMenuItem
                   onClick={async (e) => {
@@ -385,6 +400,7 @@ export const getColumns = ({
   onDelete,
   onMove,
   onReUpload,
+  onProgress,
   siblingFiles,
 }: GetColumnsOptions): ColumnDef<KnowledgeFile>[] => [
   {
@@ -398,6 +414,7 @@ export const getColumns = ({
         onDelete={onDelete}
         onMove={onMove}
         onReUpload={onReUpload}
+        onProgress={onProgress}
         siblingFiles={siblingFiles}
       />
     ),
