@@ -40,7 +40,6 @@ import dynamic from "next/dynamic";
 import { useUserStore } from "@/store/user";
 import { useRouter } from "next/navigation";
 import { MoveFolderDialog } from "./_components/move-folder-dialog";
-import { FileProgressDialog } from "./_components/file-progress-dialog";
 
 const FileViewer = dynamic(() => import("@/components/file-viewer"), {
   ssr: false,
@@ -72,7 +71,6 @@ const Page = () => {
   const [open, setOpen] = useState(false);
   const [previewFileUrl, setPreviewFileUrl] = useState<string | null>(null);
   const [movingFile, setMovingFile] = useState<KnowledgeFile | null>(null);
-  const [progressFile, setProgressFile] = useState<KnowledgeFile | null>(null);
 
   const createFolderForm = useForm<z.infer<typeof createFolderFormSchema>>({
     resolver: zodResolver(createFolderFormSchema),
@@ -182,7 +180,6 @@ const Page = () => {
       onDelete: handleDelete,
       onMove: handleMove,
       onReUpload: handleReUpload,
-      onProgress: setProgressFile,
       siblingFiles: files[currentDir.id] || [],
     });
   }, [
@@ -304,10 +301,6 @@ const Page = () => {
           setPreviewModalOpen(false);
           setPreviewFileUrl(null);
         }}
-      />
-      <FileProgressDialog
-        file={progressFile}
-        onClose={() => setProgressFile(null)}
       />
       <MoveFolderDialog
         open={Boolean(movingFile)}
