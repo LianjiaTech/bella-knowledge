@@ -141,14 +141,21 @@ export type FileProgress = {
 };
 
 export async function getFileProgresses(fileId: string) {
-  const res = await webRequest<FileProgress[]>({
-    path: `/api/files/${fileId}/progresses`,
-    method: "GET",
-  });
-  return {
-    data: res.code === 200 ? res.data : [],
-    error: res.code === 200 ? null : res.message || "查询进度失败",
-  };
+  try {
+    const res = await webRequest<FileProgress[]>({
+      path: `/api/files/${fileId}/progresses`,
+      method: "GET",
+    });
+    return {
+      data: res.code === 200 ? res.data : [],
+      error: res.code === 200 ? null : res.message || "查询进度失败",
+    };
+  } catch (error) {
+    return {
+      data: [],
+      error: error instanceof Error ? error.message : "查询进度失败",
+    };
+  }
 }
 
 export async function postCropImage(
