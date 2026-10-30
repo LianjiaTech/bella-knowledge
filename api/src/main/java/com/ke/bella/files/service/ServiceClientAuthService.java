@@ -3,6 +3,7 @@ package com.ke.bella.files.service;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -27,8 +28,9 @@ public class ServiceClientAuthService {
             .build();
 
     public ApikeyInfo authenticate(String authorization, String serviceClientCode, String effectiveAkCode) throws IOException {
+        String baseUrl = StringUtils.stripEnd(Configs.OPEN_API_BASE, "/");
         Request request = new Request.Builder()
-                .url(Configs.OPEN_API_BASE + "/v1/apikey/whoami")
+                .url(baseUrl + "/v1/apikey/whoami")
                 .header("Authorization", authorization)
                 .header(BellaContext.SERVICE_CLIENT_HEADER, serviceClientCode)
                 .header(BellaContext.EFFECTIVE_API_KEY_CODE_HEADER, effectiveAkCode)

@@ -64,6 +64,22 @@ public class ServiceClientAuthServiceTest {
     }
 
     @Test
+    public void normalizesBaseUrlWithTrailingSeparators() throws Exception {
+        String baseUrl = Configs.OPEN_API_BASE;
+        ServiceClientAuthService service = new ServiceClientAuthService();
+        for(String suffix : new String[] {"/", "///"}) {
+            Configs.OPEN_API_BASE = baseUrl + suffix;
+            ApikeyInfo effective = service.authenticate("Bearer sc-secret", "parser", "user-ak");
+            assertNotNull(effective);
+            assertEquals("user-ak", effective.getCode());
+            assertEquals("Bearer sc-secret", headers.get().getFirst("Authorization"));
+            assertEquals("parser", headers.get().getFirst(BellaContext.SERVICE_CLIENT_HEADER));
+            assertEquals("user-ak", headers.get().getFirst(BellaContext.EFFECTIVE_API_KEY_CODE_HEADER));
+        }
+        assertEquals(2, requests.get());
+    }
+
+    @Test
     public void neverCachesEffectiveIdentitiesByServiceCredential() throws Exception {
         ServiceClientAuthService service = new ServiceClientAuthService();
         assertEquals("user-ak", service.authenticate("Bearer sc-secret", "parser", "user-ak").getCode());

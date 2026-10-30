@@ -109,8 +109,9 @@ X-Service-Client: <service-client-code>
 X-Effective-Api-Key-Code: <user-ak-code>
 ```
 
-`BELLA_OPENAPI_URL` 指向的 Bella OpenAPI 必须支持三头 ServiceClient 鉴权：file-api 将三头原样发送到
+`BELLA_OPEN_API_BASE`（`bella.open-api-base`）指向的 Bella OpenAPI 必须支持三头 ServiceClient 鉴权：file-api 将三头原样发送到
 `/v1/apikey/whoami`，由上游校验调用凭证、系统编码绑定，并通过 `verifyAuthByCode` 校验用户 AK 及父 AK。
+注意：`BELLA_OPENAPI_URL` 配置的是登录服务（`bella.login.openapi-base`），不用于 ServiceClient 鉴权。
 file-api 仅接受与请求 effective AK code 一致、包含用户 ID 的结果；缺失、重复、非法请求头及鉴权失败均返回 401，
 不回退到调用系统身份，也不与 `X-BELLA-USER-AK-CODE` 混用。调用系统凭证只配置在上游，不在 file-api 复制密钥校验。
 
