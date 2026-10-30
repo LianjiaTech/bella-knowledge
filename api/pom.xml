@@ -199,7 +199,7 @@
         <dependency>
             <groupId>top.bella</groupId>
             <artifactId>openapi-spi</artifactId>
-            <version>1.1.65</version>
+            <version>1.2.78</version>
             <exclusions>
                 <exclusion>
                     <groupId>org.redisson</groupId>

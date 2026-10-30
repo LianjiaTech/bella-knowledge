@@ -19,6 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.request.RequestContextHolder;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.ke.bella.files.FileShardingCountUpdator;
@@ -47,6 +48,7 @@ import com.ke.bella.files.protocol.UpdateProgressRequestData;
 import com.ke.bella.files.service.broadcast.BroadcastService;
 import com.ke.bella.files.service.storage.StorageService;
 import com.ke.bella.files.utils.BellaContextHelper;
+import com.ke.bella.openapi.BellaContext;
 import com.ke.bella.files.utils.FilePurposeClassifier;
 import com.ke.bella.files.utils.JsonUtils;
 
@@ -150,11 +152,27 @@ public class FileService {
     }
 
     private void broadcast(FileDB fileDB, FileBroadcasting<?> message) {
+        broadcast(fileDB, message, querySourceFile(fileDB), true);
+    }
+
+    private void broadcast(FileDB fileDB, FileBroadcasting<?> message, FileDB sourceFile, boolean allowRequestAkFallback) {
         FileType fileType = FileType.fromFileId(fileDB.getFileId());
         if((fileType == FileType.SYSTEM && !FilePurpose.DOM_TREE.getValue().equals(fileDB.getPurpose()))
                 || (fileType == FileType.TEMP && !FilePurpose.ASSISTANTS_CHAT.getValue().equals(fileDB.getPurpose()))) {
             return;
         }
+        String akCode = sourceFile == null ? null : sourceFile.getAkCode();
+        if(StringUtils.isBlank(akCode)) {
+            akCode = fileDB.getAkCode();
+        }
+        if(StringUtils.isBlank(akCode) && allowRequestAkFallback
+                && RequestContextHolder.getRequestAttributes() != null && BellaContext.getApikeyIgnoreNull() != null) {
+            akCode = BellaContext.getApikeyIgnoreNull().getCode();
+        }
+        if(StringUtils.isBlank(akCode)) {
+            LOGGER.warn("File event has unknown AK, fileId={}, event={}", fileDB.getFileId(), message.getEvent());
+        }
+        message.setAkCode(akCode);
         broadcastService.broadcast(message,
                 () -> updateBroadcastStatus(fileDB.getFileId(), BroadcastStatus.SUCCESS),
                 () -> updateBroadcastStatus(fileDB.getFileId(), BroadcastStatus.FAILED));
@@ -196,26 +214,23 @@ public class FileService {
                 .build();
     }
 
-    private OpenAIFile buildOpenAIFileWithSource(FileDB fileDB) {
+    private OpenAIFile buildOpenAIFileWithSource(FileDB fileDB, FileDB sourceFileDB) {
         OpenAIFile openAIFile = transferToOpenAIFile(fileDB);
-        String purpose = fileDB.getPurpose();
+        return sourceFileDB == null ? openAIFile
+                : openAIFile.toBuilder().sourceFile(transferToOpenAIFile(sourceFileDB)).build();
+    }
 
-        FileDB sourceFileDB = null;
+    private FileDB querySourceFile(FileDB fileDB) {
         try {
-            if("dom_tree".equals(purpose)) {
-                sourceFileDB = fileRepo.queryFileByDomTreeFileId(fileDB.getFileId());
-            } else if("pdf".equals(purpose)) {
-                sourceFileDB = fileRepo.queryFileByPdfFileId(fileDB.getFileId());
+            if("dom_tree".equals(fileDB.getPurpose())) {
+                return fileRepo.queryFileByDomTreeFileId(fileDB.getFileId());
+            } else if("pdf".equals(fileDB.getPurpose())) {
+                return fileRepo.queryFileByPdfFileId(fileDB.getFileId());
             }
-
-            if(sourceFileDB != null) {
-                return openAIFile.toBuilder().sourceFile(transferToOpenAIFile(sourceFileDB)).build();
-            }
-        } catch (Exception e) {
-            LOGGER.warn("failed to query source file for {} file: {}, error: {}", purpose, fileDB.getFileId(), e.getMessage());
+        } catch (Exception exception) {
+            LOGGER.warn("Failed to query source file, fileId={}", fileDB.getFileId(), exception);
         }
-
-        return openAIFile;
+        return null;
     }
 
     private Progress transferToProgress(FileProgressDB fileProgressDB) {
@@ -422,8 +437,16 @@ public class FileService {
             String description,
             List<String> cities,
             List<String> tags) {
+        return createFileWithId(spaceCode, fileId, bucketName, keyName, filename, contentLength, purpose, metadata,
+                mimeType, type, extension, ancestorId, description, cities, tags, BellaContextHelper.getOperatorAkCode());
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public FileUploadContext createFileWithId(
+            String spaceCode, String fileId, String bucketName, String keyName, String filename, long contentLength,
+            String purpose, String metadata, String mimeType, String type, String extension, String ancestorId,
+            String description, List<String> cities, List<String> tags, String akCode) {
         FileType fileType = FilePurposeClassifier.classify(purpose);
-        String akCode = BellaContextHelper.getOperatorAkCode();
 
         String citiesJson = cities == null ? "" : JsonUtils.toJson(cities);
         String tagsJson = tags == null ? "" : JsonUtils.toJson(tags);
@@ -469,8 +492,22 @@ public class FileService {
      */
     @Transactional
     public OpenAIFile finalizeFileUpload(FileDB fileDB, String metadata) {
+        return finalizeFileUpload(fileDB, metadata, true);
+    }
 
-        OpenAIFile openAIFile = buildOpenAIFileWithSource(fileDB);
+    @Transactional
+    public OpenAIFile finalizeFileUpload(FileDB fileDB, String metadata, String uploadAkCode) {
+        FileDB eventFile = new FileDB(fileDB);
+        if(StringUtils.isBlank(eventFile.getAkCode())) {
+            eventFile.setAkCode(uploadAkCode);
+        }
+        return finalizeFileUpload(eventFile, metadata, false);
+    }
+
+    @Transactional
+    public OpenAIFile finalizeFileUpload(FileDB fileDB, String metadata, boolean allowRequestAkFallback) {
+        FileDB sourceFile = querySourceFile(fileDB);
+        OpenAIFile openAIFile = buildOpenAIFileWithSource(fileDB, sourceFile);
 
         // 文件创建后的广播机制
         FileBroadcasting<OpenAIFile> message = new FileBroadcasting<>();
@@ -479,8 +516,7 @@ public class FileService {
         message.setMetadata(metadata);
         message.setUserId(BellaContextHelper.getOperatorUserId());
         message.setUserName(BellaContextHelper.getOperatorUserName());
-        message.setAkCode(BellaContextHelper.getOperatorAkCode());
-        broadcast(fileDB, message);
+        broadcast(fileDB, message, sourceFile, allowRequestAkFallback);
 
         return openAIFile;
     }
@@ -574,7 +610,8 @@ public class FileService {
     }
 
     private OpenAIFile broadcastFileUpdated(FileDB fileDB, Scope scope) {
-        OpenAIFile finalOpenAIFile = buildOpenAIFileWithSource(fileDB);
+        FileDB sourceFile = querySourceFile(fileDB);
+        OpenAIFile finalOpenAIFile = buildOpenAIFileWithSource(fileDB, sourceFile);
 
         FileBroadcasting<OpenAIFile> message = new FileBroadcasting<>();
         message.setEvent(EventType.FILE_UPDATED);
@@ -583,8 +620,7 @@ public class FileService {
         message.setMetadata(fileDB.getMetaData());
         message.setUserId(BellaContextHelper.getOperatorUserId());
         message.setUserName(BellaContextHelper.getOperatorUserName());
-        message.setAkCode(BellaContextHelper.getOperatorAkCode());
-        broadcast(fileDB, message);
+        broadcast(fileDB, message, sourceFile, true);
 
         return finalOpenAIFile;
     }
@@ -602,7 +638,8 @@ public class FileService {
         String fileId = fileDB.getFileId();
         FileType fileType = FileType.fromFileId(fileId);
 
-        OpenAIFile fileToDelete = buildOpenAIFileWithSource(fileDB);
+        FileDB sourceFile = querySourceFile(fileDB);
+        OpenAIFile fileToDelete = buildOpenAIFileWithSource(fileDB, sourceFile);
 
         // 只标记status字段，不删除文件，不删除数据库记录
         FileOps op = new FileOps();
@@ -621,8 +658,7 @@ public class FileService {
             message.setMetadata(fileDB.getMetaData());
             message.setUserId(BellaContextHelper.getOperatorUserId());
             message.setUserName(BellaContextHelper.getOperatorUserName());
-            message.setAkCode(BellaContextHelper.getOperatorAkCode());
-            broadcast(fileDB, message);
+            broadcast(fileDB, message, sourceFile, true);
         } catch (Exception e) {
             throw new IllegalStateException("Failed to update file status (indicating deletion), fileId: "
                     + fileId + ", status: " + FileStatus.DELETED, e);
@@ -777,7 +813,6 @@ public class FileService {
         message.setMetadata(res.getMetaData());
         message.setUserId(BellaContextHelper.getOperatorUserId());
         message.setUserName(BellaContextHelper.getOperatorUserName());
-        message.setAkCode(BellaContextHelper.getOperatorAkCode());
         broadcast(res, message);
         return openAIFile;
     }
@@ -820,7 +855,6 @@ public class FileService {
         message.setMetadata("{}");
         message.setUserId(BellaContextHelper.getOperatorUserId());
         message.setUserName(BellaContextHelper.getOperatorUserName());
-        message.setAkCode(BellaContextHelper.getOperatorAkCode());
         broadcast(created, message);
         return resource;
     }
