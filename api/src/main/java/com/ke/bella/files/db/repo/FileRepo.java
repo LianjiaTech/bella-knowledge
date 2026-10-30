@@ -437,6 +437,16 @@ public class FileRepo implements BaseRepo {
                 .fetchOneInto(FileProgressDB.class);
     }
 
+    public List<FileProgressDB> queryProgresses(String fileId) {
+        fileId = queryNewFileId(fileId);
+        FileType fileType = FileType.fromFileId(fileId);
+        String shardingKey = getShardingKeyByFileId(fileId, fileType);
+        return db(shardingKey).selectFrom(FILE_PROGRESS)
+                .where(FILE_PROGRESS.FILE_ID.eq(fileId))
+                .orderBy(FILE_PROGRESS.MTIME.desc(), FILE_PROGRESS.NAME.asc())
+                .fetchInto(FileProgressDB.class);
+    }
+
     public void insertProgress(
             String fileId,
             String progressName,
