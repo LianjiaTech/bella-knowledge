@@ -114,13 +114,13 @@ public class FileServiceBroadcastTest {
         BellaContext.setApikey(ApikeyInfo.builder().code("effective-ak").build());
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(new MockHttpServletRequest()));
         fileService.finalizeFileUpload(file, "{}");
-        fileService.finalizeFileUpload(file, "{}", false);
+        fileService.finalizeFileUpload(file, "{}");
         RequestContextHolder.resetRequestAttributes();
         fileService.finalizeFileUpload(file, "{}");
         ArgumentCaptor<FileBroadcasting> captor = ArgumentCaptor.forClass(FileBroadcasting.class);
         verify(broadcastService, times(3)).broadcast(captor.capture(), any(Runnable.class), any(Runnable.class));
         assertEquals("effective-ak", captor.getAllValues().get(0).getAkCode());
-        assertEquals(null, captor.getAllValues().get(1).getAkCode());
+        assertEquals("effective-ak", captor.getAllValues().get(1).getAkCode());
         assertEquals(null, captor.getAllValues().get(2).getAkCode());
         assertEquals(null, file.getAkCode());
     }
