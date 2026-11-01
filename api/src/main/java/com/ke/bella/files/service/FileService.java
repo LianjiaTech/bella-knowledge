@@ -152,10 +152,10 @@ public class FileService {
     }
 
     private void broadcast(FileDB fileDB, FileBroadcasting<?> message) {
-        broadcast(fileDB, message, querySourceFile(fileDB), true);
+        broadcast(fileDB, message, querySourceFile(fileDB), null);
     }
 
-    private void broadcast(FileDB fileDB, FileBroadcasting<?> message, FileDB sourceFile, boolean allowRequestAkFallback) {
+    private void broadcast(FileDB fileDB, FileBroadcasting<?> message, FileDB sourceFile, String persistedAkCode) {
         FileType fileType = FileType.fromFileId(fileDB.getFileId());
         if((fileType == FileType.SYSTEM && !FilePurpose.DOM_TREE.getValue().equals(fileDB.getPurpose()))
                 || (fileType == FileType.TEMP && !FilePurpose.ASSISTANTS_CHAT.getValue().equals(fileDB.getPurpose()))) {
@@ -165,7 +165,10 @@ public class FileService {
         if(StringUtils.isBlank(akCode)) {
             akCode = fileDB.getAkCode();
         }
-        if(StringUtils.isBlank(akCode) && allowRequestAkFallback
+        if(StringUtils.isBlank(akCode)) {
+            akCode = persistedAkCode;
+        }
+        if(StringUtils.isBlank(akCode)
                 && RequestContextHolder.getRequestAttributes() != null && BellaContext.getApikeyIgnoreNull() != null) {
             akCode = BellaContext.getApikeyIgnoreNull().getCode();
         }
@@ -492,20 +495,11 @@ public class FileService {
      */
     @Transactional
     public OpenAIFile finalizeFileUpload(FileDB fileDB, String metadata) {
-        return finalizeFileUpload(fileDB, metadata, true);
+        return finalizeFileUpload(fileDB, metadata, null);
     }
 
     @Transactional
     public OpenAIFile finalizeFileUpload(FileDB fileDB, String metadata, String uploadAkCode) {
-        FileDB eventFile = new FileDB(fileDB);
-        if(StringUtils.isBlank(eventFile.getAkCode())) {
-            eventFile.setAkCode(uploadAkCode);
-        }
-        return finalizeFileUpload(eventFile, metadata, false);
-    }
-
-    @Transactional
-    public OpenAIFile finalizeFileUpload(FileDB fileDB, String metadata, boolean allowRequestAkFallback) {
         FileDB sourceFile = querySourceFile(fileDB);
         OpenAIFile openAIFile = buildOpenAIFileWithSource(fileDB, sourceFile);
 
@@ -516,7 +510,7 @@ public class FileService {
         message.setMetadata(metadata);
         message.setUserId(BellaContextHelper.getOperatorUserId());
         message.setUserName(BellaContextHelper.getOperatorUserName());
-        broadcast(fileDB, message, sourceFile, allowRequestAkFallback);
+        broadcast(fileDB, message, sourceFile, uploadAkCode);
 
         return openAIFile;
     }
@@ -620,7 +614,7 @@ public class FileService {
         message.setMetadata(fileDB.getMetaData());
         message.setUserId(BellaContextHelper.getOperatorUserId());
         message.setUserName(BellaContextHelper.getOperatorUserName());
-        broadcast(fileDB, message, sourceFile, true);
+        broadcast(fileDB, message, sourceFile, null);
 
         return finalOpenAIFile;
     }
@@ -658,7 +652,7 @@ public class FileService {
             message.setMetadata(fileDB.getMetaData());
             message.setUserId(BellaContextHelper.getOperatorUserId());
             message.setUserName(BellaContextHelper.getOperatorUserName());
-            broadcast(fileDB, message, sourceFile, true);
+            broadcast(fileDB, message, sourceFile, null);
         } catch (Exception e) {
             throw new IllegalStateException("Failed to update file status (indicating deletion), fileId: "
                     + fileId + ", status: " + FileStatus.DELETED, e);
