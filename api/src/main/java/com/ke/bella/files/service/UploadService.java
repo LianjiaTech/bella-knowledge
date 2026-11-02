@@ -103,6 +103,7 @@ public class UploadService {
         FileUploadDB row = new FileUploadDB();
         row.setUploadId(UPLOAD_ID_GENERATOR.generateWithSpaceCode(spaceCode));
         row.setSpaceCode(spaceCode);
+        row.setAkCode(StringUtils.defaultString(BellaContextHelper.getOperatorAkCode()));
         row.setFileId(fileId);
         row.setFilename(op.getFilename());
         row.setExtension(extension);
