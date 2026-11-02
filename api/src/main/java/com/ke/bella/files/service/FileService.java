@@ -19,7 +19,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.context.request.RequestContextHolder;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.ke.bella.files.FileShardingCountUpdator;
@@ -48,7 +47,6 @@ import com.ke.bella.files.protocol.UpdateProgressRequestData;
 import com.ke.bella.files.service.broadcast.BroadcastService;
 import com.ke.bella.files.service.storage.StorageService;
 import com.ke.bella.files.utils.BellaContextHelper;
-import com.ke.bella.openapi.BellaContext;
 import com.ke.bella.files.utils.FilePurposeClassifier;
 import com.ke.bella.files.utils.JsonUtils;
 
@@ -118,12 +116,11 @@ public class FileService {
             String description,
             List<String> cities,
             List<String> tags) {
-        String operationAkCode = currentOperationAkCode();
         FileType fileType = FilePurposeClassifier.classify(purpose);
         String fileId = FILE_ID_GENERATOR.generateWithType(fileType, spaceCode);
         FileUploadContext context = self.createFileWithId(spaceCode, fileId, bucket, path, filename, contentLength,
                 purpose, metadata, mimeType, type, extension, ancestorId, description, cities, tags);
-        return self.finalizeFileUpload(context.getFileDB(), metadata, operationAkCode);
+        return self.finalizeFileUpload(context.getFileDB(), metadata);
     }
 
     public FileDB queryFile(String spaceCode, String ancestorId, String filename) {
@@ -152,24 +149,12 @@ public class FileService {
         }
     }
 
-    private String currentOperationAkCode() {
-        return BellaContext.getApikeyIgnoreNull() == null ? null : BellaContext.getApikeyIgnoreNull().getCode();
-    }
-
-    private String currentRequestOperationAkCode() {
-        return RequestContextHolder.getRequestAttributes() == null ? null : currentOperationAkCode();
-    }
-
-    private void broadcast(FileDB fileDB, FileBroadcasting<?> message, String operationAkCode) {
+    private void broadcast(FileDB fileDB, FileBroadcasting<?> message) {
         FileType fileType = FileType.fromFileId(fileDB.getFileId());
         if((fileType == FileType.SYSTEM && !FilePurpose.DOM_TREE.getValue().equals(fileDB.getPurpose()))
                 || (fileType == FileType.TEMP && !FilePurpose.ASSISTANTS_CHAT.getValue().equals(fileDB.getPurpose()))) {
             return;
         }
-        if(StringUtils.isBlank(operationAkCode)) {
-            LOGGER.warn("File event has unknown operation AK, fileId={}, event={}", fileDB.getFileId(), message.getEvent());
-        }
-        message.setAkCode(operationAkCode);
         broadcastService.broadcast(message,
                 () -> updateBroadcastStatus(fileDB.getFileId(), BroadcastStatus.SUCCESS),
                 () -> updateBroadcastStatus(fileDB.getFileId(), BroadcastStatus.FAILED));
@@ -211,23 +196,26 @@ public class FileService {
                 .build();
     }
 
-    private OpenAIFile buildOpenAIFileWithSource(FileDB fileDB, FileDB sourceFileDB) {
+    private OpenAIFile buildOpenAIFileWithSource(FileDB fileDB) {
         OpenAIFile openAIFile = transferToOpenAIFile(fileDB);
-        return sourceFileDB == null ? openAIFile
-                : openAIFile.toBuilder().sourceFile(transferToOpenAIFile(sourceFileDB)).build();
-    }
+        String purpose = fileDB.getPurpose();
 
-    private FileDB querySourceFile(FileDB fileDB) {
+        FileDB sourceFileDB = null;
         try {
-            if("dom_tree".equals(fileDB.getPurpose())) {
-                return fileRepo.queryFileByDomTreeFileId(fileDB.getFileId());
-            } else if("pdf".equals(fileDB.getPurpose())) {
-                return fileRepo.queryFileByPdfFileId(fileDB.getFileId());
+            if("dom_tree".equals(purpose)) {
+                sourceFileDB = fileRepo.queryFileByDomTreeFileId(fileDB.getFileId());
+            } else if("pdf".equals(purpose)) {
+                sourceFileDB = fileRepo.queryFileByPdfFileId(fileDB.getFileId());
             }
-        } catch (Exception exception) {
-            LOGGER.warn("Failed to query source file, fileId={}", fileDB.getFileId(), exception);
+
+            if(sourceFileDB != null) {
+                return openAIFile.toBuilder().sourceFile(transferToOpenAIFile(sourceFileDB)).build();
+            }
+        } catch (Exception e) {
+            LOGGER.warn("failed to query source file for {} file: {}, error: {}", purpose, fileDB.getFileId(), e.getMessage());
         }
-        return null;
+
+        return openAIFile;
     }
 
     private Progress transferToProgress(FileProgressDB fileProgressDB) {
@@ -294,7 +282,6 @@ public class FileService {
             String description,
             List<String> cities,
             List<String> tags) {
-        String operationAkCode = currentOperationAkCode();
         // 步骤1：创建数据库记录（在事务内，快速完成）
         FileUploadContext context = self.createFile(
                 filename, file.length(), purpose, metadata,
@@ -323,7 +310,7 @@ public class FileService {
         }
 
         // 步骤3：查询并广播
-        return self.finalizeFileUpload(context.getFileDB(), metadata, operationAkCode);
+        return self.finalizeFileUpload(context.getFileDB(), metadata);
     }
 
     public OpenAIFile uploadFromStream(
@@ -360,7 +347,6 @@ public class FileService {
             List<String> cities,
             List<String> tags) {
 
-        String operationAkCode = currentOperationAkCode();
         // 步骤1：创建数据库记录（在事务内，快速完成）
         FileUploadContext context = self.createFile(
                 filename, contentLength, purpose, metadata,
@@ -391,7 +377,7 @@ public class FileService {
         }
 
         // 步骤3：查询并广播
-        return self.finalizeFileUpload(context.getFileDB(), metadata, operationAkCode);
+        return self.finalizeFileUpload(context.getFileDB(), metadata);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -436,16 +422,8 @@ public class FileService {
             String description,
             List<String> cities,
             List<String> tags) {
-        return createFileWithId(spaceCode, fileId, bucketName, keyName, filename, contentLength, purpose, metadata,
-                mimeType, type, extension, ancestorId, description, cities, tags, BellaContextHelper.getOperatorAkCode());
-    }
-
-    @Transactional(rollbackFor = Exception.class)
-    public FileUploadContext createFileWithId(
-            String spaceCode, String fileId, String bucketName, String keyName, String filename, long contentLength,
-            String purpose, String metadata, String mimeType, String type, String extension, String ancestorId,
-            String description, List<String> cities, List<String> tags, String akCode) {
         FileType fileType = FilePurposeClassifier.classify(purpose);
+        String akCode = BellaContextHelper.getOperatorAkCode();
 
         String citiesJson = cities == null ? "" : JsonUtils.toJson(cities);
         String tagsJson = tags == null ? "" : JsonUtils.toJson(tags);
@@ -491,14 +469,8 @@ public class FileService {
      */
     @Transactional
     public OpenAIFile finalizeFileUpload(FileDB fileDB, String metadata) {
-        return finalizeFileUpload(fileDB, metadata, currentRequestOperationAkCode());
-    }
 
-    @Transactional
-    public OpenAIFile finalizeFileUpload(FileDB fileDB, String metadata, String persistedAkCode) {
-        String operationAkCode = StringUtils.isNotBlank(persistedAkCode) ? persistedAkCode : currentRequestOperationAkCode();
-        FileDB sourceFile = querySourceFile(fileDB);
-        OpenAIFile openAIFile = buildOpenAIFileWithSource(fileDB, sourceFile);
+        OpenAIFile openAIFile = buildOpenAIFileWithSource(fileDB);
 
         // 文件创建后的广播机制
         FileBroadcasting<OpenAIFile> message = new FileBroadcasting<>();
@@ -507,7 +479,8 @@ public class FileService {
         message.setMetadata(metadata);
         message.setUserId(BellaContextHelper.getOperatorUserId());
         message.setUserName(BellaContextHelper.getOperatorUserName());
-        broadcast(fileDB, message, operationAkCode);
+        message.setAkCode(BellaContextHelper.getOperatorAkCode());
+        broadcast(fileDB, message);
 
         return openAIFile;
     }
@@ -586,25 +559,22 @@ public class FileService {
 
     @Transactional(rollbackFor = Exception.class)
     public OpenAIFile updateFile(FileOps ops, boolean increaseVersion, Scope actionType) {
-        String operationAkCode = currentOperationAkCode();
         FileType fileType = FileType.fromFileId(ops.getFileId());
         fileRepo.updateFile(ops, increaseVersion);
         FileDB fileDB = fileRepo.queryFile(ops.getFileId(), fileType);
-        return broadcastFileUpdated(fileDB, actionType, operationAkCode);
+        return broadcastFileUpdated(fileDB, actionType);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public OpenAIFile updateCreatorInfo(String fileId, Long cuid, String cuName, LocalDateTime ctime) {
-        String operationAkCode = currentOperationAkCode();
         FileType fileType = FileType.fromFileId(fileId);
         fileRepo.updateCreatorInfo(fileId, cuid, cuName, ctime);
         FileDB fileDB = fileRepo.queryFile(fileId, fileType);
-        return broadcastFileUpdated(fileDB, Scope.CREATOR, operationAkCode);
+        return broadcastFileUpdated(fileDB, Scope.CREATOR);
     }
 
-    private OpenAIFile broadcastFileUpdated(FileDB fileDB, Scope scope, String operationAkCode) {
-        FileDB sourceFile = querySourceFile(fileDB);
-        OpenAIFile finalOpenAIFile = buildOpenAIFileWithSource(fileDB, sourceFile);
+    private OpenAIFile broadcastFileUpdated(FileDB fileDB, Scope scope) {
+        OpenAIFile finalOpenAIFile = buildOpenAIFileWithSource(fileDB);
 
         FileBroadcasting<OpenAIFile> message = new FileBroadcasting<>();
         message.setEvent(EventType.FILE_UPDATED);
@@ -613,31 +583,26 @@ public class FileService {
         message.setMetadata(fileDB.getMetaData());
         message.setUserId(BellaContextHelper.getOperatorUserId());
         message.setUserName(BellaContextHelper.getOperatorUserName());
-        broadcast(fileDB, message, operationAkCode);
+        message.setAkCode(BellaContextHelper.getOperatorAkCode());
+        broadcast(fileDB, message);
 
         return finalOpenAIFile;
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void delete(String fileId) {
-        String operationAkCode = currentOperationAkCode();
         FileType fileType = FileType.fromFileId(fileId);
         // 删除前获取文件信息用于广播
         FileDB fileDB = fileRepo.queryFile(fileId, fileType);
-        delete(fileDB, operationAkCode);
+        delete(fileDB);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void delete(FileDB fileDB) {
-        delete(fileDB, currentOperationAkCode());
-    }
-
-    private void delete(FileDB fileDB, String operationAkCode) {
         String fileId = fileDB.getFileId();
         FileType fileType = FileType.fromFileId(fileId);
 
-        FileDB sourceFile = querySourceFile(fileDB);
-        OpenAIFile fileToDelete = buildOpenAIFileWithSource(fileDB, sourceFile);
+        OpenAIFile fileToDelete = buildOpenAIFileWithSource(fileDB);
 
         // 只标记status字段，不删除文件，不删除数据库记录
         FileOps op = new FileOps();
@@ -656,7 +621,8 @@ public class FileService {
             message.setMetadata(fileDB.getMetaData());
             message.setUserId(BellaContextHelper.getOperatorUserId());
             message.setUserName(BellaContextHelper.getOperatorUserName());
-            broadcast(fileDB, message, operationAkCode);
+            message.setAkCode(BellaContextHelper.getOperatorAkCode());
+            broadcast(fileDB, message);
         } catch (Exception e) {
             throw new IllegalStateException("Failed to update file status (indicating deletion), fileId: "
                     + fileId + ", status: " + FileStatus.DELETED, e);
@@ -775,7 +741,6 @@ public class FileService {
         FileType fileType = FileType.DIRECTORY;
         String fileId = FILE_ID_GENERATOR.generateDirId();
         String akCode = BellaContextHelper.getOperatorAkCode();
-        String operationAkCode = currentOperationAkCode();
 
         FileDB fileDB = new FileDB();
         fileDB.setFileId(fileId);
@@ -812,13 +777,13 @@ public class FileService {
         message.setMetadata(res.getMetaData());
         message.setUserId(BellaContextHelper.getOperatorUserId());
         message.setUserName(BellaContextHelper.getOperatorUserName());
-        broadcast(res, message, operationAkCode);
+        message.setAkCode(BellaContextHelper.getOperatorAkCode());
+        broadcast(res, message);
         return openAIFile;
     }
 
     @Transactional(rollbackFor = Exception.class)
     public OpenAIFile createResource(String name, String resourceId, String ancestorId, String purpose) {
-        String operationAkCode = currentOperationAkCode();
         String spaceCode = BellaContextHelper.getOperateSpaceCode();
         String fileId = FILE_ID_GENERATOR.generateWithType(FileType.USER);
 
@@ -855,7 +820,8 @@ public class FileService {
         message.setMetadata("{}");
         message.setUserId(BellaContextHelper.getOperatorUserId());
         message.setUserName(BellaContextHelper.getOperatorUserName());
-        broadcast(created, message, operationAkCode);
+        message.setAkCode(BellaContextHelper.getOperatorAkCode());
+        broadcast(created, message);
         return resource;
     }
 

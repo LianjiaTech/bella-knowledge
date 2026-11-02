@@ -10,7 +10,6 @@ import java.util.function.Supplier;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.ke.bella.files.configuration.BucketConfig;
@@ -18,7 +17,6 @@ import com.ke.bella.files.db.repo.FileUploadRepo;
 import com.ke.bella.files.db.tables.pojos.FileDB;
 import com.ke.bella.files.db.tables.pojos.FileUploadDB;
 import com.ke.bella.files.protocol.OpenAIFile;
-import com.ke.bella.files.protocol.UploadOps.CreateUploadOp;
 import com.ke.bella.files.protocol.UploadOps.CompleteUploadOp;
 import com.ke.bella.files.service.lock.FileUniquenessLock;
 import com.ke.bella.files.service.storage.StorageService;
@@ -58,7 +56,6 @@ public class UploadAkOwnershipTest {
         session.setUploadId("upload-1");
         session.setFileId("file-upload-1");
         session.setSpaceCode("sp-a");
-        session.setAkCode("upload-owner-ak");
         session.setFilename("a.txt");
         session.setPurpose("assistants");
         session.setBucket("private");
@@ -83,56 +80,34 @@ public class UploadAkOwnershipTest {
     }
 
     @Test
-    public void createCapturesEffectiveAkBeforeStorageCall() {
-        when(storage.createMultipartUpload(anyString(), anyString(), anyString(), anyString(), anyString()))
-                .thenAnswer(invocation -> {
-                    BellaContext.setApikey(ApikeyInfo.builder().code("changed-system-ak").build());
-                    return "storage-upload";
-                });
-        when(repo.insert(any(FileUploadDB.class))).thenAnswer(invocation -> {
-            FileUploadDB row = invocation.getArgument(0);
-            row.setCtime(LocalDateTime.now());
-            return row;
-        });
-        CreateUploadOp op = new CreateUploadOp();
-        op.setFilename("a.txt");
-        op.setPurpose("assistants");
-        op.setBytes(11L);
-        service.create(op);
-        ArgumentCaptor<FileUploadDB> captor = ArgumentCaptor.forClass(FileUploadDB.class);
-        verify(repo).insert(captor.capture());
-        assertEquals("effective-ak", captor.getValue().getAkCode());
+    public void completeUsesCurrentOperationAk() {
+        assertCompletionUsesCurrentOperationAk("PENDING");
     }
 
     @Test
-    public void completePassesStoredAkToCreationAndEvent() {
-        assertCompletionUsesStoredAk("PENDING");
+    public void retryUsesCurrentOperationAk() {
+        assertCompletionUsesCurrentOperationAk("COMPLETING");
     }
 
-    @Test
-    public void retryPassesStoredAkToCreationAndEvent() {
-        assertCompletionUsesStoredAk("COMPLETING");
-    }
-
-    private void assertCompletionUsesStoredAk(String status) {
+    private void assertCompletionUsesCurrentOperationAk(String status) {
         session.setStatus(status);
         when(storage.objectExists("private", "path")).thenReturn(true);
         FileDB created = new FileDB();
         when(files.createFileWithId("sp-a", "file-upload-1", "private", "path", "a.txt", 11L, "assistants", "{}",
-                "text/plain", "text", "txt", null, "", null, null, "upload-owner-ak"))
+                "text/plain", "text", "txt", null, "", null, null))
                 .thenReturn(FileService.FileUploadContext.builder().fileDB(created).build());
-        when(files.finalizeFileUpload(created, "{}", "upload-owner-ak")).thenReturn(OpenAIFile.builder().bytes(11L).build());
+        when(files.finalizeFileUpload(created, "{}")).thenReturn(OpenAIFile.builder().bytes(11L).build());
         assertEquals("completed", service.complete("upload-1", new CompleteUploadOp()).getStatus());
-        verify(files).finalizeFileUpload(created, "{}", "upload-owner-ak");
+        verify(files).finalizeFileUpload(created, "{}");
         verify(repo).bindFileId("upload-1", "file-upload-1");
     }
 
     @Test
-    public void recoveryOfExistingFilePassesStoredAkWithoutRecreatingFile() {
+    public void recoveryOfExistingFileUsesCurrentOperationAk() {
         FileDB existing = new FileDB();
         when(files.getFile0("file-upload-1")).thenReturn(existing);
         service.complete("upload-1", new CompleteUploadOp());
-        verify(files).finalizeFileUpload(existing, "{}", "upload-owner-ak");
+        verify(files).finalizeFileUpload(existing, "{}");
         verifyNoInteractions(storage);
         verify(repo).bindFileId("upload-1", "file-upload-1");
     }

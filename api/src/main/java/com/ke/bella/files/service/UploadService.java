@@ -98,13 +98,11 @@ public class UploadService {
         String path = purpose + "/" + fileId + (StringUtils.isEmpty(extension) ? "" : "." + extension);
         String mimeType = StringUtils.defaultString(op.getMimeType());
         String type = StringUtils.isEmpty(mimeType) ? "" : StringUtils.substringBefore(mimeType, "/");
-        String akCode = BellaContextHelper.getOperatorAkCode();
         String storageUploadId = storageService.createMultipartUpload(bucket, path, mimeType, op.getFilename(), "");
 
         FileUploadDB row = new FileUploadDB();
         row.setUploadId(UPLOAD_ID_GENERATOR.generateWithSpaceCode(spaceCode));
         row.setSpaceCode(spaceCode);
-        row.setAkCode(StringUtils.defaultString(akCode));
         row.setFileId(fileId);
         row.setFilename(op.getFilename());
         row.setExtension(extension);
@@ -162,7 +160,7 @@ public class UploadService {
             }
             FileDB existingById = getFileIfPresent(current.getFileId());
             if(existingById != null) {
-                OpenAIFile file = fileService.finalizeFileUpload(existingById, current.getMetadata(), current.getAkCode());
+                OpenAIFile file = fileService.finalizeFileUpload(existingById, current.getMetadata());
                 fileUploadRepo.bindFileId(uploadId, current.getFileId());
                 current.setStatus("COMPLETED");
                 return toUpload(current, file);
@@ -195,8 +193,8 @@ public class UploadService {
             FileService.FileUploadContext fileContext = fileService.createFileWithId(current.getSpaceCode(), current.getFileId(), current.getBucket(),
                     current.getPath(), current.getFilename(), finalBytes, current.getPurpose(), current.getMetadata(), current.getMimeType(),
                     current.getType(), current.getExtension(), emptyToNull(current.getAncestorId()), current.getDescription(),
-                    jsonList(current.getCities()), jsonList(current.getTags()), current.getAkCode());
-            OpenAIFile file = fileService.finalizeFileUpload(fileContext.getFileDB(), current.getMetadata(), current.getAkCode());
+                    jsonList(current.getCities()), jsonList(current.getTags()));
+            OpenAIFile file = fileService.finalizeFileUpload(fileContext.getFileDB(), current.getMetadata());
             fileUploadRepo.bindFileId(uploadId, current.getFileId());
             current.setStatus("COMPLETED");
             return toUpload(current, file);

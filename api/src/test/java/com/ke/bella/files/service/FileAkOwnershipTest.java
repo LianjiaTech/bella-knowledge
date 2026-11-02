@@ -63,14 +63,7 @@ public class FileAkOwnershipTest {
     }
 
     @Test
-    public void explicitCapturedAkIsNotOverwrittenByCurrentContext() {
-        service.createFileWithId("sp-a", "file-captured-1", "private", "path", "a.txt", 1L,
-                "assistants", "{}", "text/plain", "text", "txt", null, null, null, null, "captured-ak");
-        assertEquals("captured-ak", inserted.get().getAkCode());
-    }
-
-    @Test
-    public void compatibleCreateMethodCapturesEffectiveAk() {
+    public void createMethodCapturesEffectiveAk() {
         service.createFileWithId("sp-a", "file-ordinary-1", "private", "path", "a.txt", 1L,
                 "assistants", "{}", "text/plain", "text", "txt", null, null, null, null);
         assertEquals("effective-ak", inserted.get().getAkCode());
