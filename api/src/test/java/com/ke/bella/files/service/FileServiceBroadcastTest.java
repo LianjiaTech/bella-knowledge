@@ -13,9 +13,6 @@ import java.time.LocalDateTime;
 
 import org.junit.Before;
 import org.junit.After;
-import org.springframework.mock.web.MockHttpServletRequest;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 import com.ke.bella.openapi.apikey.ApikeyInfo;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
@@ -54,7 +51,6 @@ public class FileServiceBroadcastTest {
     @After
     public void cleanup() {
         BellaContext.clearAll();
-        RequestContextHolder.resetRequestAttributes();
     }
 
     @Test
@@ -62,7 +58,6 @@ public class FileServiceBroadcastTest {
         FileDB file = file("file-owned-1", FilePurpose.ASSISTANTS);
         file.setAkCode("owner-ak");
         BellaContext.setApikey(ApikeyInfo.builder().code("operation-ak").build());
-        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(new MockHttpServletRequest()));
         when(fileRepo.queryFile(file.getFileId(), FileType.USER)).thenReturn(file);
         fileService.finalizeFileUpload(file, "{}");
         fileService.updateFile(FileOps.builder().fileId(file.getFileId()).filename("renamed").build(), false, Scope.FILENAME);
@@ -84,7 +79,6 @@ public class FileServiceBroadcastTest {
             org.mockito.Mockito.doReturn(source).when(fileRepo).queryFileByDomTreeFileId(derived.getFileId());
             when(fileRepo.queryFileByPdfFileId(derived.getFileId())).thenReturn(source);
             BellaContext.setApikey(ApikeyInfo.builder().code("operation-ak").build());
-            RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(new MockHttpServletRequest()));
             fileService.finalizeFileUpload(derived, "{}");
         }
         ArgumentCaptor<FileBroadcasting> captor = ArgumentCaptor.forClass(FileBroadcasting.class);
@@ -99,7 +93,6 @@ public class FileServiceBroadcastTest {
         FileDB derived = systemFile(FilePurpose.DOM_TREE);
         derived.setAkCode("derived-ak");
         BellaContext.setApikey(ApikeyInfo.builder().code("operation-ak").build());
-        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(new MockHttpServletRequest()));
         fileService.finalizeFileUpload(derived, "{}");
         when(fileRepo.queryFileByDomTreeFileId(derived.getFileId())).thenThrow(new IllegalStateException("lookup failed"));
         fileService.finalizeFileUpload(derived, "{}");
@@ -114,30 +107,17 @@ public class FileServiceBroadcastTest {
     }
 
     @Test
-    public void historicalEmptyAkOnlyFallsBackWithinSynchronousRequest() {
+    public void historicalEmptyAkUsesCurrentOperationContext() {
         FileDB file = file("file-historical-1", FilePurpose.ASSISTANTS);
         BellaContext.setApikey(ApikeyInfo.builder().code("effective-ak").build());
-        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(new MockHttpServletRequest()));
         fileService.finalizeFileUpload(file, "{}");
         fileService.finalizeFileUpload(file, "{}");
-        RequestContextHolder.resetRequestAttributes();
         fileService.finalizeFileUpload(file, "{}");
         ArgumentCaptor<FileBroadcasting> captor = ArgumentCaptor.forClass(FileBroadcasting.class);
         verify(broadcastService, times(3)).broadcast(captor.capture(), any(Runnable.class), any(Runnable.class));
         assertEquals("effective-ak", captor.getAllValues().get(0).getAkCode());
         assertEquals("effective-ak", captor.getAllValues().get(1).getAkCode());
-        assertEquals(null, captor.getAllValues().get(2).getAkCode());
-        assertEquals(null, file.getAkCode());
-    }
-
-    @Test
-    public void uploadRecoveryUsesCapturedAkWithoutRewritingHistoricalRecord() {
-        FileDB file = file("file-retry-1", FilePurpose.ASSISTANTS);
-        BellaContext.setApikey(ApikeyInfo.builder().code("system-ak").build());
-        fileService.finalizeFileUpload(file, "{}", "upload-owner-ak");
-        ArgumentCaptor<FileBroadcasting> captor = ArgumentCaptor.forClass(FileBroadcasting.class);
-        verify(broadcastService).broadcast(captor.capture(), any(Runnable.class), any(Runnable.class));
-        assertEquals("upload-owner-ak", captor.getValue().getAkCode());
+        assertEquals("effective-ak", captor.getAllValues().get(2).getAkCode());
         assertEquals(null, file.getAkCode());
     }
 
