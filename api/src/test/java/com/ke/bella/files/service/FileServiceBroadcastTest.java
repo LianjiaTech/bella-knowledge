@@ -58,10 +58,11 @@ public class FileServiceBroadcastTest {
     }
 
     @Test
-    public void storedAkWinsForCreatedUpdatedAndDeletedEvents() {
+    public void operationAkWinsOverStoredFileAkForCreatedUpdatedAndDeletedEvents() {
         FileDB file = file("file-owned-1", FilePurpose.ASSISTANTS);
         file.setAkCode("owner-ak");
-        BellaContext.setApikey(ApikeyInfo.builder().code("system-ak").build());
+        BellaContext.setApikey(ApikeyInfo.builder().code("operation-ak").build());
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(new MockHttpServletRequest()));
         when(fileRepo.queryFile(file.getFileId(), FileType.USER)).thenReturn(file);
         fileService.finalizeFileUpload(file, "{}");
         fileService.updateFile(FileOps.builder().fileId(file.getFileId()).filename("renamed").build(), false, Scope.FILENAME);
@@ -69,12 +70,12 @@ public class FileServiceBroadcastTest {
         ArgumentCaptor<FileBroadcasting> captor = ArgumentCaptor.forClass(FileBroadcasting.class);
         verify(broadcastService, times(3)).broadcast(captor.capture(), any(Runnable.class), any(Runnable.class));
         for(FileBroadcasting message : captor.getAllValues()) {
-            assertEquals("owner-ak", message.getAkCode());
+            assertEquals("operation-ak", message.getAkCode());
         }
     }
 
     @Test
-    public void derivedEventsUseOriginalSourceAk() {
+    public void derivedEventsUseOperationAkOverOriginalSourceAk() {
         for(FilePurpose purpose : new FilePurpose[] {FilePurpose.DOM_TREE, FilePurpose.PDF}) {
             FileDB derived = file("file-derived-" + purpose.getValue(), purpose);
             derived.setAkCode("parser-ak");
@@ -82,19 +83,23 @@ public class FileServiceBroadcastTest {
             source.setAkCode("original-ak");
             org.mockito.Mockito.doReturn(source).when(fileRepo).queryFileByDomTreeFileId(derived.getFileId());
             when(fileRepo.queryFileByPdfFileId(derived.getFileId())).thenReturn(source);
+            BellaContext.setApikey(ApikeyInfo.builder().code("operation-ak").build());
+            RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(new MockHttpServletRequest()));
             fileService.finalizeFileUpload(derived, "{}");
         }
         ArgumentCaptor<FileBroadcasting> captor = ArgumentCaptor.forClass(FileBroadcasting.class);
         verify(broadcastService, times(2)).broadcast(captor.capture(), any(Runnable.class), any(Runnable.class));
         for(FileBroadcasting message : captor.getAllValues()) {
-            assertEquals("original-ak", message.getAkCode());
+            assertEquals("operation-ak", message.getAkCode());
         }
     }
 
     @Test
-    public void missingOrBrokenSourceLookupPreservesDerivedAk() {
+    public void missingOrBrokenSourceLookupUsesOperationAk() {
         FileDB derived = systemFile(FilePurpose.DOM_TREE);
         derived.setAkCode("derived-ak");
+        BellaContext.setApikey(ApikeyInfo.builder().code("operation-ak").build());
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(new MockHttpServletRequest()));
         fileService.finalizeFileUpload(derived, "{}");
         when(fileRepo.queryFileByDomTreeFileId(derived.getFileId())).thenThrow(new IllegalStateException("lookup failed"));
         fileService.finalizeFileUpload(derived, "{}");
@@ -104,7 +109,7 @@ public class FileServiceBroadcastTest {
         ArgumentCaptor<FileBroadcasting> captor = ArgumentCaptor.forClass(FileBroadcasting.class);
         verify(broadcastService, times(3)).broadcast(captor.capture(), any(Runnable.class), any(Runnable.class));
         for(FileBroadcasting message : captor.getAllValues()) {
-            assertEquals("derived-ak", message.getAkCode());
+            assertEquals("operation-ak", message.getAkCode());
         }
     }
 
