@@ -39,7 +39,6 @@ import org.springframework.jdbc.datasource.TransactionAwareDataSourceProxy;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.util.AopTestUtils;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -102,9 +101,7 @@ public class FileServiceMoveTransactionTest {
 
     @Test
     public void crossSpaceUpdateFailureRollsBackEntryAndSpaceCache() {
-        FileEntryRepo entryRepoTarget = AopTestUtils.getTargetObject(fileEntryRepo);
         recreateCrossSpaceShards();
-        ReflectionTestUtils.setField(entryRepoTarget, "writeMode", "entry");
         try {
             FileDB leaf = addLeaf(SOURCE_SPACE, "cross-rollback.txt", "cross-rollback");
 
@@ -118,16 +115,13 @@ public class FileServiceMoveTransactionTest {
             assertEquals(SOURCE_SPACE, fileRepo.queryFile(leaf.getFileId()).getSpaceCode());
             verifyNoInteractions(broadcastService);
         } finally {
-            ReflectionTestUtils.setField(entryRepoTarget, "writeMode", "dual");
         }
     }
 
     @Test
     public void crossSpaceMoveBroadcastsTargetSpaceAndMigratesEntry() {
-        FileEntryRepo entryRepoTarget = AopTestUtils.getTargetObject(fileEntryRepo);
         FailingFileRepo failingRepo = AopTestUtils.getTargetObject(fileRepo);
         recreateCrossSpaceShards();
-        ReflectionTestUtils.setField(entryRepoTarget, "writeMode", "entry");
         failingRepo.failOnUpdate = false;
         try {
             FileDB leaf = addLeaf(SOURCE_SPACE, "cross-broadcast.txt", "cross-broadcast");
@@ -144,16 +138,13 @@ public class FileServiceMoveTransactionTest {
             assertEquals(TARGET_SPACE, ((OpenAIFile) captor.getValue().getData()).getSpaceCode());
         } finally {
             failingRepo.failOnUpdate = true;
-            ReflectionTestUtils.setField(entryRepoTarget, "writeMode", "dual");
         }
     }
 
     @Test
     public void crossSpaceMoveInfersTargetSpaceFromAncestor() {
-        FileEntryRepo entryRepoTarget = AopTestUtils.getTargetObject(fileEntryRepo);
         FailingFileRepo failingRepo = AopTestUtils.getTargetObject(fileRepo);
         recreateCrossSpaceShards();
-        ReflectionTestUtils.setField(entryRepoTarget, "writeMode", "entry");
         failingRepo.failOnUpdate = false;
         try {
             FileDB leaf = addLeaf(SOURCE_SPACE, "cross-infer.txt", "cross-infer");
@@ -170,7 +161,6 @@ public class FileServiceMoveTransactionTest {
                     movedEntry.getParentEntryId());
         } finally {
             failingRepo.failOnUpdate = true;
-            ReflectionTestUtils.setField(entryRepoTarget, "writeMode", "dual");
         }
     }
 
