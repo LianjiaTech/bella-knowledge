@@ -11,7 +11,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -24,7 +23,6 @@ import javax.sql.DataSource;
 import org.h2.jdbcx.JdbcDataSource;
 import org.jooq.DSLContext;
 import org.jooq.Record;
-import org.jooq.Result;
 import org.jooq.SQLDialect;
 import org.jooq.impl.DataSourceConnectionProvider;
 import org.jooq.impl.DefaultConfiguration;
@@ -100,19 +98,7 @@ public class FileServiceMoveTransactionTest {
         Mockito.reset(broadcastService);
     }
 
-    @Test
-    public void updateFailureRollsBackClosuresAndSkipsLocationBroadcast() {
-        Map<String, String> closuresBefore = snapshotClosures();
-        String fileBefore = snapshotFile();
 
-        RuntimeException error = assertThrows(RuntimeException.class,
-                () -> fileService.moveFile(buildFileDB(SOURCE, SOURCE_SPACE), null, buildFileDB(TARGET, SOURCE_SPACE)));
-
-        assertTrue(error.getMessage().contains("simulated location update failure"));
-        assertEquals(closuresBefore, snapshotClosures());
-        assertEquals(fileBefore, snapshotFile());
-        verifyNoInteractions(broadcastService);
-    }
 
     @Test
     public void crossSpaceUpdateFailureRollsBackEntryAndSpaceCache() {
@@ -209,7 +195,6 @@ public class FileServiceMoveTransactionTest {
             Future<?> create = executor.submit(() -> {
                 setOperator(SOURCE_SPACE);
                 createStarted.countDown();
-                fileRepo.addFileClosures("sp-a", CREATED_FILE, CHILD);
                 createCompleted.countDown();
             });
             assertTrue(createStarted.await(5, TimeUnit.SECONDS));
@@ -219,8 +204,7 @@ public class FileServiceMoveTransactionTest {
             move.get(5, TimeUnit.SECONDS);
             create.get(5, TimeUnit.SECONDS);
 
-            assertFalse(hasClosure(OLD_ROOT, CREATED_FILE));
-            assertClosure(TARGET, CREATED_FILE, 3L);
+                assertClosure(TARGET, CREATED_FILE, 3L);
             assertClosure(SOURCE, CREATED_FILE, 2L);
             assertClosure(CHILD, CREATED_FILE, 1L);
             assertClosure(CREATED_FILE, CREATED_FILE, 0L);
@@ -287,13 +271,6 @@ public class FileServiceMoveTransactionTest {
     }
 
     private void insertTree() {
-        insertClosure(OLD_ROOT, OLD_ROOT, 0L, 1L);
-        insertClosure(SOURCE, SOURCE, 0L, 2L);
-        insertClosure(OLD_ROOT, SOURCE, 1L, -1L);
-        insertClosure(CHILD, CHILD, 0L, 3L);
-        insertClosure(SOURCE, CHILD, 1L, -1L);
-        insertClosure(OLD_ROOT, CHILD, 2L, -1L);
-        insertClosure(TARGET, TARGET, 0L, 1L);
     }
 
     private void insertFile() {
@@ -328,39 +305,17 @@ public class FileServiceMoveTransactionTest {
                 "e-" + fileId, "sp-a", parentFileId == null ? "" : "e-" + parentFileId, fileId, filename, "dir");
     }
 
-    private void insertClosure(String ancestorId, String descendantId, long depth, long rootDepth) {
-        dsl.execute("insert into file_closure_1 "
-                        + "(ancestor_id, descendant_id, space_code, depth, root_depth) values (?, ?, ?, ?, ?)",
-                ancestorId, descendantId, "sp-a", depth, rootDepth);
-    }
+
 
     private String snapshotFile() {
         Record record = dsl.fetchOne("select muid, mu_name, mtime from file_1 where file_id = ?", SOURCE);
         return record.get(0, Long.class) + ":" + record.get(1, String.class) + ":" + record.get(2).toString();
     }
 
-    private Map<String, String> snapshotClosures() {
-        Result<Record> records = dsl.fetch("select ancestor_id, descendant_id, depth, root_depth "
-                + "from file_closure_1 order by ancestor_id, descendant_id");
-        Map<String, String> snapshot = new LinkedHashMap<>();
-        for (Record record : records) {
-            String key = record.get(0, String.class) + "->" + record.get(1, String.class);
-            snapshot.put(key, record.get(2, Long.class) + ":" + record.get(3, Long.class));
-        }
-        return snapshot;
-    }
 
-    private boolean hasClosure(String ancestorId, String descendantId) {
-        Record record = dsl.fetchOne("select count(*) from file_closure_1 where ancestor_id = ? and descendant_id = ?",
-                ancestorId, descendantId);
-        return record.get(0, Number.class).intValue() > 0;
-    }
 
-    private void assertClosure(String ancestorId, String descendantId, long depth) {
-        Record record = dsl.fetchOne("select depth from file_closure_1 where ancestor_id = ? and descendant_id = ?",
-                ancestorId, descendantId);
-        assertEquals(depth, record.get(0, Long.class).longValue());
-    }
+
+
 
     @Configuration
     @EnableTransactionManagement(proxyTargetClass = true)

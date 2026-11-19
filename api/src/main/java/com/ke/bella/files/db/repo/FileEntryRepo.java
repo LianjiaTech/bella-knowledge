@@ -1,7 +1,6 @@
 package com.ke.bella.files.db.repo;
 
 import static com.ke.bella.files.db.Tables.FILE;
-import static com.ke.bella.files.db.Tables.FILE_CLOSURE;
 import static com.ke.bella.files.db.Tables.FILE_ENTRY;
 
 import java.util.ArrayList;
@@ -33,7 +32,6 @@ import org.jooq.Table;
 import org.jooq.impl.DSL;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,7 +39,6 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.ke.bella.files.db.IDGenerator;
 import com.ke.bella.files.db.tables.pojos.FileDB;
 import com.ke.bella.files.db.tables.pojos.FileEntryDB;
-import com.ke.bella.files.db.tables.records.FileClosureRecord;
 import com.ke.bella.files.db.tables.records.FileEntryRecord;
 import com.ke.bella.files.enums.NodeType;
 import com.ke.bella.files.protocol.FileNodeCount;
@@ -73,16 +70,6 @@ public class FileEntryRepo implements BaseRepo {
 
     private int sqlInChunkSize = SQL_IN_CHUNK_SIZE;
 
-    /**
-     * dual（默认）：闭包表和 entry 双写，任一失败整体回滚，保证两边严格一致；
-     * entry：停写闭包，entry 是唯一记录，闭包读回退同时关闭；
-     * closure：逃生阀——完全停写 entry，退回纯闭包链路。用于 dual 阶段 entry 侧出问题时不发版止血；
-     * 切回 dual 后窗口期缺失的 entry 由离线回填补齐（懒迁移已随存量迁移完成移除），切 entry 读之前必须重跑回填校验。
-     * 下闭包表的路径：write-mode 切 entry → 观察 → drop 表，中间不需要发布。
-     */
-    @Value("${bella.file-api.file-entry.write-mode:dual}")
-    private String writeMode;
-
     public FileEntryRepo(DSLContext db) {
         this.db = db;
     }
@@ -93,18 +80,6 @@ public class FileEntryRepo implements BaseRepo {
 
     void setSqlInChunkSize(int size) {
         this.sqlInChunkSize = size;
-    }
-
-    void setFileEntryWriteMode(String writeMode) {
-        this.writeMode = writeMode;
-    }
-
-    public boolean closureWriteEnabled() {
-        return !"entry".equalsIgnoreCase(writeMode);
-    }
-
-    public boolean entryWriteEnabled() {
-        return !"closure".equalsIgnoreCase(writeMode);
     }
 
     private DSLContext entryDb(String spaceCode) {
@@ -279,7 +254,7 @@ public class FileEntryRepo implements BaseRepo {
     /**
      * 批量祖先链：按层聚合 IN 查询解析父链，查询次数与最大树深同阶，而非文件数。
      * 无 entry 且 file 已删除/不存在的 fileId 返回空数组（与闭包实现一致）；
-     * 无 entry 但 file 仍活跃说明数据未迁移完成，抛 EntryReadNotReadyException 由调用方回退闭包读。
+     * 无 entry 但 file 仍活跃说明数据未迁移完成，抛 EntryReadNotReadyException 暴露数据异常。
      */
     public Map<String, List<String>> ancestorFileIds(String spaceCode, List<String> fileIds) {
         Map<String, List<String>> result = new HashMap<>();
@@ -496,10 +471,6 @@ public class FileEntryRepo implements BaseRepo {
                 .thenComparing(idComparator);
     }
 
-    /**
-     * entry 写失败一律抛出，让外层主事务整体回滚，file/闭包/entry 严格一致。
-     * write-mode=closure 是逃生阀：entry 写全部空操作，退回纯闭包链路。
-     */
     private String entryType(FileDB file) {
         if(Integer.valueOf(1).equals(file.getIsDir())) {
             return TYPE_DIR;
@@ -509,9 +480,6 @@ public class FileEntryRepo implements BaseRepo {
 
     @Transactional(rollbackFor = Exception.class)
     public FileEntryDB addEntry(String spaceCode, FileDB file, @Nullable String ancestorId) {
-        if(!entryWriteEnabled()) {
-            return null;
-        }
         String parentEntryId = resolveParentEntryId(spaceCode, ancestorId);
         assertNameAvailable(spaceCode, parentEntryId, file.getFilename(), null);
         FileEntryRecord record = FILE_ENTRY.newRecord();
@@ -560,9 +528,6 @@ public class FileEntryRepo implements BaseRepo {
     }
 
     public void rename(String spaceCode, String fileId, String filename) {
-        if(!entryWriteEnabled()) {
-            return;
-        }
         FileEntryDB entry = requireActiveEntry(spaceCode, fileId);
         assertNameAvailable(spaceCode, entry.getParentEntryId(), filename, entry.getEntryId());
         int updated = entryDb(spaceCode).update(FILE_ENTRY)
@@ -576,9 +541,6 @@ public class FileEntryRepo implements BaseRepo {
     }
 
     public void move(String spaceCode, String fileId, @Nullable String targetAncestorId) {
-        if(!entryWriteEnabled()) {
-            return;
-        }
         FileEntryDB entry = requireActiveEntry(spaceCode, fileId);
         String parentEntryId = resolveParentEntryId(spaceCode, targetAncestorId);
         assertNotSelfOrDescendant(spaceCode, entry, parentEntryId);
@@ -594,9 +556,6 @@ public class FileEntryRepo implements BaseRepo {
     }
 
     public void delete(String spaceCode, String fileId) {
-        if(!entryWriteEnabled()) {
-            return;
-        }
         int deleted = entryDb(spaceCode).deleteFrom(FILE_ENTRY)
                 .where(FILE_ENTRY.SPACE_CODE.eq(spaceCode))
                 .and(FILE_ENTRY.FILE_ID.eq(fileId))
@@ -612,9 +571,6 @@ public class FileEntryRepo implements BaseRepo {
      */
     @Transactional(rollbackFor = Exception.class)
     public FileEntryDB moveAcrossSpace(FileDB file, String targetSpaceCode, @Nullable FileDB targetAncestor) {
-        if(!entryWriteEnabled()) {
-            throw new IllegalStateException("cross-space move requires file_entry writes, current write-mode is closure");
-        }
         String fileId = file.getFileId();
         String sourceSpaceCode = file.getSpaceCode();
         String targetAncestorId = targetAncestor == null ? null : targetAncestor.getFileId();
@@ -753,25 +709,18 @@ public class FileEntryRepo implements BaseRepo {
         if(sourceUpdated != 1) {
             throw new IllegalStateException("delete source file_entry failed, fileId: " + fileId);
         }
-        if(closureWriteEnabled()) {
-            moveLeafClosureAcrossSpace(fileId, sourceSpaceCode, targetSpaceCode, targetAncestorId);
-        }
         updateFileSpaceCache(Collections.singletonList(fileId), targetSpaceCode);
     }
 
     /**
      * 非空目录跨空间迁移：同一本地事务内把子树全部 file_entry 改写到目标空间分片（保留 entry_id 与父子关系，
      * 仅根 entry 的 parent_entry_id 指向目标父入口），并批量刷新 file.space_code 缓存。
-     * 只迁窄表 file_entry，不随迁闭包，因此仅允许在 write-mode=entry（闭包已停写）下执行；
+     * 只迁移 file_entry，不改变 file 物理分片；
      * file 物理行、file_id、bucket/path 和对象内容均不变；失败整体回滚，源目录保持完好。
      * 跨空间不一定跨分片：两个空间落在同一物理分片时原地 UPDATE 改写空间归属，仅跨分片才搬行。
      */
     private void moveSubtreeAcrossSpace(FileEntryDB source, List<FileEntryDB> descendants, String sourceSpaceCode,
             String targetSpaceCode, String targetParentEntryId) {
-        if(closureWriteEnabled()) {
-            throw new IllegalStateException(
-                    "cross-space move of non-empty directories requires write-mode entry, closure is still being written");
-        }
         long startMillis = System.currentTimeMillis();
         String fileId = source.getFileId();
         List<FileEntryDB> subtree = new ArrayList<>(descendants.size() + 1);
@@ -927,50 +876,6 @@ public class FileEntryRepo implements BaseRepo {
         int updated = Arrays.stream(db.batch(updates).execute()).sum();
         if(updated != fileIds.size()) {
             throw new IllegalStateException("update file space cache failed, expected: " + fileIds.size() + ", updated: " + updated);
-        }
-    }
-
-    private void moveLeafClosureAcrossSpace(String fileId, String sourceSpaceCode, String targetSpaceCode,
-            @Nullable String targetAncestorId) {
-        DSLContext sourceDsl = entryDb(sourceSpaceCode);
-        DSLContext targetDsl = entryDb(targetSpaceCode);
-        int deleted = sourceDsl.deleteFrom(FILE_CLOSURE)
-                .where(FILE_CLOSURE.DESCENDANT_ID.eq(fileId))
-                .and(FILE_CLOSURE.SPACE_CODE.eq(sourceSpaceCode))
-                .execute();
-        if(deleted == 0) {
-            throw new IllegalStateException("source file_closure not found, fileId: " + fileId);
-        }
-
-        long rootDepth = 1L;
-        if(StringUtils.isNotEmpty(targetAncestorId)) {
-            List<FileClosureRecord> ancestors = targetDsl.selectFrom(FILE_CLOSURE)
-                    .where(FILE_CLOSURE.DESCENDANT_ID.eq(targetAncestorId))
-                    .and(FILE_CLOSURE.SPACE_CODE.eq(targetSpaceCode))
-                    .orderBy(FILE_CLOSURE.DEPTH.asc())
-                    .fetchInto(FileClosureRecord.class);
-            if(ancestors.isEmpty()) {
-                throw new IllegalStateException("target ancestor closure not found, fileId: " + targetAncestorId);
-            }
-            rootDepth = ancestors.size() + 1L;
-            for (FileClosureRecord ancestor : ancestors) {
-                insertClosure(targetDsl, targetSpaceCode, ancestor.getAncestorId(), fileId, ancestor.getDepth() + 1L, -1L);
-            }
-        }
-        insertClosure(targetDsl, targetSpaceCode, fileId, fileId, 0L, rootDepth);
-    }
-
-    private void insertClosure(DSLContext dsl, String spaceCode, String ancestorId, String descendantId, long depth,
-            long rootDepth) {
-        FileClosureRecord record = FILE_CLOSURE.newRecord();
-        record.setSpaceCode(spaceCode);
-        record.setAncestorId(ancestorId);
-        record.setDescendantId(descendantId);
-        record.setDepth(depth);
-        record.setRootDepth(rootDepth);
-        fillCreatorInfo(record);
-        if(dsl.insertInto(FILE_CLOSURE).set(record).execute() != 1) {
-            throw new IllegalStateException("insert target file_closure failed, fileId: " + descendantId);
         }
     }
 

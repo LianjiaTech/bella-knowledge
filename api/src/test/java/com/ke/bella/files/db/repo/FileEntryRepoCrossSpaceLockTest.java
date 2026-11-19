@@ -70,9 +70,7 @@ public class FileEntryRepoCrossSpaceLockTest {
         FileRepoTestFixture.recreateUserFileTables(dsl, sourceShard);
         FileRepoTestFixture.recreateUserFileTables(dsl, targetShard);
         IDGenerator.setInstanceId(1L);
-        // @Value 注入在 @Bean 方法之后执行，开关必须在 bean 初始化完成后设置到代理背后的目标对象
         FileEntryRepo target = AopTestUtils.getTargetObject(entryRepo);
-        target.setFileEntryWriteMode("entry");
         executor = Executors.newFixedThreadPool(2);
         setOperator(SOURCE_SPACE);
     }

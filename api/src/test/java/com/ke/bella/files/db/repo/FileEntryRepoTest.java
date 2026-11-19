@@ -1,7 +1,6 @@
 package com.ke.bella.files.db.repo;
 
 import static com.ke.bella.files.db.Tables.FILE;
-import static com.ke.bella.files.db.Tables.FILE_CLOSURE;
 import static com.ke.bella.files.db.Tables.FILE_ENTRY;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
@@ -85,7 +84,7 @@ public class FileEntryRepoTest {
         assertNotNull(original);
         assertEquals(entryRepo.queryActiveByFileId(SOURCE_SPACE, firstParent.getFileId()).getEntryId(), original.getParentEntryId());
         assertTrue(entryRepo.exists(SOURCE_SPACE, firstParent.getFileId(), "report.txt"));
-        // dual 模式下 entry 写不再降级：重名冲突直接失败
+        // entry 是唯一目录写入路径：重名冲突直接失败
         assertThrows(IllegalStateException.class,
                 () -> addFile(SOURCE_SPACE, "report.txt", firstParent.getFileId(), "duplicate"));
 
@@ -98,7 +97,6 @@ public class FileEntryRepoTest {
         assertEquals("renamed.txt", entryRepo.queryActiveByFileId(SOURCE_SPACE, file.getFileId()).getFilename());
 
         fileRepo.updateFile(FileOps.builder().fileId(file.getFileId()).status(FileStatus.DELETED).build());
-        fileRepo.deleteFileClosure(file.getFileId(), FileType.USER);
         assertNull(entryRepo.queryActiveByFileId(SOURCE_SPACE, file.getFileId()));
         assertEquals(0, DSLContextHolder.get(FileRepo.getShardingKeyBySpaceCode(SOURCE_SPACE), dsl)
                 .fetchCount(FILE_ENTRY, FILE_ENTRY.FILE_ID.eq(file.getFileId())));
@@ -157,10 +155,6 @@ public class FileEntryRepoTest {
         assertEquals(TARGET_SPACE, unchanged.getSpaceCode());
         assertEquals(source.getBucket(), unchanged.getBucket());
         assertEquals(source.getPath(), unchanged.getPath());
-        assertFalse(hasClosure(SOURCE_SPACE, source.getFileId(), source.getFileId()));
-        assertTrue(hasClosure(TARGET_SPACE, targetParent.getFileId(), source.getFileId()));
-
-        fileRepo.setFileEntryReadMode("entry");
         Page<FileDB> targetPage = fileRepo.pageFiles(PageFileOps.builder()
                 .spaceCode(TARGET_SPACE)
                 .ancestorId(targetParent.getFileId())
@@ -186,8 +180,6 @@ public class FileEntryRepoTest {
 
     @Test
     public void crossSpaceMoveMigratesNonEmptyDirectorySubtreeInEntryMode() {
-        entryRepo.setFileEntryWriteMode("entry");
-        fileRepo.setFileEntryReadMode("entry");
 
         FileDB root = addDirectory(SOURCE_SPACE, "tree-root", null, "tree-root");
         FileDB fileA = addFile(SOURCE_SPACE, "tree-a.txt", root.getFileId(), "tree-a");
@@ -243,7 +235,6 @@ public class FileEntryRepoTest {
 
     @Test
     public void crossSpaceMoveOfNonEmptyDirectoryExceedingWarnThresholdStillSucceeds() {
-        entryRepo.setFileEntryWriteMode("entry");
         entryRepo.setCrossSpaceMoveWarnThreshold(1);
 
         FileDB root = addDirectory(SOURCE_SPACE, "warn-root", null, "warn-root");
@@ -256,22 +247,10 @@ public class FileEntryRepoTest {
         assertEquals(2L, entryRepo.countNodes(TARGET_SPACE, root.getFileId()).getFileCount());
     }
 
-    @Test
-    public void crossSpaceMoveOfNonEmptyDirectoryRequiresEntryWriteMode() {
-        FileDB root = addDirectory(SOURCE_SPACE, "dual-root", null, "dual-root");
-        addFile(SOURCE_SPACE, "dual-a.txt", root.getFileId(), "dual-a");
 
-        // dual 模式闭包仍在写，非空目录不随迁闭包，必须拒绝；源目录保持完好
-        IllegalStateException error = assertThrows(IllegalStateException.class,
-                () -> entryRepo.moveAcrossSpace(root, TARGET_SPACE, null));
-        assertTrue(error.getMessage().contains("requires write-mode entry"));
-        assertNotNull(entryRepo.queryActiveByFileId(SOURCE_SPACE, root.getFileId()));
-        assertEquals(SOURCE_SPACE, fileRepo.queryFile(root.getFileId()).getSpaceCode());
-    }
 
     @Test
     public void crossSpaceMoveRejectsTargetNameConflictBeforeAnyWrite() {
-        entryRepo.setFileEntryWriteMode("entry");
         FileDB root = addDirectory(SOURCE_SPACE, "conflict-dir", null, "conflict-src");
         FileDB child = addFile(SOURCE_SPACE, "conflict-a.txt", root.getFileId(), "conflict-a");
         setOperator(TARGET_SPACE);
@@ -288,7 +267,6 @@ public class FileEntryRepoTest {
 
     @Test
     public void moveAcrossSpaceRejectsSameSpaceCall() {
-        entryRepo.setFileEntryWriteMode("entry");
         FileDB root = addDirectory(SOURCE_SPACE, "same-root", null, "same-root");
         FileDB child = addFile(SOURCE_SPACE, "same-a.txt", root.getFileId(), "same-a");
         FileDB sibling = addDirectory(SOURCE_SPACE, "same-target", null, "same-target");
@@ -312,7 +290,6 @@ public class FileEntryRepoTest {
 
     @Test
     public void crossSpaceMoveHandlesSubtreeAtMaxDepthAndRejectsBeyond() {
-        entryRepo.setFileEntryWriteMode("entry");
         FileDB root = addDirectory(SOURCE_SPACE, "depth-root", null, "depth-root");
         FileDB deepest = root;
         for (int level = 1; level <= FileEntryRepo.MAX_TREE_DEPTH; level++) {
@@ -336,7 +313,6 @@ public class FileEntryRepoTest {
 
     @Test
     public void crossSpaceMoveAccountsForTargetParentDepth() {
-        entryRepo.setFileEntryWriteMode("entry");
         FileDB targetDeepest = null;
         for (int level = 1; level <= FileEntryRepo.MAX_TREE_DEPTH; level++) {
             targetDeepest = addDirectory(TARGET_SPACE, "tp-" + level,
@@ -365,7 +341,6 @@ public class FileEntryRepoTest {
 
     @Test
     public void crossSpaceMoveChunksAllInListsAndStaysConsistent() {
-        entryRepo.setFileEntryWriteMode("entry");
         // 块大小压到 2，强制 BFS、insert-select、delete 和缓存刷新全部走分块路径
         entryRepo.setSqlInChunkSize(2);
         FileDB root = addDirectory(SOURCE_SPACE, "chunk-root", null, "chunk-root");
@@ -395,7 +370,6 @@ public class FileEntryRepoTest {
 
     @Test
     public void crossSpaceMoveWithinSamePhysicalShardKeepsBothSpacesIsolated() {
-        entryRepo.setFileEntryWriteMode("entry");
         // 块大小压到 1，强制同分片 UPDATE 快路径也走分块
         entryRepo.setSqlInChunkSize(1);
         // 找一个与源空间落在同一物理分片的不同空间：走原地 UPDATE 快路径，源/目标为同一张表
@@ -430,7 +404,6 @@ public class FileEntryRepoTest {
 
     @Test
     public void crossSpaceMoveRejectsNonDirectoryTargetParent() {
-        entryRepo.setFileEntryWriteMode("entry");
         FileDB movedDir = addDirectory(SOURCE_SPACE, "parent-check-src", null, "parent-check-src");
         addFile(SOURCE_SPACE, "parent-check-child.txt", movedDir.getFileId(), "parent-check-child");
         setOperator(TARGET_SPACE);
@@ -443,90 +416,11 @@ public class FileEntryRepoTest {
         assertNotNull(entryRepo.queryActiveByFileId(SOURCE_SPACE, movedDir.getFileId()));
     }
 
-    @Test
-    public void entryReadResolvesAncestorChainsWithoutClosure() {
-        FileDB rootDir = addDirectory(SOURCE_SPACE, "chain-root", null, "chain-root");
-        FileDB childDir = addDirectory(SOURCE_SPACE, "chain-child", rootDir.getFileId(), "chain-child");
-        FileDB leaf = addFile(SOURCE_SPACE, "chain-leaf.txt", childDir.getFileId(), "chain-leaf");
-        FileDB rootFile = addFile(SOURCE_SPACE, "chain-top.txt", null, "chain-top");
-        FileDB deleted = addFile(SOURCE_SPACE, "chain-del.txt", null, "chain-del");
-        fileRepo.updateFile(FileOps.builder().fileId(deleted.getFileId()).status(FileStatus.DELETED).build());
 
-        // 清空闭包表，证明以下读取完全来自 file_entry
-        dsl.execute("delete from file_closure_" + FileRepo.getShardingKeyBySpaceCode(SOURCE_SPACE));
-        fileRepo.setFileEntryReadMode("entry");
 
-        assertEquals(childDir.getFileId(), fileRepo.getDirectAncestorId(leaf.getFileId()));
-        assertNull(fileRepo.getDirectAncestorId(rootFile.getFileId()));
 
-        List<String> pathIds = fileRepo.getPathFiles(leaf.getFileId()).stream()
-                .map(FileDB::getFileId)
-                .collect(Collectors.toList());
-        assertEquals(Arrays.asList(rootDir.getFileId(), childDir.getFileId(), leaf.getFileId()), pathIds);
 
-        Map<String, List<String>> ancestors = fileRepo.getFileAncestorIds(SOURCE_SPACE,
-                Arrays.asList(leaf.getFileId(), childDir.getFileId(), rootFile.getFileId(), deleted.getFileId()));
-        assertEquals(Arrays.asList(rootDir.getFileId(), childDir.getFileId()), ancestors.get(leaf.getFileId()));
-        assertEquals(Collections.singletonList(rootDir.getFileId()), ancestors.get(childDir.getFileId()));
-        assertEquals(Collections.emptyList(), ancestors.get(rootFile.getFileId()));
-        assertEquals(Collections.emptyList(), ancestors.get(deleted.getFileId()));
-    }
 
-    @Test
-    public void entryOnlyModeStopsClosureWritesAndStaysConsistent() {
-        entryRepo.setFileEntryWriteMode("entry");
-        fileRepo.setFileEntryReadMode("entry");
-        DSLContext shardDsl = DSLContextHolder.get(FileRepo.getShardingKeyBySpaceCode(SOURCE_SPACE), dsl);
-
-        FileDB root = addDirectory(SOURCE_SPACE, "eo-root", null, "eo-root");
-        FileDB child = addDirectory(SOURCE_SPACE, "eo-child", root.getFileId(), "eo-child");
-        FileDB leaf = addFile(SOURCE_SPACE, "eo-leaf.txt", child.getFileId(), "eo-leaf");
-
-        // 闭包表零写入，层级读写全部走 entry
-        assertEquals(0, shardDsl.fetchCount(FILE_CLOSURE));
-        assertEquals(child.getFileId(), fileRepo.getDirectAncestorId(leaf.getFileId()));
-        assertEquals(Arrays.asList(root.getFileId(), child.getFileId(), leaf.getFileId()),
-                fileRepo.getPathFiles(leaf.getFileId()).stream().map(FileDB::getFileId).collect(Collectors.toList()));
-
-        // 防环校验由 entry 自己承担
-        assertThrows(IllegalArgumentException.class,
-                () -> fileRepo.moveFile(root, child));
-
-        // entry 写是主写：重名冲突必须失败，不再降级
-        assertThrows(IllegalStateException.class,
-                () -> addFile(SOURCE_SPACE, "eo-child", root.getFileId(), "eo-dup"));
-
-        fileRepo.moveFile(leaf, root);
-        assertEquals(root.getFileId(), fileRepo.getDirectAncestorId(leaf.getFileId()));
-
-        fileRepo.updateFile(FileOps.builder().fileId(leaf.getFileId()).status(FileStatus.DELETED).build());
-        fileRepo.deleteFileClosure(leaf.getFileId(), FileType.USER);
-        assertNull(entryRepo.queryActiveByFileId(SOURCE_SPACE, leaf.getFileId()));
-        assertEquals(0, shardDsl.fetchCount(FILE_CLOSURE));
-    }
-
-    @Test
-    public void closureModeStopsEntryWritesAndKeepsClosureAuthoritative() {
-        entryRepo.setFileEntryWriteMode("closure");
-        DSLContext shardDsl = DSLContextHolder.get(FileRepo.getShardingKeyBySpaceCode(SOURCE_SPACE), dsl);
-
-        FileDB root = addDirectory(SOURCE_SPACE, "cm-root", null, "cm-root");
-        FileDB leaf = addFile(SOURCE_SPACE, "cm-leaf.txt", root.getFileId(), "cm-leaf");
-
-        // entry 零写入，闭包链路完整可用
-        assertEquals(0, shardDsl.fetchCount(FILE_ENTRY));
-        assertEquals(root.getFileId(), fileRepo.getDirectAncestorId(leaf.getFileId()));
-
-        fileRepo.moveFile(leaf, null);
-        assertNull(fileRepo.getDirectAncestorId(leaf.getFileId()));
-        fileRepo.updateFile(FileOps.builder().fileId(leaf.getFileId()).filename("cm-renamed.txt").build());
-        fileRepo.updateFile(FileOps.builder().fileId(leaf.getFileId()).status(FileStatus.DELETED).build());
-        assertEquals(0, shardDsl.fetchCount(FILE_ENTRY));
-
-        // 跨空间移动依赖 entry 记录，closure 模式下必须拒绝
-        assertThrows(IllegalStateException.class,
-                () -> entryRepo.moveAcrossSpace(root, TARGET_SPACE, null));
-    }
 
     @Test
     public void countNodesUsesEntriesForSpaceAndDirectChildren() {
@@ -536,10 +430,6 @@ public class FileEntryRepoTest {
         FileDB resource = addResource(SOURCE_SPACE, "count-resource", directory.getFileId(), "count-resource");
         FileDB nestedDirectory = addDirectory(SOURCE_SPACE, "count-nested", directory.getFileId(), "count-nested");
         addFile(SOURCE_SPACE, "count-grandchild.txt", nestedDirectory.getFileId(), "count-grandchild");
-
-        DSLContextHolder.get(FileRepo.getShardingKeyBySpaceCode(SOURCE_SPACE), dsl)
-                .dropTable(FILE_CLOSURE)
-                .execute();
 
         FileNodeCount spaceCount = entryRepo.countNodes(SOURCE_SPACE, null);
         assertEquals(3L, spaceCount.getFileCount());
@@ -564,17 +454,15 @@ public class FileEntryRepoTest {
         FileDB resource = addResource(SOURCE_SPACE, "res-node", dir.getFileId(), "res-node");
 
         // 闭包读作为基准
-        List<String> closureListed = listIds(dir.getFileId());
-        List<String> closureFilePage = pageIds(dir.getFileId(), "file");
-        List<String> closureResourcePage = pageIds(dir.getFileId(), "resource");
-        assertEquals(Collections.singletonList(file.getFileId()), closureListed);
-        assertEquals(Collections.singletonList(file.getFileId()), closureFilePage);
-        assertEquals(Collections.singletonList(resource.getFileId()), closureResourcePage);
-
-        fileRepo.setFileEntryReadMode("entry");
-        assertEquals(closureListed, listIds(dir.getFileId()));
-        assertEquals(closureFilePage, pageIds(dir.getFileId(), "file"));
-        assertEquals(closureResourcePage, pageIds(dir.getFileId(), "resource"));
+        List<String> entryListed = listIds(dir.getFileId());
+        List<String> entryFilePage = pageIds(dir.getFileId(), "file");
+        List<String> entryResourcePage = pageIds(dir.getFileId(), "resource");
+        assertEquals(Collections.singletonList(file.getFileId()), entryListed);
+        assertEquals(Collections.singletonList(file.getFileId()), entryFilePage);
+        assertEquals(Collections.singletonList(resource.getFileId()), entryResourcePage);
+        assertEquals(entryListed, listIds(dir.getFileId()));
+        assertEquals(entryFilePage, pageIds(dir.getFileId(), "file"));
+        assertEquals(entryResourcePage, pageIds(dir.getFileId(), "resource"));
         assertEquals(2, pageIds(dir.getFileId(), null).size());
     }
 
@@ -607,7 +495,6 @@ public class FileEntryRepoTest {
         DSLContext shardDsl = DSLContextHolder.get(FileRepo.getShardingKeyBySpaceCode(SOURCE_SPACE), dsl);
         LocalDateTime sharedCtime = LocalDateTime.of(2026, 8, 9, 0, 0);
         shardDsl.update(FILE).set(FILE.CTIME, sharedCtime).execute();
-        fileRepo.setFileEntryReadMode("entry");
 
         List<FileDB> firstPage = fileRepo.listFile(null, 2, "asc", null, SOURCE_SPACE, null);
         assertEquals(first.getFileId(), firstPage.get(0).getFileId());
@@ -619,37 +506,7 @@ public class FileEntryRepoTest {
         assertTrue(fileRepo.listFile(null, 2, "asc", missingCursorId, SOURCE_SPACE, null).isEmpty());
     }
 
-    @Test
-    public void addFileWritesClosureInFileSpaceNotOperatorSpace() {
-        // login context stays in SOURCE_SPACE while the file targets TARGET_SPACE,
-        // mimicking an import with space_code in the request body
-        setOperator(SOURCE_SPACE);
-        String hash = String.valueOf(Math.abs(CustomStringUtils.hashCode(TARGET_SPACE)));
-        String fileId = "file-260808000000000321-" + hash + FileType.USER.getSuffix();
-        FileDB file = new FileDB();
-        file.setFileId(fileId);
-        file.setFilename("import.txt");
-        file.setIsDir(0);
-        file.setNodeType(NodeType.FILE.getValue());
-        file.setResourceId("");
-        file.setSpaceCode(TARGET_SPACE);
-        file.setPurpose("assistants");
-        file.setStatus(FileStatus.NOT_DELETED.getValue());
-        file.setBucket("bucket");
-        file.setPath("import/import.txt");
-        file.setMetaData("{}");
-        fileRepo.addFile(file, null, FileType.USER);
 
-        DSLContext shardDsl = DSLContextHolder.get(FileRepo.getShardingKeyBySpaceCode(TARGET_SPACE), dsl);
-        List<String> closureSpaces = shardDsl.select(FILE_CLOSURE.SPACE_CODE).from(FILE_CLOSURE)
-                .where(FILE_CLOSURE.DESCENDANT_ID.eq(fileId))
-                .fetchInto(String.class);
-        assertFalse(closureSpaces.isEmpty());
-        assertTrue(closureSpaces.stream().allMatch(TARGET_SPACE::equals));
-
-        // duplicate detection in the target space now sees the file
-        assertTrue(fileRepo.exists(TARGET_SPACE, null, "import.txt"));
-    }
 
     private FileDB addDirectory(String spaceCode, String filename, String ancestorId, String seed) {
         return add(spaceCode, filename, ancestorId, seed, FileType.DIRECTORY, 1, NodeType.DIRECTORY, "");
@@ -684,13 +541,7 @@ public class FileEntryRepoTest {
         return fileRepo.queryFile(fileId, type);
     }
 
-    private boolean hasClosure(String spaceCode, String ancestorId, String descendantId) {
-        String shard = FileRepo.getShardingKeyBySpaceCode(spaceCode);
-        DSLContext shardDsl = DSLContextHolder.get(shard, dsl);
-        return shardDsl.fetchExists(DSL.selectOne().from(com.ke.bella.files.db.Tables.FILE_CLOSURE)
-                .where(com.ke.bella.files.db.Tables.FILE_CLOSURE.ANCESTOR_ID.eq(ancestorId))
-                .and(com.ke.bella.files.db.Tables.FILE_CLOSURE.DESCENDANT_ID.eq(descendantId)));
-    }
+
 
     private void setOperator(String spaceCode) {
         BellaContext.setOperator(Operator.builder().userId(1L).userName("tester").spaceCode(spaceCode).build());

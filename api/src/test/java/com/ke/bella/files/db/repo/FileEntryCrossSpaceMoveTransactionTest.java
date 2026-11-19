@@ -62,15 +62,12 @@ public class FileEntryCrossSpaceMoveTransactionTest {
         assertNotEquals(sourceShard, targetShard);
         FileRepoTestFixture.recreateUserFileTables(dsl, sourceShard);
         dsl.execute("drop table if exists file_" + targetShard);
-        dsl.execute("drop table if exists file_closure_" + targetShard);
         dsl.execute("drop table if exists file_entry_" + targetShard);
         dsl.execute("create table file_" + targetShard + " as select * from file_" + sourceShard + " where 1 = 0");
-        dsl.execute("create table file_closure_" + targetShard + " as select * from file_closure_" + sourceShard + " where 1 = 0");
         dsl.execute("create table file_entry_" + targetShard + " as select * from file_entry_" + sourceShard + " where 1 = 0");
         IDGenerator.setInstanceId(1L);
         entryRepo = new FileEntryRepo(dsl);
         fileRepo = new FileRepo(dsl, entryRepo);
-        entryRepo.setFileEntryWriteMode("entry");
         setOperator(SOURCE_SPACE);
     }
 

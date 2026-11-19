@@ -130,7 +130,6 @@ public class FileServiceResourceTest {
         assertEquals("dataset:12345", deleted.getResourceId());
         verify(fileRepo).updateFile(org.mockito.ArgumentMatchers.argThat(op -> op.getStatus() == FileStatus.DELETED),
                 org.mockito.ArgumentMatchers.eq(false));
-        verify(fileRepo).deleteFileClosure("file-resource-1", FileType.USER);
         verifyNoInteractions(storageService);
     }
 
