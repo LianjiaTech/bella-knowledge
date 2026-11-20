@@ -28,15 +28,15 @@ import com.ke.bella.openapi.BellaContext;
 import com.ke.bella.openapi.Operator;
 
 public class FileRepoMoveTest {
-    private static final String OLD_ROOT = "file-old-0-d";
-    private static final String SOURCE = "file-source-0-d";
-    private static final String CHILD = "file-child-0-d";
-    private static final String LEAF = "file-leaf-0";
-    private static final String NEW_ROOT = "file-new-root-0-d";
-    private static final String TARGET = "file-target-0-d";
-    private static final String PAGE_DIRECTORY = "file-page-dir-0-d";
-    private static final String PAGE_FILE = "file-page-file-0";
-    private static final String PAGE_RESOURCE = "file-page-resource-0";
+    private static final String OLD_ROOT = "file-260824000000000001-0-d";
+    private static final String SOURCE = "file-260824000000000002-0-d";
+    private static final String CHILD = "file-260824000000000003-0-d";
+    private static final String LEAF = "file-260824000000000004-0";
+    private static final String NEW_ROOT = "file-260824000000000005-0-d";
+    private static final String TARGET = "file-260824000000000006-0-d";
+    private static final String PAGE_DIRECTORY = "file-260824000000000007-0-d";
+    private static final String PAGE_FILE = "file-260824000000000008-0";
+    private static final String PAGE_RESOURCE = "file-260824000000000009-0";
 
     private static Connection connection;
     private static DSLContext dsl;
@@ -169,7 +169,7 @@ public class FileRepoMoveTest {
             String entryType) {
         dsl.execute("insert into file_0 (file_id, filename, is_dir, node_type, resource_id, space_code, meta_data) "
                         + "values (?, ?, ?, ?, ?, ?, ?)",
-                fileId, filename, isDir, nodeType.getValue(), resourceId, "sp-0", "{}");
+                fileId, filename, isDir, nodeType.getValue(), resourceId == null ? "" : resourceId, "sp-0", "{}");
         insertEntry(fileId, TARGET, filename, FileEntryRepo.TYPE_DIR.equals(entryType));
         if(!FileEntryRepo.TYPE_DIR.equals(entryType)) {
             dsl.execute("update file_entry_0 set type = ? where file_id = ?", entryType, fileId);

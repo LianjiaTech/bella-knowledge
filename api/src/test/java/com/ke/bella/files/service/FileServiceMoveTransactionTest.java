@@ -1,7 +1,6 @@
 package com.ke.bella.files.service;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
@@ -11,18 +10,18 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
-import java.util.Map;
+import java.util.Arrays;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import javax.sql.DataSource;
 
 import org.h2.jdbcx.JdbcDataSource;
 import org.jooq.DSLContext;
-import org.jooq.Record;
 import org.jooq.SQLDialect;
 import org.jooq.impl.DataSourceConnectionProvider;
 import org.jooq.impl.DefaultConfiguration;
@@ -70,7 +69,7 @@ public class FileServiceMoveTransactionTest {
     private static final String SOURCE = "file-source-1-d";
     private static final String CHILD = "file-child-1-d";
     private static final String TARGET = "file-target-1-d";
-    private static final String CREATED_FILE = "file-created-1-d";
+    private static final String CREATED_FILE = "file-260824000000000010-1-d";
     private static final String SOURCE_SPACE = "sp-a";
     private static final String TARGET_SPACE = "sp-b";
 
@@ -165,7 +164,7 @@ public class FileServiceMoveTransactionTest {
     }
 
     @Test
-    public void creatingInMovingSubtreeWaitsForNewAncestorChain() throws Exception {
+    public void creatingInMovingSubtreeKeepsParentChainConsistent() throws Exception {
         CountDownLatch moveCompleted = new CountDownLatch(1);
         CountDownLatch allowMoveCommit = new CountDownLatch(1);
         CountDownLatch createStarted = new CountDownLatch(1);
@@ -185,19 +184,24 @@ public class FileServiceMoveTransactionTest {
             Future<?> create = executor.submit(() -> {
                 setOperator(SOURCE_SPACE);
                 createStarted.countDown();
+                addDirectoryUnder(CREATED_FILE, "created", CHILD);
                 createCompleted.countDown();
             });
             assertTrue(createStarted.await(5, TimeUnit.SECONDS));
-            assertFalse(createCompleted.await(200, TimeUnit.MILLISECONDS));
+            assertTrue(createCompleted.await(5, TimeUnit.SECONDS));
 
             allowMoveCommit.countDown();
             move.get(5, TimeUnit.SECONDS);
             create.get(5, TimeUnit.SECONDS);
 
-                assertClosure(TARGET, CREATED_FILE, 3L);
-            assertClosure(SOURCE, CREATED_FILE, 2L);
-            assertClosure(CHILD, CREATED_FILE, 1L);
-            assertClosure(CREATED_FILE, CREATED_FILE, 0L);
+            FileEntryDB created = fileEntryRepo.queryActiveByFileId(SOURCE_SPACE, CREATED_FILE);
+            assertNotNull(created);
+            assertEquals(fileEntryRepo.queryActiveByFileId(SOURCE_SPACE, CHILD).getEntryId(),
+                    created.getParentEntryId());
+            assertEquals(Arrays.asList(TARGET, SOURCE, CHILD, CREATED_FILE),
+                    fileRepo.getPathFiles(CREATED_FILE).stream()
+                            .map(FileDB::getFileId)
+                            .collect(Collectors.toList()));
         } finally {
             allowMoveCommit.countDown();
             executor.shutdownNow();
@@ -238,6 +242,23 @@ public class FileServiceMoveTransactionTest {
 
     private FileDB addDirectory(String spaceCode, String filename, String seed) {
         return add(spaceCode, filename, seed, FileType.DIRECTORY, 1, NodeType.DIRECTORY);
+    }
+
+    private FileDB addDirectoryUnder(String fileId, String filename, String ancestorId) {
+        FileDB file = new FileDB();
+        file.setFileId(fileId);
+        file.setFilename(filename);
+        file.setIsDir(1);
+        file.setNodeType(NodeType.DIRECTORY.getValue());
+        file.setResourceId("");
+        file.setSpaceCode(SOURCE_SPACE);
+        file.setPurpose("assistants");
+        file.setStatus(FileStatus.NOT_DELETED.getValue());
+        file.setBucket("bucket");
+        file.setPath("path/" + filename);
+        file.setMetaData("{}");
+        fileRepo.addFile(file, ancestorId, FileType.DIRECTORY);
+        return fileRepo.queryFile(fileId, FileType.DIRECTORY);
     }
 
     private FileDB add(String spaceCode, String filename, String seed, FileType type, int isDir, NodeType nodeType) {
@@ -296,11 +317,6 @@ public class FileServiceMoveTransactionTest {
     }
 
 
-
-    private String snapshotFile() {
-        Record record = dsl.fetchOne("select muid, mu_name, mtime from file_1 where file_id = ?", SOURCE);
-        return record.get(0, Long.class) + ":" + record.get(1, String.class) + ":" + record.get(2).toString();
-    }
 
 
 
