@@ -10,7 +10,6 @@ import com.ke.bella.files.db.tables.DatasetQa;
 import com.ke.bella.files.db.tables.DatasetQaReference;
 import com.ke.bella.files.db.tables.DatasetSharding;
 import com.ke.bella.files.db.tables.File;
-import com.ke.bella.files.db.tables.FileClosure;
 import com.ke.bella.files.db.tables.FileEntry;
 import com.ke.bella.files.db.tables.FileSharding;
 import com.ke.bella.files.db.tables.FileSystem;
@@ -34,8 +33,6 @@ public class Indexes {
     // -------------------------------------------------------------------------
     // INDEX definitions
     // -------------------------------------------------------------------------
-
-    public static final Index FILE_CLOSURE_IDX_ANCESTOR_DEPTH_STATUS = Internal.createIndex(DSL.name("idx_ancestor_depth_status"), FileClosure.FILE_CLOSURE, new OrderField[] { FileClosure.FILE_CLOSURE.ANCESTOR_ID, FileClosure.FILE_CLOSURE.DEPTH }, false);
     public static final Index FILE_ENTRY_IDX_FILE_ID = Internal.createIndex(DSL.name("idx_file_id"), FileEntry.FILE_ENTRY, new OrderField[] { FileEntry.FILE_ENTRY.FILE_ID }, false);
     public static final Index FILE_ENTRY_IDX_PARENT_ENTRY_ID = Internal.createIndex(DSL.name("idx_parent_entry_id"), FileEntry.FILE_ENTRY, new OrderField[] { FileEntry.FILE_ENTRY.PARENT_ENTRY_ID }, false);
     public static final Index DATASET_IDX_CTIME = Internal.createIndex(DSL.name("idx_ctime"), Dataset.DATASET, new OrderField[] { Dataset.DATASET.CTIME }, false);
@@ -49,7 +46,6 @@ public class Indexes {
     public static final Index DATASET_DOCUMENT_IDX_DATASET_ID = Internal.createIndex(DSL.name("idx_dataset_id"), DatasetDocument.DATASET_DOCUMENT, new OrderField[] { DatasetDocument.DATASET_DOCUMENT.DATASET_ID }, false);
     public static final Index DATASET_QA_REFERENCE_IDX_DATASET_ID = Internal.createIndex(DSL.name("idx_dataset_id"), DatasetQaReference.DATASET_QA_REFERENCE, new OrderField[] { DatasetQaReference.DATASET_QA_REFERENCE.DATASET_ID }, false);
     public static final Index DATASET_QA_IDX_DATASET_ITEM = Internal.createIndex(DSL.name("idx_dataset_item"), DatasetQa.DATASET_QA, new OrderField[] { DatasetQa.DATASET_QA.DATASET_ID, DatasetQa.DATASET_QA.ITEM_ID }, false);
-    public static final Index FILE_CLOSURE_IDX_DESCENDANT_DEPTH_STATUS = Internal.createIndex(DSL.name("idx_descendant_depth_status"), FileClosure.FILE_CLOSURE, new OrderField[] { FileClosure.FILE_CLOSURE.DESCENDANT_ID, FileClosure.FILE_CLOSURE.DEPTH }, false);
     public static final Index FILE_IDX_DOM_TREE_FILE_ID = Internal.createIndex(DSL.name("idx_dom_tree_file_id"), File.FILE, new OrderField[] { File.FILE.DOM_TREE_FILE_ID }, false);
     public static final Index FILE_SYSTEM_IDX_DOM_TREE_FILE_ID = Internal.createIndex(DSL.name("idx_dom_tree_file_id"), FileSystem.FILE_SYSTEM, new OrderField[] { FileSystem.FILE_SYSTEM.DOM_TREE_FILE_ID }, false);
     public static final Index FILE_TEMP_IDX_DOM_TREE_FILE_ID = Internal.createIndex(DSL.name("idx_dom_tree_file_id"), FileTemp.FILE_TEMP, new OrderField[] { FileTemp.FILE_TEMP.DOM_TREE_FILE_ID }, false);
@@ -66,7 +62,6 @@ public class Indexes {
     public static final Index FILE_SYSTEM_IDX_PDF_FILE_ID = Internal.createIndex(DSL.name("idx_pdf_file_id"), FileSystem.FILE_SYSTEM, new OrderField[] { FileSystem.FILE_SYSTEM.PDF_FILE_ID }, false);
     public static final Index FILE_TEMP_IDX_PDF_FILE_ID = Internal.createIndex(DSL.name("idx_pdf_file_id"), FileTemp.FILE_TEMP, new OrderField[] { FileTemp.FILE_TEMP.PDF_FILE_ID }, false);
     public static final Index DATASET_IDX_SPACE_CODE = Internal.createIndex(DSL.name("idx_space_code"), Dataset.DATASET, new OrderField[] { Dataset.DATASET.SPACE_CODE }, false);
-    public static final Index FILE_CLOSURE_IDX_SPACE_CODE_ROOT_DEPTH = Internal.createIndex(DSL.name("idx_space_code_root_depth"), FileClosure.FILE_CLOSURE, new OrderField[] { FileClosure.FILE_CLOSURE.SPACE_CODE, FileClosure.FILE_CLOSURE.ROOT_DEPTH }, false);
     public static final Index FILE_IDX_SPACE_PURPOSE = Internal.createIndex(DSL.name("idx_space_purpose"), File.FILE, new OrderField[] { File.FILE.SPACE_CODE, File.FILE.PURPOSE, File.FILE.STATUS }, false);
     public static final Index FILE_SYSTEM_IDX_SPACE_PURPOSE = Internal.createIndex(DSL.name("idx_space_purpose"), FileSystem.FILE_SYSTEM, new OrderField[] { FileSystem.FILE_SYSTEM.SPACE_CODE, FileSystem.FILE_SYSTEM.PURPOSE, FileSystem.FILE_SYSTEM.STATUS }, false);
     public static final Index FILE_TEMP_IDX_SPACE_PURPOSE = Internal.createIndex(DSL.name("idx_space_purpose"), FileTemp.FILE_TEMP, new OrderField[] { FileTemp.FILE_TEMP.SPACE_CODE, FileTemp.FILE_TEMP.PURPOSE, FileTemp.FILE_TEMP.STATUS }, false);

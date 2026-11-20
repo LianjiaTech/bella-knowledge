@@ -610,10 +610,6 @@ public class FileService {
         op.setStatus(FileStatus.DELETED);
         try {
             fileRepo.updateFile(op, false);
-            if(fileType.needsDirectorySupport()) {
-                fileRepo.deleteFileClosure(fileId, fileType);
-            }
-
             // 文件删除后的广播机制
             FileBroadcasting<OpenAIFile> message = new FileBroadcasting<>();
             message.setEvent(EventType.FILE_DELETED);

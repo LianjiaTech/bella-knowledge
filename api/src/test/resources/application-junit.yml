@@ -1,8 +1,6 @@
 bella:
   file-api:
     file-entry:
-      read-mode: closure
-      write-mode: dual
       cross-space-move-warn-threshold: 5000
     file:
       tmp-file-dir: .
